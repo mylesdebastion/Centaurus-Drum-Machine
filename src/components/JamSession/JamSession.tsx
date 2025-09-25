@@ -8,6 +8,7 @@ import { UserList } from './UserList';
 import { MobileNavigation } from '../Layout/MobileNavigation';
 import { ResponsiveContainer } from '../Layout/ResponsiveContainer';
 import { DrumTrack, VisualizerSettings, User, MIDINote } from '../../types';
+import { createDefaultPattern, createEmptyTrack } from '../../utils/drumPatterns';
 
 interface JamSessionProps {
   sessionCode: string;
@@ -24,52 +25,7 @@ export const JamSession: React.FC<JamSessionProps> = ({
     { id: '3', name: 'Sam', color: '#10b981', isHost: false }
   ]);
 
-  const [tracks, setTracks] = useState<DrumTrack[]>([
-    {
-      id: '1',
-      name: 'Kick',
-      instrument: 'Bass Drum',
-      steps: new Array(16).fill(false),
-      velocities: new Array(16).fill(0.8),
-      muted: false,
-      solo: false,
-      volume: 0.8,
-      color: '#ef4444'
-    },
-    {
-      id: '2',
-      name: 'Snare',
-      instrument: 'Snare Drum',
-      steps: new Array(16).fill(false),
-      velocities: new Array(16).fill(0.8),
-      muted: false,
-      solo: false,
-      volume: 0.8,
-      color: '#f59e0b'
-    },
-    {
-      id: '3',
-      name: 'Hi-Hat',
-      instrument: 'Closed Hi-Hat',
-      steps: new Array(16).fill(false),
-      velocities: new Array(16).fill(0.6),
-      muted: false,
-      solo: false,
-      volume: 0.7,
-      color: '#10b981'
-    },
-    {
-      id: '4',
-      name: 'Perc',
-      instrument: 'Percussion',
-      steps: new Array(16).fill(false),
-      velocities: new Array(16).fill(0.7),
-      muted: false,
-      solo: false,
-      volume: 0.6,
-      color: '#8b5cf6'
-    }
-  ]);
+  const [tracks, setTracks] = useState<DrumTrack[]>(() => createDefaultPattern());
 
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -200,6 +156,23 @@ export const JamSession: React.FC<JamSessionProps> = ({
     })));
   };
 
+  const handleAddTrack = (track: DrumTrack) => {
+    setTracks(prev => [...prev, track]);
+  };
+
+  const handleRemoveTrack = (trackId: string) => {
+    setTracks(prev => prev.filter(track => track.id !== trackId));
+    // Reset selected track if it was removed
+    if (tracks.findIndex(t => t.id === trackId) <= selectedTrack) {
+      setSelectedTrack(Math.max(0, selectedTrack - 1));
+    }
+  };
+
+  const handleLoadDefaultPattern = () => {
+    setTracks(createDefaultPattern());
+    setSelectedTrack(0);
+  };
+
   const renderMobileView = () => {
     switch (activeView) {
       case 'drum':
@@ -214,6 +187,9 @@ export const JamSession: React.FC<JamSessionProps> = ({
             onPlay={handlePlay}
             onStop={handleStop}
             onTempoChange={handleTempoChange}
+            onAddTrack={handleAddTrack}
+            onRemoveTrack={handleRemoveTrack}
+            onLoadDefaultPattern={handleLoadDefaultPattern}
           />
         );
       case 'visualizer':
@@ -342,6 +318,9 @@ export const JamSession: React.FC<JamSessionProps> = ({
                 onTempoChange={handleTempoChange}
                 onClearTrack={handleClearTrack}
                 onClearAll={handleClearAll}
+               onAddTrack={handleAddTrack}
+               onRemoveTrack={handleRemoveTrack}
+               onLoadDefaultPattern={handleLoadDefaultPattern}
               />
 
               <Visualizer

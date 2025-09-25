@@ -1,7 +1,9 @@
 import React from 'react';
+import { RefreshCw } from 'lucide-react';
 import { DrumTrack, ColorMode } from '../../types';
 import { TrackRow } from './TrackRow';
 import { TransportControls } from './TransportControls';
+import { TrackManager } from './TrackManager';
 
 interface DrumMachineProps {
   tracks: DrumTrack[];
@@ -19,6 +21,9 @@ interface DrumMachineProps {
   onTempoChange: (tempo: number) => void;
   onClearTrack: (trackId: string) => void;
   onClearAll: () => void;
+  onAddTrack: (track: DrumTrack) => void;
+  onRemoveTrack: (trackId: string) => void;
+  onLoadDefaultPattern: () => void;
 }
 
 export const DrumMachine: React.FC<DrumMachineProps> = ({
@@ -37,12 +42,22 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
   onTempoChange,
   onClearTrack,
   onClearAll
+  onAddTrack,
+  onRemoveTrack,
+  onLoadDefaultPattern
 }) => {
   return (
     <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold">Drum Machine</h2>
         <div className="flex items-center gap-4">
+          <button
+            onClick={onLoadDefaultPattern}
+            className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Load Default Beat
+          </button>
           <button
             onClick={onClearAll}
             className="text-sm text-red-400 hover:text-red-300 transition-colors"
@@ -58,6 +73,13 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
         onPlay={onPlay}
         onStop={onStop}
         onTempoChange={onTempoChange}
+      />
+
+      <TrackManager
+        tracks={tracks}
+        onAddTrack={onAddTrack}
+        onRemoveTrack={onRemoveTrack}
+        maxTracks={8}
       />
 
       {/* Step Numbers */}
@@ -92,6 +114,8 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
             onSolo={() => onTrackSolo(track.id)}
             onVolumeChange={(volume) => onTrackVolumeChange(track.id, volume)}
             onClear={() => onClearTrack(track.id)}
+            onRemove={() => onRemoveTrack(track.id)}
+            canRemove={tracks.length > 1}
           />
         ))}
       </div>

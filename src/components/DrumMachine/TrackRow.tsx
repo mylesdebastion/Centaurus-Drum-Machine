@@ -14,6 +14,8 @@ interface TrackRowProps {
   onSolo: () => void;
   onVolumeChange: (volume: number) => void;
   onClear: () => void;
+  onRemove: () => void;
+  canRemove: boolean;
 }
 
 export const TrackRow: React.FC<TrackRowProps> = ({
@@ -27,6 +29,8 @@ export const TrackRow: React.FC<TrackRowProps> = ({
   onSolo,
   onVolumeChange,
   onClear
+  onRemove,
+  canRemove
 }) => {
   const [showVelocity, setShowVelocity] = useState(false);
   
@@ -88,6 +92,16 @@ export const TrackRow: React.FC<TrackRowProps> = ({
         >
           <Trash2 className="w-4 h-4" />
         </button>
+
+        {canRemove && (
+          <button
+            onClick={onRemove}
+            className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
+            title="Remove track"
+          >
+            <Trash2 className="w-4 h-4 fill-current" />
+          </button>
+        )}
       </div>
 
       {/* Steps */}

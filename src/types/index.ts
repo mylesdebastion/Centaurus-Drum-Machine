@@ -33,6 +33,7 @@ export interface DrumPattern {
   name: string;
   tracks: DrumTrack[];
   tempo: number;
+  isDefault?: boolean;
 }
 
 export type ColorMode = 'spectrum' | 'chromatic' | 'harmonic';
