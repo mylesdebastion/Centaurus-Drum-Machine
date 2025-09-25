@@ -346,5 +346,5 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         </div>
       </div>
     </div>
-  );
-};
+              >
+                <span>{currentStepIndex < selectedLesson.steps.length - 1 ? 'Next Step' : 'Complete Lesson'}</span>
