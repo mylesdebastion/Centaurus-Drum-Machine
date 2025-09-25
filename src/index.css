@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply bg-gray-900 text-white min-h-screen;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  
+  .btn-accent {
+    @apply bg-accent-600 hover:bg-accent-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  
+  .step-button {
+    @apply w-12 h-12 rounded-lg border-2 border-gray-600 bg-gray-800 hover:bg-gray-700 transition-all duration-150 cursor-pointer flex items-center justify-center;
+  }
+  
+  .step-button.active {
+    @apply border-primary-500 bg-primary-600 shadow-lg shadow-primary-500/30;
+  }
+  
+  .step-button.playing {
+    @apply animate-pulse-beat;
+  }
+  
+  .track-row {
+    @apply flex items-center gap-2 p-3 bg-gray-800 rounded-lg;
+  }
+  
+  .visualizer-canvas {
+    @apply w-full h-64 bg-black rounded-lg border border-gray-700;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-800;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-500;
+}
