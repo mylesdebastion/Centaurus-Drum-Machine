@@ -13,6 +13,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   const [selectedLesson, setSelectedLesson] = useState<EducationLesson | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [userPattern, setUserPattern] = useState<boolean[]>(new Array(16).fill(false));
+  const [snarePattern, setSnarePattern] = useState<boolean[]>(new Array(16).fill(false));
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPlayStep, setCurrentPlayStep] = useState(0);
   const [tempo] = useState(120); // Fixed tempo for education mode
@@ -33,22 +34,15 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   const lessons: EducationLesson[] = [
     {
       id: '1',
-      title: 'Basic Beat',
-      description: 'Learn to create a simple 4/4 beat with kick and snare',
+      title: 'Rhythm Patterns',
+      description: 'Learn to create a simple kick drum pattern',
       difficulty: 'beginner',
       steps: [
         {
           id: '1-1',
           instruction: 'Click on steps 1, 5, 9, and 13 to create a basic kick drum pattern',
           expectedPattern: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
-          hint: 'The kick drum should hit on every quarter note (beats 1, 2, 3, 4)',
-          completed: false
-        },
-        {
-          id: '1-2',
-          instruction: 'Now add a snare on steps 5 and 13 (beats 2 and 4)',
-          expectedPattern: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
-          hint: 'Snare typically goes on the backbeat (beats 2 and 4)',
+          hint: 'Put the kick on every quarter note (steps 1, 5, 9, 13)',
           completed: false
         }
       ]
@@ -75,15 +69,22 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     },
     {
       id: '3',
-      title: 'Rhythm Patterns',
-      description: 'Learn common rhythm patterns used in music',
+      title: 'Basic Beat',
+      description: 'Learn to create a complete 4/4 beat with kick and snare',
       difficulty: 'intermediate',
       steps: [
         {
           id: '3-1',
-          instruction: 'Create a "four-on-the-floor" pattern with the kick drum',
+          instruction: 'First, create a kick drum pattern on steps 1, 5, 9, and 13',
           expectedPattern: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
-          hint: 'Put the kick on every quarter note (steps 1, 5, 9, 13)',
+          hint: 'The kick drum should hit on every quarter note (beats 1, 2, 3, 4)',
+          completed: false
+        },
+        {
+          id: '3-2',
+          instruction: 'Now add a snare track below. Click on steps 5 and 13 for the snare (beats 2 and 4)',
+          expectedPattern: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
+          hint: 'Snare typically goes on the backbeat (beats 2 and 4)',
           completed: false
         }
       ]
@@ -101,6 +102,11 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     const currentStep = selectedLesson.steps[currentStepIndex];
     if (!currentStep.expectedPattern) return true;
     
+    // For the second step of Basic Beat lesson (snare track)
+    if (selectedLesson.id === '3' && currentStepIndex === 1) {
+      return JSON.stringify(snarePattern) === JSON.stringify(currentStep.expectedPattern);
+    }
+    
     return JSON.stringify(userPattern) === JSON.stringify(currentStep.expectedPattern);
   };
 
@@ -109,17 +115,27 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     
     if (currentStepIndex < selectedLesson.steps.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
-      setUserPattern(new Array(16).fill(false));
+      // Don't reset kick pattern when moving to snare step
+      if (!(selectedLesson.id === '3' && currentStepIndex === 0)) {
+        setUserPattern(new Array(16).fill(false));
+      }
+      setSnarePattern(new Array(16).fill(false));
     } else {
       // Lesson completed
       setSelectedLesson(null);
       setCurrentStepIndex(0);
       setUserPattern(new Array(16).fill(false));
+      setSnarePattern(new Array(16).fill(false));
     }
   };
 
   const resetPattern = () => {
-    setUserPattern(new Array(16).fill(false));
+    // For the second step of Basic Beat lesson (snare track)
+    if (selectedLesson?.id === '3' && currentStepIndex === 1) {
+      setSnarePattern(new Array(16).fill(false));
+    } else {
+      setUserPattern(new Array(16).fill(false));
+    }
   };
 
   // Playback functionality
@@ -143,6 +159,11 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         audioEngine.playDrum('kick', 0.8);
       }
       
+      // Play snare if snare pattern is active (for Basic Beat lesson)
+      if (selectedLesson?.id === '3' && snarePattern[stepIndex]) {
+        audioEngine.playDrum('snare', 0.8);
+      }
+      
       // Update visual step indicator
       setCurrentPlayStep(stepIndex);
       
@@ -155,7 +176,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       Tone.Transport.stop();
       Tone.Transport.cancel(scheduleId);
     };
-  }, [isPlaying, tempo, userPattern]);
+  }, [isPlaying, tempo, userPattern, snarePattern, selectedLesson]);
 
   const handlePlayPattern = () => {
     setIsPlaying(!isPlaying);
@@ -328,6 +349,34 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                 ))}
               </div>
             </div>
+
+            {/* Snare Track for Basic Beat lesson step 2 */}
+            {selectedLesson.id === '3' && currentStepIndex === 1 && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-4">
+                <div className="w-full sm:w-16 text-white font-medium text-center sm:text-left">Snare</div>
+                <div className="grid grid-cols-8 sm:flex sm:gap-2 gap-1 w-full sm:w-auto">
+                  {snarePattern.map((active, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        const newPattern = [...snarePattern];
+                        newPattern[index] = !newPattern[index];
+                        setSnarePattern(newPattern);
+                      }}
+                      className={`step-button-compact ${active ? 'active' : ''} ${
+                        isPlaying && index === currentPlayStep ? 'ring-2 ring-yellow-400' : ''
+                      } touch-target`}
+                      style={{
+                        backgroundColor: active ? '#10b981' : undefined,
+                        borderColor: active ? '#10b981' : undefined
+                      }}
+                    >
+                      {active && <div className="w-2 h-2 rounded-full bg-white" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Pattern Check */}
             <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
