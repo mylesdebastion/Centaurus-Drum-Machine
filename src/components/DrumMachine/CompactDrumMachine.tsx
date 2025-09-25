@@ -16,7 +16,6 @@ interface CompactDrumMachineProps {
   onStop: () => void;
   onTempoChange: (tempo: number) => void;
   onAddTrack: (track: DrumTrack) => void;
-  onRemoveTrack: (trackId: string) => void;
   onLoadDefaultPattern: () => void;
 }
 
@@ -31,7 +30,6 @@ export const CompactDrumMachine: React.FC<CompactDrumMachineProps> = ({
   onStop,
   onTempoChange,
   onAddTrack,
-  onRemoveTrack,
   onLoadDefaultPattern
 }) => {
   const [selectedTrack, setSelectedTrack] = useState(0);

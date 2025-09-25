@@ -1,19 +1,17 @@
 import React, { useState } from 'react';
 import { Plus, ChevronDown } from 'lucide-react';
 import { DrumTrack } from '../../types';
-import { DRUM_INSTRUMENTS, createEmptyTrack, getAvailableInstruments } from '../../utils/drumPatterns';
+import { createEmptyTrack, getAvailableInstruments } from '../../utils/drumPatterns';
 
 interface TrackManagerProps {
   tracks: DrumTrack[];
   onAddTrack: (track: DrumTrack) => void;
-  onRemoveTrack: (trackId: string) => void;
   maxTracks?: number;
 }
 
 export const TrackManager: React.FC<TrackManagerProps> = ({
   tracks,
   onAddTrack,
-  onRemoveTrack,
   maxTracks = 8
 }) => {
   const [showAddMenu, setShowAddMenu] = useState(false);

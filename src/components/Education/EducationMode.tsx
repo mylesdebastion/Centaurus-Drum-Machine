@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useEffect } from 'react';
 import { BookOpen, Play, Check, ArrowRight, RotateCcw, Star } from 'lucide-react';
-import { EducationLesson, LessonStep } from '../../types';
+import { EducationLesson } from '../../types';
 import { audioEngine } from '../../utils/audioEngine';
 
 interface EducationModeProps {
