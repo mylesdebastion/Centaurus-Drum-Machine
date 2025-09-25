@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useEffect } from 'react';
 import { BookOpen, Play, Check, ArrowRight, RotateCcw, Star } from 'lucide-react';
 import { EducationLesson, LessonStep } from '../../types';
 
@@ -10,6 +11,9 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   const [selectedLesson, setSelectedLesson] = useState<EducationLesson | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [userPattern, setUserPattern] = useState<boolean[]>(new Array(16).fill(false));
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentPlayStep, setCurrentPlayStep] = useState(0);
+  const [tempo] = useState(120); // Fixed tempo for education mode
 
   const lessons: EducationLesson[] = [
     {
@@ -101,6 +105,35 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
 
   const resetPattern = () => {
     setUserPattern(new Array(16).fill(false));
+  };
+
+  // Playback functionality
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const interval = setInterval(() => {
+      setCurrentPlayStep((prev) => {
+        const nextStep = (prev + 1) % 16;
+        if (nextStep === 0) {
+          // Pattern completed, stop playing
+          setIsPlaying(false);
+          return 0;
+        }
+        return nextStep;
+      });
+    }, (60 / tempo / 4) * 1000); // 16th note timing
+
+    return () => clearInterval(interval);
+  }, [isPlaying, tempo]);
+
+  const handlePlayPattern = () => {
+    if (isPlaying) {
+      setIsPlaying(false);
+      setCurrentPlayStep(0);
+    } else {
+      setCurrentPlayStep(0);
+      setIsPlaying(true);
+    }
   };
 
   if (!selectedLesson) {
@@ -286,7 +319,9 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                 <button
                   onClick={nextStep}
                   className="btn-accent flex items-center gap-2 w-full sm:w-auto touch-target"
-                >
+                  className={`step-button-compact ${active ? 'active' : ''} ${
+                    isPlaying && currentPlayStep === i ? 'playing animate-pulse-beat' : ''
+                  } touch-target`}
                   <span>{currentStepIndex < selectedLesson.steps.length - 1 ? 'Next Step' : 'Complete Lesson'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
@@ -297,9 +332,16 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
 
         {/* Play Button */}
         <div className="text-center">
-          <button className="btn-primary text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 flex items-center gap-3 mx-auto w-full sm:w-auto touch-target">
+          <button 
+            onClick={handlePlayPattern}
+            className={`text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 flex items-center gap-3 mx-auto w-full sm:w-auto touch-target transition-colors ${
+              isPlaying 
+                ? 'bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg'
+                : 'btn-primary'
+            }`}
+          >
             <Play className="w-5 h-5 sm:w-6 sm:h-6" />
-            Play Your Pattern
+            {isPlaying ? 'Stop Pattern' : 'Play Your Pattern'}
           </button>
         </div>
       </div>
