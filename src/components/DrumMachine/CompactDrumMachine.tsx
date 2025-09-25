@@ -114,20 +114,6 @@ export const CompactDrumMachine: React.FC<CompactDrumMachineProps> = ({
                         {instrument.name}
                       </button>
                     ))}
-                    {tracks.length > 1 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemoveTrack(track.id);
-                          if (selectedTrack >= tracks.length - 1) {
-                            setSelectedTrack(Math.max(0, tracks.length - 2));
-                          }
-                        }}
-                        className="ml-auto text-red-400 hover:text-red-300 text-xs"
-                      >
-                        ×
-                      </button>
-                    )}
                   </div>
                 </div>
               )}

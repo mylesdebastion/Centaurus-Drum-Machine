@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, ChevronDown } from 'lucide-react';
+import { Plus, ChevronDown } from 'lucide-react';
 import { DrumTrack } from '../../types';
 import { DRUM_INSTRUMENTS, createEmptyTrack, getAvailableInstruments } from '../../utils/drumPatterns';
 
