@@ -3,6 +3,7 @@ import { Play, Pause, Square, ChevronDown, ChevronUp, Plus, RefreshCw } from 'lu
 import { DrumTrack, ColorMode } from '../../types';
 import { getDrumTrackColor } from '../../utils/colorMapping';
 import { getAvailableInstruments, createEmptyTrack } from '../../utils/drumPatterns';
+import { audioEngine } from '../../utils/audioEngine';
 
 interface CompactDrumMachineProps {
   tracks: DrumTrack[];
@@ -41,6 +42,31 @@ export const CompactDrumMachine: React.FC<CompactDrumMachineProps> = ({
   const dynamicColor = getDrumTrackColor(currentTrack?.name || '', colorMode);
   const availableInstruments = getAvailableInstruments(tracks);
   const canAddMore = tracks.length < 8;
+
+  // Initialize audio engine on component mount
+  React.useEffect(() => {
+    const initAudio = async () => {
+      try {
+        await audioEngine.initialize();
+      } catch (error) {
+        console.error('Failed to initialize audio:', error);
+      }
+    };
+    
+    initAudio();
+  }, []);
+
+  // Play drum sounds when steps are active
+  React.useEffect(() => {
+    if (!isPlaying) return;
+
+    tracks.forEach((track) => {
+      if (track.steps[currentStep] && !track.muted) {
+        const velocity = track.velocities[currentStep] * track.volume;
+        audioEngine.playDrum(track.name, velocity);
+      }
+    });
+  }, [currentStep, isPlaying, tracks]);
 
   const handleAddTrack = (instrumentId: string) => {
     try {

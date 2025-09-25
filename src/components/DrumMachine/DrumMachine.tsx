@@ -4,6 +4,7 @@ import { DrumTrack, ColorMode } from '../../types';
 import { TrackRow } from './TrackRow';
 import { TransportControls } from './TransportControls';
 import { TrackManager } from './TrackManager';
+import { audioEngine } from '../../utils/audioEngine';
 
 interface DrumMachineProps {
   tracks: DrumTrack[];
@@ -46,6 +47,36 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
   onRemoveTrack,
   onLoadDefaultPattern
 }) => {
+  // Initialize audio engine on component mount
+  React.useEffect(() => {
+    const initAudio = async () => {
+      try {
+        await audioEngine.initialize();
+      } catch (error) {
+        console.error('Failed to initialize audio:', error);
+      }
+    };
+    
+    initAudio();
+    
+    // Cleanup on unmount
+    return () => {
+      audioEngine.dispose();
+    };
+  }, []);
+
+  // Play drum sounds when steps are active
+  React.useEffect(() => {
+    if (!isPlaying) return;
+
+    tracks.forEach((track) => {
+      if (track.steps[currentStep] && !track.muted) {
+        const velocity = track.velocities[currentStep] * track.volume;
+        audioEngine.playDrum(track.name, velocity);
+      }
+    });
+  }, [currentStep, isPlaying, tracks]);
+
   return (
     <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
       <div className="flex items-center justify-between mb-6">

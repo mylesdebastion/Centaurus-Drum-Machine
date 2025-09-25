@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useEffect } from 'react';
 import { BookOpen, Play, Check, ArrowRight, RotateCcw, Star } from 'lucide-react';
 import { EducationLesson, LessonStep } from '../../types';
+import { audioEngine } from '../../utils/audioEngine';
 
 interface EducationModeProps {
   onExitEducation: () => void;
@@ -14,6 +15,19 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPlayStep, setCurrentPlayStep] = useState(0);
   const [tempo] = useState(120); // Fixed tempo for education mode
+
+  // Initialize audio engine on component mount
+  useEffect(() => {
+    const initAudio = async () => {
+      try {
+        await audioEngine.initialize();
+      } catch (error) {
+        console.error('Failed to initialize audio:', error);
+      }
+    };
+    
+    initAudio();
+  }, []);
 
   const lessons: EducationLesson[] = [
     {
@@ -114,6 +128,12 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     const interval = setInterval(() => {
       setCurrentPlayStep((prev) => {
         const nextStep = (prev + 1) % 16;
+        
+        // Play drum sound if step is active
+        if (userPattern[prev]) {
+          audioEngine.playDrum('kick', 0.8);
+        }
+        
         if (nextStep === 0) {
           // Pattern completed, stop playing
           setIsPlaying(false);
@@ -121,7 +141,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         }
         return nextStep;
       });
-    }, (60 / tempo / 4) * 1000); // 16th note timing
+    }, (60 / tempo / 4) * 1000);
 
     return () => clearInterval(interval);
   }, [isPlaying, tempo]);
