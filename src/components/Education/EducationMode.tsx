@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useEffect } from 'react';
 import { BookOpen, Play, Check, ArrowRight, RotateCcw, Star } from 'lucide-react';
 import * as Tone from 'tone';
-import { EducationLesson } from '../../types';
+import { EducationLesson, VisualizerSettings, MIDINote } from '../../types';
 import { audioEngine } from '../../utils/audioEngine';
+import { CompactVisualizer } from '../Visualizer/CompactVisualizer';
 
 interface EducationModeProps {
   onExitEducation: () => void;
@@ -17,6 +18,14 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPlayStep, setCurrentPlayStep] = useState(0);
   const [tempo] = useState(120); // Fixed tempo for education mode
+  const [visualizerSettings, setVisualizerSettings] = useState<VisualizerSettings>({
+    colorMode: 'spectrum',
+    brightness: 0.8,
+    ledMatrixEnabled: false,
+    ledMatrixIP: ''
+  });
+  const [midiNotes, setMidiNotes] = useState<MIDINote[]>([]);
+  const [colorModeStep, setColorModeStep] = useState(0);
 
   // Initialize audio engine on component mount
   useEffect(() => {
@@ -55,14 +64,14 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       steps: [
         {
           id: '2-1',
-          instruction: 'Watch how different drum sounds create different colors',
-          hint: 'Low sounds like kick drums appear as red, high sounds like hi-hats appear as blue/violet',
+          instruction: 'Click the drum buttons below to see how different sounds create different colors in the visualizer',
+          hint: 'Notice how low sounds like kick drums appear as red, while high sounds appear as blue/violet',
           completed: false
         },
         {
           id: '2-2',
-          instruction: 'Try switching between color modes to see the difference',
-          hint: 'Each mode shows a different way to map sound to color',
+          instruction: 'Now try switching between the different color modes to see how the same sounds can be displayed differently',
+          hint: 'Spectrum mode shows frequency (low=red, high=violet), Chromatic shows note names, Harmonic shows musical relationships',
           completed: false
         }
       ]
@@ -182,6 +191,52 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     setIsPlaying(!isPlaying);
   };
 
+  const playDrumSound = (drumName: string, midiNote: number) => {
+    // Play the drum sound
+    audioEngine.playDrum(drumName, 0.8);
+    
+    // Add MIDI note for visualization
+    const note: MIDINote = {
+      note: midiNote,
+      velocity: 0.8,
+      channel: 10,
+      timestamp: Date.now(),
+      userId: 'education'
+    };
+    
+    setMidiNotes(prev => [...prev.slice(-10), note]);
+    
+    // Mark first step as completed when any drum is played
+    if (selectedLesson?.id === '2' && currentStepIndex === 0) {
+      // Auto-advance after playing a few different sounds
+      setTimeout(() => {
+        if (currentStepIndex === 0) {
+          setCurrentStepIndex(1);
+        }
+      }, 3000);
+    }
+  };
+
+  const switchColorMode = () => {
+    const modes: Array<'spectrum' | 'chromatic' | 'harmonic'> = ['spectrum', 'chromatic', 'harmonic'];
+    const currentIndex = modes.indexOf(visualizerSettings.colorMode);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    
+    setVisualizerSettings(prev => ({
+      ...prev,
+      colorMode: modes[nextIndex]
+    }));
+    
+    setColorModeStep(prev => prev + 1);
+    
+    // Mark second step as completed after trying all color modes
+    if (selectedLesson?.id === '2' && currentStepIndex === 1 && colorModeStep >= 2) {
+      setTimeout(() => {
+        nextStep();
+      }, 1000);
+    }
+  };
+
   if (!selectedLesson) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4 sm:p-6">
@@ -269,7 +324,8 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
           >
             Exit Education
           </button>
-        </div>
+          </div>
+        )}
 
         {/* Lesson Progress */}
         <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 sm:p-6 mb-6 border border-white/20">
@@ -301,18 +357,129 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         </div>
 
         {/* Interactive Drum Pattern */}
-        {currentStep.expectedPattern && (
+        {(currentStep.expectedPattern || selectedLesson?.id === '2') && (
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 sm:p-6 mb-6 border border-white/20">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg sm:text-xl font-bold text-white">🥁 Create Your Pattern</h3>
-              <button
-                onClick={resetPattern}
-                className="btn-secondary flex items-center gap-2 touch-target"
-              >
-                <RotateCcw className="w-4 h-4" />
-                <span className="hidden sm:inline">Reset</span>
-              </button>
-            </div>
+            {selectedLesson?.id === '2' ? (
+              // Color and Pitch lesson content
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg sm:text-xl font-bold text-white">🎨 Sound and Color Explorer</h3>
+                  {currentStepIndex === 1 && (
+                    <button
+                      onClick={switchColorMode}
+                      className="btn-accent flex items-center gap-2 touch-target"
+                    >
+                      Switch to {visualizerSettings.colorMode === 'spectrum' ? 'Chromatic' : 
+                                visualizerSettings.colorMode === 'chromatic' ? 'Harmonic' : 'Spectrum'} Mode
+                    </button>
+                  )}
+                </div>
+
+                {/* Visualizer */}
+                <div className="mb-6">
+                  <CompactVisualizer
+                    settings={visualizerSettings}
+                    onSettingsChange={setVisualizerSettings}
+                    midiNotes={midiNotes}
+                  />
+                </div>
+
+                {currentStepIndex === 0 && (
+                  // Step 1: Play different drums to see colors
+                  <div>
+                    <h4 className="text-white font-medium mb-3">Click the drums to hear sounds and see colors:</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <button
+                        onClick={() => playDrumSound('kick', 36)}
+                        className="bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-lg transition-colors touch-target"
+                      >
+                        🥁 Kick<br/>
+                        <span className="text-xs opacity-75">(Low/Red)</span>
+                      </button>
+                      <button
+                        onClick={() => playDrumSound('snare', 38)}
+                        className="bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg transition-colors touch-target"
+                      >
+                        🥁 Snare<br/>
+                        <span className="text-xs opacity-75">(Mid/Green)</span>
+                      </button>
+                      <button
+                        onClick={() => playDrumSound('hihat', 42)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg transition-colors touch-target"
+                      >
+                        🎩 Hi-Hat<br/>
+                        <span className="text-xs opacity-75">(High/Blue)</span>
+                      </button>
+                      <button
+                        onClick={() => playDrumSound('crash', 49)}
+                        className="bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg transition-colors touch-target"
+                      >
+                        💥 Crash<br/>
+                        <span className="text-xs opacity-75">(Very High/Purple)</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {currentStepIndex === 1 && (
+                  // Step 2: Switch color modes
+                  <div>
+                    <h4 className="text-white font-medium mb-3">Current Color Mode: <span className="text-yellow-400 capitalize">{visualizerSettings.colorMode}</span></h4>
+                    <div className="bg-black/30 rounded-lg p-4 mb-4">
+                      <p className="text-white/80 text-sm">
+                        {visualizerSettings.colorMode === 'spectrum' && 
+                          '🌈 Spectrum Mode: Colors represent frequency - low sounds are red, high sounds are violet'}
+                        {visualizerSettings.colorMode === 'chromatic' && 
+                          '🎵 Chromatic Mode: Each musical note has its own color that stays the same across octaves'}
+                        {visualizerSettings.colorMode === 'harmonic' && 
+                          '🎼 Harmonic Mode: Musically related notes have similar colors based on the circle of fifths'}
+                      </p>
+                    </div>
+                    <p className="text-white/70 text-sm mb-4">
+                      Try the same drum sounds in different color modes to see how the visualization changes:
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <button
+                        onClick={() => playDrumSound('kick', 36)}
+                        className="bg-gray-600 hover:bg-gray-700 text-white py-2 px-3 rounded-lg transition-colors touch-target"
+                      >
+                        🥁 Kick
+                      </button>
+                      <button
+                        onClick={() => playDrumSound('snare', 38)}
+                        className="bg-gray-600 hover:bg-gray-700 text-white py-2 px-3 rounded-lg transition-colors touch-target"
+                      >
+                        🥁 Snare
+                      </button>
+                      <button
+                        onClick={() => playDrumSound('hihat', 42)}
+                        className="bg-gray-600 hover:bg-gray-700 text-white py-2 px-3 rounded-lg transition-colors touch-target"
+                      >
+                        🎩 Hi-Hat
+                      </button>
+                      <button
+                        onClick={() => playDrumSound('crash', 49)}
+                        className="bg-gray-600 hover:bg-gray-700 text-white py-2 px-3 rounded-lg transition-colors touch-target"
+                      >
+                        💥 Crash
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Regular pattern creation for other lessons
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg sm:text-xl font-bold text-white">🥁 Create Your Pattern</h3>
+                  <button
+                    onClick={resetPattern}
+                    className="btn-secondary flex items-center gap-2 touch-target"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span className="hidden sm:inline">Reset</span>
+                  </button>
+                </div>
 
             {/* Step Numbers */}
             <div className="grid grid-cols-8 sm:flex sm:gap-2 gap-1 mb-3 sm:ml-4">
@@ -377,6 +544,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                 </div>
               </div>
             )}
+          )}
 
             {/* Pattern Check */}
             <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -405,20 +573,31 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         )}
 
         {/* Play Button */}
-        <div className="text-center">
-          <button 
-            onClick={handlePlayPattern}
-            className={`text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 flex items-center gap-3 mx-auto w-full sm:w-auto touch-target transition-colors ${
-              isPlaying 
-                ? 'bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg'
-                : 'btn-primary'
-            }`}
-          >
-            <Play className="w-5 h-5 sm:w-6 sm:h-6" />
-            {isPlaying ? 'Stop Pattern' : 'Play Your Pattern'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+        {selectedLesson?.id !== '2' && (
+          <div className="text-center">
+          <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              {isPatternCorrect ? (
+                <>
+                  <Check className="w-5 h-5 text-green-400" />
+                  <span className="text-green-400 font-medium text-sm sm:text-base">Great job! Pattern is correct!</span>
+                </>
+              ) : (
+                <span className="text-white/70 text-sm sm:text-base">Keep trying... you're doing great!</span>
+              )}
+            </div>
+            
+            {isPatternCorrect && (
+              <button
+                onClick={nextStep}
+                className="btn-accent flex items-center gap-2 w-full sm:w-auto touch-target"
+              >
+                <span>{currentStepIndex < selectedLesson.steps.length - 1 ? 'Next Step' : 'Complete Lesson'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
+            </div>
+          )}
+        )}
