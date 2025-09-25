@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Play, Pause, Square, ChevronDown, ChevronUp } from 'lucide-react';
-import { DrumTrack } from '../../types';
+import { DrumTrack, ColorMode } from '../../types';
+import { getDrumTrackColor } from '../../utils/colorMapping';
 
 interface CompactDrumMachineProps {
   tracks: DrumTrack[];
   currentStep: number;
   isPlaying: boolean;
   tempo: number;
+  colorMode: ColorMode;
   onStepToggle: (trackId: string, stepIndex: number) => void;
   onPlay: () => void;
   onStop: () => void;
@@ -18,6 +20,7 @@ export const CompactDrumMachine: React.FC<CompactDrumMachineProps> = ({
   currentStep,
   isPlaying,
   tempo,
+  colorMode,
   onStepToggle,
   onPlay,
   onStop,
@@ -27,6 +30,7 @@ export const CompactDrumMachine: React.FC<CompactDrumMachineProps> = ({
   const [showAllTracks, setShowAllTracks] = useState(false);
 
   const currentTrack = tracks[selectedTrack];
+  const dynamicColor = getDrumTrackColor(currentTrack?.name || '', colorMode);
 
   return (
     <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
@@ -92,7 +96,7 @@ export const CompactDrumMachine: React.FC<CompactDrumMachineProps> = ({
                 <div className="flex items-center gap-2">
                   <div
                     className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: track.color }}
+                    style={{ backgroundColor: getDrumTrackColor(track.name, colorMode) }}
                   />
                   <span className="text-sm font-medium">{track.name}</span>
                 </div>
@@ -114,7 +118,7 @@ export const CompactDrumMachine: React.FC<CompactDrumMachineProps> = ({
                 <div className="flex items-center gap-2">
                   <div
                     className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: track.color }}
+                    style={{ backgroundColor: getDrumTrackColor(track.name, colorMode) }}
                   />
                   <span className="text-sm font-medium">{track.name}</span>
                 </div>
@@ -150,7 +154,7 @@ export const CompactDrumMachine: React.FC<CompactDrumMachineProps> = ({
               }`}
               style={{
                 backgroundColor: currentTrack.steps[i]
-                  ? `${currentTrack.color}${Math.round(currentTrack.velocities[i] * 255).toString(16).padStart(2, '0')}`
+                  ? `${dynamicColor}${Math.round(currentTrack.velocities[i] * 255).toString(16).padStart(2, '0')}`
                   : undefined
               }}
             >

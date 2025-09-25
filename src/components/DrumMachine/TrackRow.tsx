@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Volume2, VolumeX, Headphones, Trash2, MoveVertical as MoreVertical } from 'lucide-react';
-import { DrumTrack } from '../../types';
+import { DrumTrack, ColorMode } from '../../types';
+import { getDrumTrackColor } from '../../utils/colorMapping';
 
 interface TrackRowProps {
   track: DrumTrack;
   currentStep: number;
   isPlaying: boolean;
+  colorMode: ColorMode;
   onStepToggle: (stepIndex: number) => void;
   onVelocityChange: (stepIndex: number, velocity: number) => void;
   onMute: () => void;
@@ -18,6 +20,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
   track,
   currentStep,
   isPlaying,
+  colorMode,
   onStepToggle,
   onVelocityChange,
   onMute,
@@ -26,6 +29,9 @@ export const TrackRow: React.FC<TrackRowProps> = ({
   onClear
 }) => {
   const [showVelocity, setShowVelocity] = useState(false);
+  
+  // Get dynamic color based on visualizer color mode
+  const dynamicColor = getDrumTrackColor(track.name, colorMode);
 
   return (
     <div className="track-row">
@@ -34,7 +40,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
         <div className="flex items-center gap-2 mb-1">
           <div
             className="w-3 h-3 rounded-full"
-            style={{ backgroundColor: track.color }}
+            style={{ backgroundColor: dynamicColor }}
           />
           <span className="font-medium text-sm">{track.name}</span>
         </div>
@@ -95,7 +101,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
               }`}
               style={{
                 backgroundColor: active
-                  ? `${track.color}${Math.round(track.velocities[index] * 255).toString(16).padStart(2, '0')}`
+                  ? `${dynamicColor}${Math.round(track.velocities[index] * 255).toString(16).padStart(2, '0')}`
                   : undefined
               }}
             >

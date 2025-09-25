@@ -1,5 +1,5 @@
 import React from 'react';
-import { DrumTrack } from '../../types';
+import { DrumTrack, ColorMode } from '../../types';
 import { TrackRow } from './TrackRow';
 import { TransportControls } from './TransportControls';
 
@@ -8,6 +8,7 @@ interface DrumMachineProps {
   currentStep: number;
   isPlaying: boolean;
   tempo: number;
+  colorMode: ColorMode;
   onStepToggle: (trackId: string, stepIndex: number) => void;
   onVelocityChange: (trackId: string, stepIndex: number, velocity: number) => void;
   onTrackMute: (trackId: string) => void;
@@ -25,6 +26,7 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
   currentStep,
   isPlaying,
   tempo,
+  colorMode,
   onStepToggle,
   onVelocityChange,
   onTrackMute,
@@ -83,6 +85,7 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
             track={track}
             currentStep={currentStep}
             isPlaying={isPlaying}
+            colorMode={colorMode}
             onStepToggle={(stepIndex) => onStepToggle(track.id, stepIndex)}
             onVelocityChange={(stepIndex, velocity) => onVelocityChange(track.id, stepIndex, velocity)}
             onMute={() => onTrackMute(track.id)}
