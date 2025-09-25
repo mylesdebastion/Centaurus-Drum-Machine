@@ -319,9 +319,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                 <button
                   onClick={nextStep}
                   className="btn-accent flex items-center gap-2 w-full sm:w-auto touch-target"
-                  className={`step-button-compact ${active ? 'active' : ''} ${
-                    isPlaying && currentPlayStep === i ? 'playing animate-pulse-beat' : ''
-                  } touch-target`}
+                >
                   <span>{currentStepIndex < selectedLesson.steps.length - 1 ? 'Next Step' : 'Complete Lesson'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
@@ -346,5 +344,5 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         </div>
       </div>
     </div>
-              >
-                <span>{currentStepIndex < selectedLesson.steps.length - 1 ? 'Next Step' : 'Complete Lesson'}</span>
+  );
+};
