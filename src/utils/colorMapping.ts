@@ -58,8 +58,9 @@ export const getNoteColor = (note: number, mode: ColorMode): RGBColor => {
   switch (mode) {
     case 'spectrum':
       // Map note (0-127) to spectrum (red to violet)
+      // 0° = red, 60° = yellow, 120° = green, 180° = cyan, 240° = blue, 270° = violet
       const hue = (note / 127) * 270; // 0° = red, 270° = violet
-      return hslToRgb(hue, 100, 50);
+      return hslToRgb(hue, 85, 55);
     
     case 'chromatic':
       // Map note to chromatic colors (12 colors repeating)
@@ -86,10 +87,10 @@ export const getNoteColor = (note: number, mode: ColorMode): RGBColor => {
 export const getDrumTrackColor = (trackName: string, mode: ColorMode): string => {
   // General MIDI drum note mapping
   const drumNoteMap: Record<string, number> = {
-    'Kick': 36,      // Bass Drum 1
-    'Snare': 38,     // Acoustic Snare
-    'Hi-Hat': 42,    // Closed Hi-Hat
-    'Perc': 39,      // Hand Clap
+    'Kick': 36,      // Bass Drum 1 (low frequency)
+    'Snare': 38,     // Acoustic Snare (mid frequency)
+    'Hi-Hat': 42,    // Closed Hi-Hat (high frequency)
+    'Perc': 39,      // Hand Clap (mid-high frequency)
     'Crash': 49,     // Crash Cymbal 1
     'Ride': 51,      // Ride Cymbal 1
     'Tom': 45,       // Low Tom
@@ -108,8 +109,9 @@ export const getFrequencyColor = (frequency: number, mode: ColorMode): RGBColor 
   // Map frequency (0-1) to appropriate color based on mode
   switch (mode) {
     case 'spectrum':
-      const hue = frequency * 270; // Map 0-1 to red-violet spectrum
-      return hslToRgb(hue, 80, 50);
+      // Map frequency (0-1) to red-violet spectrum
+      const hue = frequency * 270; // 0 = red (0°), 1 = violet (270°)
+      return hslToRgb(hue, 85, 55);
     
     case 'chromatic':
       // For frequency data, treat as continuous spectrum
