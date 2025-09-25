@@ -28,7 +28,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
   onMute,
   onSolo,
   onVolumeChange,
-  onClear
+  onClear,
   onRemove,
   canRemove
 }) => {
