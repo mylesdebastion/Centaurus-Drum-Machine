@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useEffect } from 'react';
-import { BookOpen, Play, Check, ArrowRight, RotateCcw, Star } from 'lucide-react';
+import { BookOpen, Play, Pause, Check, ArrowRight, RotateCcw, Star } from 'lucide-react';
 import * as Tone from 'tone';
 import { EducationLesson, VisualizerSettings, MIDINote } from '../../types';
 import { audioEngine } from '../../utils/audioEngine';
@@ -43,7 +43,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   const lessons: EducationLesson[] = [
     {
       id: '1',
-      title: 'Rhythm Patterns',
+      title: 'Basic Beat',
       description: 'Learn to create a simple kick drum pattern',
       difficulty: 'beginner',
       steps: [
@@ -78,7 +78,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     },
     {
       id: '3',
-      title: 'Basic Beat',
+      title: 'Rhythm Patterns',
       description: 'Learn to create a complete 4/4 beat with kick and snare',
       difficulty: 'intermediate',
       steps: [
@@ -111,7 +111,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     const currentStep = selectedLesson.steps[currentStepIndex];
     if (!currentStep.expectedPattern) return true;
     
-    // For the second step of Basic Beat lesson (snare track)
+    // For the second step of Rhythm Patterns lesson (snare track)
     if (selectedLesson.id === '3' && currentStepIndex === 1) {
       return JSON.stringify(snarePattern) === JSON.stringify(currentStep.expectedPattern);
     }
@@ -139,7 +139,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   };
 
   const resetPattern = () => {
-    // For the second step of Basic Beat lesson (snare track)
+    // For the second step of Rhythm Patterns lesson (snare track)
     if (selectedLesson?.id === '3' && currentStepIndex === 1) {
       setSnarePattern(new Array(16).fill(false));
     } else {
@@ -168,7 +168,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         audioEngine.playDrum('kick', 0.8);
       }
       
-      // Play snare if snare pattern is active (for Basic Beat lesson)
+      // Play snare if snare pattern is active (for Rhythm Patterns lesson)
       if (selectedLesson?.id === '3' && snarePattern[stepIndex]) {
         audioEngine.playDrum('snare', 0.8);
       }
@@ -324,8 +324,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
           >
             Exit Education
           </button>
-          </div>
-        )}
+        </div>
 
         {/* Lesson Progress */}
         <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 sm:p-6 mb-6 border border-white/20">
@@ -481,94 +480,95 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                   </button>
                 </div>
 
-            {/* Step Numbers */}
-            <div className="grid grid-cols-8 sm:flex sm:gap-2 gap-1 mb-3 sm:ml-4">
-              {Array.from({ length: 16 }, (_, i) => (
-                <div
-                  key={i}
-                  className={`h-6 flex items-center justify-center text-xs font-mono ${
-                    i % 4 === 0 ? 'text-yellow-400' : 'text-white/60'
-                  }`}
-                >
-                  {i + 1}
-                </div>
-              ))}
-            </div>
-
-            {/* Pattern Grid */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="w-full sm:w-16 text-white font-medium text-center sm:text-left">Kick</div>
-              <div className="grid grid-cols-8 sm:flex sm:gap-2 gap-1 w-full sm:w-auto">
-                {userPattern.map((active, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleStepToggle(index)}
-                    className={`step-button-compact ${active ? 'active' : ''} ${
-                      isPlaying && index === currentPlayStep ? 'ring-2 ring-yellow-400' : ''
-                    } touch-target`}
-                    style={{
-                      backgroundColor: active ? '#ef4444' : undefined,
-                      borderColor: active ? '#ef4444' : undefined
-                    }}
-                  >
-                    {active && <div className="w-2 h-2 rounded-full bg-white" />}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Snare Track for Basic Beat lesson step 2 */}
-            {selectedLesson.id === '3' && currentStepIndex === 1 && (
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-4">
-                <div className="w-full sm:w-16 text-white font-medium text-center sm:text-left">Snare</div>
-                <div className="grid grid-cols-8 sm:flex sm:gap-2 gap-1 w-full sm:w-auto">
-                  {snarePattern.map((active, index) => (
-                    <button
-                      key={index}
-                      onClick={() => {
-                        const newPattern = [...snarePattern];
-                        newPattern[index] = !newPattern[index];
-                        setSnarePattern(newPattern);
-                      }}
-                      className={`step-button-compact ${active ? 'active' : ''} ${
-                        isPlaying && index === currentPlayStep ? 'ring-2 ring-yellow-400' : ''
-                      } touch-target`}
-                      style={{
-                        backgroundColor: active ? '#10b981' : undefined,
-                        borderColor: active ? '#10b981' : undefined
-                      }}
+                {/* Step Numbers */}
+                <div className="grid grid-cols-8 sm:flex sm:gap-2 gap-1 mb-3 sm:ml-4">
+                  {Array.from({ length: 16 }, (_, i) => (
+                    <div
+                      key={i}
+                      className={`h-6 flex items-center justify-center text-xs font-mono ${
+                        i % 4 === 0 ? 'text-yellow-400' : 'text-white/60'
+                      }`}
                     >
-                      {active && <div className="w-2 h-2 rounded-full bg-white" />}
-                    </button>
+                      {i + 1}
+                    </div>
                   ))}
+                </div>
+
+                {/* Pattern Grid */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="w-full sm:w-16 text-white font-medium text-center sm:text-left">Kick</div>
+                  <div className="grid grid-cols-8 sm:flex sm:gap-2 gap-1 w-full sm:w-auto">
+                    {userPattern.map((active, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleStepToggle(index)}
+                        className={`step-button-compact ${active ? 'active' : ''} ${
+                          isPlaying && index === currentPlayStep ? 'ring-2 ring-yellow-400' : ''
+                        } touch-target`}
+                        style={{
+                          backgroundColor: active ? '#ef4444' : undefined,
+                          borderColor: active ? '#ef4444' : undefined
+                        }}
+                      >
+                        {active && <div className="w-2 h-2 rounded-full bg-white" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Snare Track for Rhythm Patterns lesson step 2 */}
+                {selectedLesson.id === '3' && currentStepIndex === 1 && (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-4">
+                    <div className="w-full sm:w-16 text-white font-medium text-center sm:text-left">Snare</div>
+                    <div className="grid grid-cols-8 sm:flex sm:gap-2 gap-1 w-full sm:w-auto">
+                      {snarePattern.map((active, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            const newPattern = [...snarePattern];
+                            newPattern[index] = !newPattern[index];
+                            setSnarePattern(newPattern);
+                          }}
+                          className={`step-button-compact ${active ? 'active' : ''} ${
+                            isPlaying && index === currentPlayStep ? 'ring-2 ring-yellow-400' : ''
+                          } touch-target`}
+                          style={{
+                            backgroundColor: active ? '#10b981' : undefined,
+                            borderColor: active ? '#10b981' : undefined
+                          }}
+                        >
+                          {active && <div className="w-2 h-2 rounded-full bg-white" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pattern Check */}
+                <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    {isPatternCorrect ? (
+                      <>
+                        <Check className="w-5 h-5 text-green-400" />
+                        <span className="text-green-400 font-medium text-sm sm:text-base">Great job! Pattern is correct!</span>
+                      </>
+                    ) : (
+                      <span className="text-white/70 text-sm sm:text-base">Keep trying... you're doing great!</span>
+                    )}
+                  </div>
+                  
+                  {isPatternCorrect && (
+                    <button
+                      onClick={nextStep}
+                      className="btn-accent flex items-center gap-2 w-full sm:w-auto touch-target"
+                    >
+                      <span>{currentStepIndex < selectedLesson.steps.length - 1 ? 'Next Step' : 'Complete Lesson'}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             )}
-          )}
-
-            {/* Pattern Check */}
-            <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                {isPatternCorrect ? (
-                  <>
-                    <Check className="w-5 h-5 text-green-400" />
-                    <span className="text-green-400 font-medium text-sm sm:text-base">Great job! Pattern is correct!</span>
-                  </>
-                ) : (
-                  <span className="text-white/70 text-sm sm:text-base">Keep trying... you're doing great!</span>
-                )}
-              </div>
-              
-              {isPatternCorrect && (
-                <button
-                  onClick={nextStep}
-                  className="btn-accent flex items-center gap-2 w-full sm:w-auto touch-target"
-                >
-                  <span>{currentStepIndex < selectedLesson.steps.length - 1 ? 'Next Step' : 'Complete Lesson'}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              )}
-            </div>
           </div>
         )}
 
@@ -587,3 +587,4 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       </div>
     </div>
   );
+};
