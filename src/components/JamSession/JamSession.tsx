@@ -8,7 +8,7 @@ import { UserList } from './UserList';
 import { MobileNavigation } from '../Layout/MobileNavigation';
 import { ResponsiveContainer } from '../Layout/ResponsiveContainer';
 import { DrumTrack, VisualizerSettings, User, MIDINote } from '../../types';
-import { createDefaultPattern, createEmptyTrack } from '../../utils/drumPatterns';
+import { createDefaultPattern } from '../../utils/drumPatterns';
 
 interface JamSessionProps {
   sessionCode: string;

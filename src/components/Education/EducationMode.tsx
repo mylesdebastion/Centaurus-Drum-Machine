@@ -144,7 +144,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     }, (60 / tempo / 4) * 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, tempo]);
+  }, [isPlaying, tempo, userPattern]);
 
   const handlePlayPattern = () => {
     if (isPlaying) {
@@ -310,7 +310,9 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                   <button
                     key={index}
                     onClick={() => handleStepToggle(index)}
-                    className={`step-button-compact ${active ? 'active' : ''} touch-target`}
+                    className={`step-button-compact ${active ? 'active' : ''} ${
+                      isPlaying && index === currentPlayStep ? 'ring-2 ring-yellow-400' : ''
+                    } touch-target`}
                     style={{
                       backgroundColor: active ? '#ef4444' : undefined,
                       borderColor: active ? '#ef4444' : undefined

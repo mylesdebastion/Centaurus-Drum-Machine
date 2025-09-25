@@ -6,6 +6,7 @@ import { createEmptyTrack, getAvailableInstruments } from '../../utils/drumPatte
 interface TrackManagerProps {
   tracks: DrumTrack[];
   onAddTrack: (track: DrumTrack) => void;
+  onRemoveTrack: (trackId: string) => void;
   maxTracks?: number;
 }
 
