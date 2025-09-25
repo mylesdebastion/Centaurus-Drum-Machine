@@ -575,29 +575,15 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         {/* Play Button */}
         {selectedLesson?.id !== '2' && (
           <div className="text-center">
-          <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              {isPatternCorrect ? (
-                <>
-                  <Check className="w-5 h-5 text-green-400" />
-                  <span className="text-green-400 font-medium text-sm sm:text-base">Great job! Pattern is correct!</span>
-                </>
-              ) : (
-                <span className="text-white/70 text-sm sm:text-base">Keep trying... you're doing great!</span>
-              )}
-            </div>
-            
-            {isPatternCorrect && (
-              <button
-                onClick={nextStep}
-                className="btn-accent flex items-center gap-2 w-full sm:w-auto touch-target"
-              >
-                <span>{currentStepIndex < selectedLesson.steps.length - 1 ? 'Next Step' : 'Complete Lesson'}</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            )}
+            <button
+              onClick={handlePlayPattern}
+              className="btn-primary flex items-center gap-2 touch-target"
+            >
+              {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+              <span>{isPlaying ? 'Stop' : 'Play'} Pattern</span>
+            </button>
           </div>
         )}
-            </div>
-          )}
-        )}
+      </div>
+    </div>
+  );
