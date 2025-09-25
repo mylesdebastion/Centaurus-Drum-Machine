@@ -169,7 +169,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     
     let stepIndex = 0;
     
-    const scheduleId = Tone.Transport.scheduleRepeat((time) => {
+    const scheduleId = Tone.Transport.scheduleRepeat(() => {
       // Play drum sound if step is active
       if (userPattern[stepIndex]) {
         audioEngine.playDrum('kick', 0.8);

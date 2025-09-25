@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Palette, Monitor, Lightbulb, Settings } from 'lucide-react';
+import { Palette, Lightbulb, Settings } from 'lucide-react';
 import { ColorMode, VisualizerSettings } from '../../types';
 import { getNoteColor, getFrequencyColor } from '../../utils/colorMapping';
 
@@ -48,7 +48,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     midiNotes: Array<{ note: number; velocity: number; timestamp: number }> = []
   ) => {
     // Draw MIDI notes as colored circles
-    midiNotes.forEach((note, index) => {
+    midiNotes.forEach((note) => {
       const color = getNoteColor(note.note, settings.colorMode);
       const alpha = note.velocity * settings.brightness;
       const age = Date.now() - note.timestamp;

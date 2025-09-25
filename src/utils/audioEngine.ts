@@ -4,7 +4,7 @@ import * as Tone from 'tone';
 export class AudioEngine {
   private static instance: AudioEngine;
   private isInitialized = false;
-  private drumSamples: { [key: string]: Tone.Player } = {};
+  private drumSamples: { [key: string]: Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth } = {};
   private masterVolume: Tone.Volume;
 
   private constructor() {
@@ -40,7 +40,6 @@ export class AudioEngine {
         }).connect(this.masterVolume),
         
         'hihat': new Tone.MetalSynth({
-          frequency: 200,
           envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
           harmonicity: 5.1,
           modulationIndex: 32,
@@ -49,7 +48,6 @@ export class AudioEngine {
         }).connect(this.masterVolume),
         
         'openhat': new Tone.MetalSynth({
-          frequency: 200,
           envelope: { attack: 0.001, decay: 0.3, release: 0.1 },
           harmonicity: 5.1,
           modulationIndex: 32,
@@ -63,7 +61,6 @@ export class AudioEngine {
         }).connect(this.masterVolume),
         
         'crash': new Tone.MetalSynth({
-          frequency: 300,
           envelope: { attack: 0.001, decay: 1.4, release: 0.2 },
           harmonicity: 5.1,
           modulationIndex: 64,
@@ -72,7 +69,6 @@ export class AudioEngine {
         }).connect(this.masterVolume),
         
         'ride': new Tone.MetalSynth({
-          frequency: 800,
           envelope: { attack: 0.001, decay: 0.4, release: 0.1 },
           harmonicity: 5.1,
           modulationIndex: 16,

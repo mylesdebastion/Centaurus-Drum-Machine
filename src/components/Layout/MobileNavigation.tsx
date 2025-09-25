@@ -1,5 +1,5 @@
 import React from 'react';
-import { Music, Eye, BookOpen, Users, Settings } from 'lucide-react';
+import { Music, Eye, Users, Settings } from 'lucide-react';
 
 interface MobileNavigationProps {
   activeView: 'drum' | 'visualizer' | 'users' | 'settings';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Crown, Mic, MicOff, Volume2, UserX } from 'lucide-react';
+import { Crown, Mic, Volume2, UserX } from 'lucide-react';
 import { User } from '../../types';
 
 interface UserListProps {
@@ -44,7 +44,7 @@ export const UserList: React.FC<UserListProps> = ({
                     {user.id === currentUserId && ' (You)'}
                   </span>
                   {user.isHost && (
-                    <Crown className="w-4 h-4 text-yellow-400" title="Host" />
+                    <Crown className="w-4 h-4 text-yellow-400" />
                   )}
                 </div>
                 <div className="flex items-center gap-1 text-xs text-gray-400">

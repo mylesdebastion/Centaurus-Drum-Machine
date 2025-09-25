@@ -30,7 +30,7 @@ export const JamSession: React.FC<JamSessionProps> = ({
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [tempo, setTempo] = useState(120);
-  const [isConnected, setIsConnected] = useState(true);
+  const [isConnected] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [midiNotes, setMidiNotes] = useState<MIDINote[]>([]);
   const [isMobile, setIsMobile] = useState(false);
@@ -162,15 +162,10 @@ export const JamSession: React.FC<JamSessionProps> = ({
 
   const handleRemoveTrack = (trackId: string) => {
     setTracks(prev => prev.filter(track => track.id !== trackId));
-    // Reset selected track if it was removed
-    if (tracks.findIndex(t => t.id === trackId) <= selectedTrack) {
-      setSelectedTrack(Math.max(0, selectedTrack - 1));
-    }
   };
 
   const handleLoadDefaultPattern = () => {
     setTracks(createDefaultPattern());
-    setSelectedTrack(0);
   };
 
   const renderMobileView = () => {
@@ -188,7 +183,6 @@ export const JamSession: React.FC<JamSessionProps> = ({
             onStop={handleStop}
             onTempoChange={handleTempoChange}
             onAddTrack={handleAddTrack}
-            onRemoveTrack={handleRemoveTrack}
             onLoadDefaultPattern={handleLoadDefaultPattern}
           />
         );
