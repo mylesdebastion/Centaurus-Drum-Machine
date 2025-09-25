@@ -109,6 +109,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   const checkPattern = () => {
     if (!selectedLesson) return false;
     const currentStep = selectedLesson.steps[currentStepIndex];
+    if (!currentStep) return false;
     if (!currentStep.expectedPattern) return true;
     
     // For the second step of Rhythm Patterns lesson (snare track)
@@ -121,6 +122,8 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
 
   const nextStep = () => {
     if (!selectedLesson) return;
+    const currentStep = selectedLesson.steps[currentStepIndex];
+    if (!currentStep) return;
     
     if (currentStepIndex < selectedLesson.steps.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
@@ -139,6 +142,10 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   };
 
   const resetPattern = () => {
+    if (!selectedLesson) return;
+    const currentStep = selectedLesson.steps[currentStepIndex];
+    if (!currentStep) return;
+    
     // For the second step of Rhythm Patterns lesson (snare track)
     if (selectedLesson?.id === '3' && currentStepIndex === 1) {
       setSnarePattern(new Array(16).fill(false));
@@ -303,6 +310,16 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   }
 
   const currentStep = selectedLesson.steps[currentStepIndex];
+  
+  // Safety check: if currentStep is undefined, reset to lesson selection
+  if (!currentStep) {
+    setSelectedLesson(null);
+    setCurrentStepIndex(0);
+    setUserPattern(new Array(16).fill(false));
+    setSnarePattern(new Array(16).fill(false));
+    return null;
+  }
+  
   const isPatternCorrect = checkPattern();
 
   return (
