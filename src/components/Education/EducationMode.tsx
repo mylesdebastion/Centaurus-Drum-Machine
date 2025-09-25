@@ -147,13 +147,6 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       setCurrentPlayStep(stepIndex);
       
       stepIndex = (stepIndex + 1) % 16;
-      
-      if (stepIndex === 0) {
-        // Pattern completed, stop playing
-        Tone.Transport.stop();
-        setIsPlaying(false);
-        setCurrentPlayStep(0);
-      }
     }, "16n", 0); // 16th note intervals starting immediately
     
     Tone.Transport.start();
