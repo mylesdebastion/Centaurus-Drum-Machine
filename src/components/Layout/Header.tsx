@@ -20,8 +20,8 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-2 sm:gap-4">
           <div className="flex items-center gap-2">
             <Music className="w-6 h-6 sm:w-8 sm:h-8 text-primary-500" />
-            <h1 className="text-lg sm:text-xl font-bold hidden sm:block">ESP32 Jam Session</h1>
-            <h1 className="text-lg font-bold sm:hidden">ESP32 Jam</h1>
+            <h1 className="text-lg sm:text-xl font-bold hidden sm:block">Audiolux Jam Session</h1>
+            <h1 className="text-lg font-bold sm:hidden">Audiolux Jam</h1>
           </div>
           
           {sessionCode && (

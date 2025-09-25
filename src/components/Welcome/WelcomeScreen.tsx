@@ -34,7 +34,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             </div>
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">
-            ESP32 Jam Session
+            Audiolux Jam Session
           </h1>
           <p className="text-lg sm:text-xl text-gray-300 mb-2">
             Real-time collaborative music making with synchronized visuals
@@ -123,7 +123,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         {/* Quick Info */}
         <div className="mt-8 sm:mt-12 text-center">
           <p className="text-gray-500 text-xs sm:text-sm">
-            Compatible with MIDI controllers • ESP32 LED integration • Web Audio API
+            Compatible with MIDI controllers • LED integration • Web Audio API
           </p>
         </div>
       </div>
