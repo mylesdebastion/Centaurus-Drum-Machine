@@ -105,40 +105,40 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
 
   if (!selectedLesson) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4 sm:p-6">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
             <div className="flex items-center gap-3">
-              <BookOpen className="w-8 h-8 text-yellow-400" />
-              <h1 className="text-3xl font-bold text-white">Education Mode</h1>
+              <BookOpen className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400" />
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">Education Mode</h1>
             </div>
             <button
               onClick={onExitEducation}
-              className="btn-secondary"
+              className="btn-secondary w-full sm:w-auto touch-target"
             >
               Exit Education
             </button>
           </div>
 
           {/* Welcome Message */}
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 mb-8 border border-white/20">
-            <h2 className="text-2xl font-bold text-white mb-3">Welcome, Music Explorer! 🎵</h2>
-            <p className="text-white/80 text-lg">
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 sm:p-6 mb-6 sm:mb-8 border border-white/20">
+            <h2 className="text-xl sm:text-2xl font-bold text-white mb-3">Welcome, Music Explorer! 🎵</h2>
+            <p className="text-white/80 text-base sm:text-lg">
               Let's learn about rhythm and music through fun, interactive lessons. 
               Watch how your beats create beautiful colors and patterns!
             </p>
           </div>
 
           {/* Lesson Cards */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {lessons.map((lesson) => (
               <div
                 key={lesson.id}
-                className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/20 transition-all cursor-pointer"
+                className="bg-white/10 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-white/20 hover:bg-white/20 transition-all cursor-pointer touch-target"
                 onClick={() => setSelectedLesson(lesson)}
               >
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-3">
                   <div className={`px-2 py-1 rounded-full text-xs font-medium ${
                     lesson.difficulty === 'beginner' ? 'bg-green-500/20 text-green-300' :
                     lesson.difficulty === 'intermediate' ? 'bg-yellow-500/20 text-yellow-300' :
@@ -148,17 +148,17 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                   </div>
                   <div className="flex">
                     {Array.from({ length: lesson.difficulty === 'beginner' ? 1 : lesson.difficulty === 'intermediate' ? 2 : 3 }, (_, i) => (
-                      <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />
+                      <Star key={i} className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current" />
                     ))}
                   </div>
                 </div>
                 
-                <h3 className="text-xl font-bold text-white mb-2">{lesson.title}</h3>
-                <p className="text-white/70 mb-4">{lesson.description}</p>
+                <h3 className="text-lg sm:text-xl font-bold text-white mb-2">{lesson.title}</h3>
+                <p className="text-white/70 mb-4 text-sm sm:text-base">{lesson.description}</p>
                 
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-white/60">{lesson.steps.length} steps</span>
-                  <ArrowRight className="w-5 h-5 text-white/60" />
+                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-white/60" />
                 </div>
               </div>
             ))}
@@ -172,31 +172,31 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   const isPatternCorrect = checkPattern();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4 sm:p-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSelectedLesson(null)}
-              className="text-white/70 hover:text-white transition-colors"
+              className="text-white/70 hover:text-white transition-colors touch-target"
             >
               ← Back to Lessons
             </button>
           </div>
           <button
             onClick={onExitEducation}
-            className="btn-secondary"
+            className="btn-secondary w-full sm:w-auto touch-target"
           >
             Exit Education
           </button>
         </div>
 
         {/* Lesson Progress */}
-        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 mb-6 border border-white/20">
+        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 sm:p-6 mb-6 border border-white/20">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-white">{selectedLesson.title}</h2>
-            <div className="text-white/70">
+            <h2 className="text-xl sm:text-2xl font-bold text-white">{selectedLesson.title}</h2>
+            <div className="text-white/70 text-sm sm:text-base">
               Step {currentStepIndex + 1} of {selectedLesson.steps.length}
             </div>
           </div>
@@ -210,37 +210,37 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         </div>
 
         {/* Current Step */}
-        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 mb-6 border border-white/20">
-          <h3 className="text-xl font-bold text-white mb-3">📝 Instructions</h3>
-          <p className="text-white/90 text-lg mb-4">{currentStep.instruction}</p>
+        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 sm:p-6 mb-6 border border-white/20">
+          <h3 className="text-lg sm:text-xl font-bold text-white mb-3">📝 Instructions</h3>
+          <p className="text-white/90 text-base sm:text-lg mb-4">{currentStep.instruction}</p>
           
           {currentStep.hint && (
             <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3">
-              <p className="text-yellow-200">💡 Hint: {currentStep.hint}</p>
+              <p className="text-yellow-200 text-sm sm:text-base">💡 Hint: {currentStep.hint}</p>
             </div>
           )}
         </div>
 
         {/* Interactive Drum Pattern */}
         {currentStep.expectedPattern && (
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 mb-6 border border-white/20">
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 sm:p-6 mb-6 border border-white/20">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-white">🥁 Create Your Pattern</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-white">🥁 Create Your Pattern</h3>
               <button
                 onClick={resetPattern}
-                className="btn-secondary flex items-center gap-2"
+                className="btn-secondary flex items-center gap-2 touch-target"
               >
                 <RotateCcw className="w-4 h-4" />
-                Reset
+                <span className="hidden sm:inline">Reset</span>
               </button>
             </div>
 
             {/* Step Numbers */}
-            <div className="flex gap-2 mb-3 ml-4">
+            <div className="grid grid-cols-8 sm:flex sm:gap-2 gap-1 mb-3 sm:ml-4">
               {Array.from({ length: 16 }, (_, i) => (
                 <div
                   key={i}
-                  className={`w-12 h-6 flex items-center justify-center text-xs font-mono ${
+                  className={`h-6 flex items-center justify-center text-xs font-mono ${
                     i % 4 === 0 ? 'text-yellow-400' : 'text-white/60'
                   }`}
                 >
@@ -250,14 +250,14 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
             </div>
 
             {/* Pattern Grid */}
-            <div className="flex items-center gap-4">
-              <div className="w-16 text-white font-medium">Kick</div>
-              <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="w-full sm:w-16 text-white font-medium text-center sm:text-left">Kick</div>
+              <div className="grid grid-cols-8 sm:flex sm:gap-2 gap-1 w-full sm:w-auto">
                 {userPattern.map((active, index) => (
                   <button
                     key={index}
                     onClick={() => handleStepToggle(index)}
-                    className={`step-button ${active ? 'active' : ''}`}
+                    className={`step-button-compact ${active ? 'active' : ''} touch-target`}
                     style={{
                       backgroundColor: active ? '#ef4444' : undefined,
                       borderColor: active ? '#ef4444' : undefined
@@ -270,24 +270,24 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
             </div>
 
             {/* Pattern Check */}
-            <div className="mt-4 flex items-center justify-between">
+            <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-2">
                 {isPatternCorrect ? (
                   <>
                     <Check className="w-5 h-5 text-green-400" />
-                    <span className="text-green-400 font-medium">Great job! Pattern is correct!</span>
+                    <span className="text-green-400 font-medium text-sm sm:text-base">Great job! Pattern is correct!</span>
                   </>
                 ) : (
-                  <span className="text-white/70">Keep trying... you're doing great!</span>
+                  <span className="text-white/70 text-sm sm:text-base">Keep trying... you're doing great!</span>
                 )}
               </div>
               
               {isPatternCorrect && (
                 <button
                   onClick={nextStep}
-                  className="btn-accent flex items-center gap-2"
+                  className="btn-accent flex items-center gap-2 w-full sm:w-auto touch-target"
                 >
-                  {currentStepIndex < selectedLesson.steps.length - 1 ? 'Next Step' : 'Complete Lesson'}
+                  <span>{currentStepIndex < selectedLesson.steps.length - 1 ? 'Next Step' : 'Complete Lesson'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               )}
@@ -297,8 +297,8 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
 
         {/* Play Button */}
         <div className="text-center">
-          <button className="btn-primary text-lg px-8 py-4 flex items-center gap-3 mx-auto">
-            <Play className="w-6 h-6" />
+          <button className="btn-primary text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 flex items-center gap-3 mx-auto w-full sm:w-auto touch-target">
+            <Play className="w-5 h-5 sm:w-6 sm:h-6" />
             Play Your Pattern
           </button>
         </div>
