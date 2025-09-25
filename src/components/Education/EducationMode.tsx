@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useEffect } from 'react';
 import { BookOpen, Play, Check, ArrowRight, RotateCcw, Star } from 'lucide-react';
+import * as Tone from 'tone';
 import { EducationLesson } from '../../types';
 import { audioEngine } from '../../utils/audioEngine';
 
@@ -123,37 +124,48 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
 
   // Playback functionality
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying) {
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
+      setCurrentPlayStep(0);
+      return;
+    }
 
-    const interval = setInterval(() => {
-      setCurrentPlayStep((prev) => {
-        const nextStep = (prev + 1) % 16;
-        
-        // Play drum sound if step is active
-        if (userPattern[prev]) {
-          audioEngine.playDrum('kick', 0.8);
-        }
-        
-        if (nextStep === 0) {
-          // Pattern completed, stop playing
-          setIsPlaying(false);
-          return 0;
-        }
-        return nextStep;
-      });
-    }, (60 / tempo / 4) * 1000);
+    // Set up Tone.js transport
+    Tone.Transport.bpm.value = tempo;
+    Tone.Transport.cancel(); // Clear any existing events
+    
+    let stepIndex = 0;
+    
+    const scheduleId = Tone.Transport.scheduleRepeat((time) => {
+      // Play drum sound if step is active
+      if (userPattern[stepIndex]) {
+        audioEngine.playDrum('kick', 0.8);
+      }
+      
+      // Update visual step indicator
+      setCurrentPlayStep(stepIndex);
+      
+      stepIndex = (stepIndex + 1) % 16;
+      
+      if (stepIndex === 0) {
+        // Pattern completed, stop playing
+        Tone.Transport.stop();
+        setIsPlaying(false);
+        setCurrentPlayStep(0);
+      }
+    }, "16n", 0); // 16th note intervals starting immediately
+    
+    Tone.Transport.start();
 
-    return () => clearInterval(interval);
+    return () => {
+      Tone.Transport.stop();
+      Tone.Transport.cancel(scheduleId);
+    };
   }, [isPlaying, tempo, userPattern]);
 
   const handlePlayPattern = () => {
-    if (isPlaying) {
-      setIsPlaying(false);
-      setCurrentPlayStep(0);
-    } else {
-      setCurrentPlayStep(0);
-      setIsPlaying(true);
-    }
+    setIsPlaying(!isPlaying);
   };
 
   if (!selectedLesson) {
