@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Volume2, VolumeX, Headphones, Trash2, MoveVertical as MoreVertical } from 'lucide-react';
+import { Volume2, VolumeX, Headphones, Trash2, MoveVertical as MoreVertical, Eraser } from 'lucide-react';
 import { DrumTrack, ColorMode } from '../../types';
 import { getDrumTrackColor } from '../../utils/colorMapping';
 
@@ -90,7 +90,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
           className="p-1 text-gray-400 hover:text-red-400 rounded transition-colors"
           title="Clear track"
         >
-          <Trash2 className="w-4 h-4" />
+          <Eraser className="w-4 h-4" />
         </button>
 
         {canRemove && (
@@ -99,7 +99,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
             className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
             title="Remove track"
           >
-            <Trash2 className="w-4 h-4 fill-current" />
+            <Trash2 className="w-4 h-4" />
           </button>
         )}
       </div>
