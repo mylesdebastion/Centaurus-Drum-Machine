@@ -28,7 +28,7 @@ export const CompactDrumMachine: React.FC<CompactDrumMachineProps> = ({
   onStepToggle,
   onPlay,
   onStop,
-  onTempoChange
+  onTempoChange,
   onAddTrack,
   onRemoveTrack,
   onLoadDefaultPattern
