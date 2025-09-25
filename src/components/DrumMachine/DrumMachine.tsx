@@ -41,7 +41,7 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
   onStop,
   onTempoChange,
   onClearTrack,
-  onClearAll
+ onClearAll,
   onAddTrack,
   onRemoveTrack,
   onLoadDefaultPattern
