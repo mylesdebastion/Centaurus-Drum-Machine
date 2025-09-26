@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APC40 Drum Machine Sequencer with MIDI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .controller {
+            background: #2a2a2a;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+            max-width: 1200px;
+            width: 100%;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #444;
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: 600;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .control-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #888;
+            letter-spacing: 1px;
+        }
+        
+        .control-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #4ecdc4;
+        }
+        
+        .midi-status {
+            padding: 8px 15px;
+            background: #333;
+            border-radius: 4px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .midi-status.connected {
+            background: #1a4a1a;
+            border: 1px solid #4ecdc4;
+        }
+        
+        .midi-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+        }
+        
+        .midi-status.connected .midi-indicator {
+            background: #4ecdc4;
+            animation: pulse 2s infinite;
+        }
+        
+        .color-mode-selector {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .color-mode-btn {
+            padding: 8px 15px;
+            background: #444;
+            border: 2px solid #666;
+            border-radius: 4px;
+            color: #ccc;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 12px;
+        }
+        
+        .color-mode-btn.active {
+            background: #4ecdc4;
+            border-color: #4ecdc4;
+            color: #000;
+        }
+        
+        .color-mode-btn:hover:not(.active) {
+            background: #555;
+            border-color: #888;
+        }
+        
+        .sequencer {
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        
+        .track {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+        
+        .track-label {
+            width: 100px;
+            font-size: 14px;
+            font-weight: 500;
+            text-align: right;
+            padding-right: 15px;
+            color: #aaa;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+        
+        .track-icon {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-left: 8px;
+            background: #666;
+        }
+        
+        .steps {
+            display: flex;
+            gap: 6px;
+            flex: 1;
+        }
+        
+        .step {
+            flex: 1;
+            aspect-ratio: 1;
+            background: #333;
+            border: 2px solid #444;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+            min-width: 40px;
+            max-width: 80px;
+        }
+        
+        .step::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.2) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .step.active {
+            border-color: #888;
+        }
+        
+        .step.active::before {
+            opacity: 1;
+        }
+        
+        .step.current {
+            box-shadow: 0 0 20px rgba(78, 205, 196, 0.8);
+            transform: scale(1.1);
+        }
+        
+        /* Mark beat 1 and beat 5 (halfway point in 8 steps) */
+        .step:nth-child(1), .step:nth-child(5) {
+            border-left-width: 3px;
+            border-left-color: #666;
+        }
+        
+        .transport {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 30px;
+        }
+        
+        .transport-btn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #444 0%, #555 100%);
+            border: 2px solid #666;
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .transport-btn:hover {
+            background: linear-gradient(135deg, #555 0%, #666 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        
+        .transport-btn.playing {
+            background: linear-gradient(135deg, #4ecdc4 0%, #44a3a0 100%);
+            border-color: #4ecdc4;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(78, 205, 196, 0.4); }
+            50% { box-shadow: 0 0 30px rgba(78, 205, 196, 0.8); }
+        }
+        
+        .velocity-indicator {
+            position: absolute;
+            bottom: 2px;
+            left: 2px;
+            right: 2px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            transition: height 0.2s;
+            height: 0;
+        }
+        
+        @media (max-width: 768px) {
+            .track-label {
+                width: 60px;
+                font-size: 12px;
+            }
+            
+            .step {
+                min-width: 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="controller">
+        <div class="header">
+            <h1 class="title">APC40 Drum Sequencer</h1>
+            <div class="controls">
+                <div class="midi-status" id="midiStatus">
+                    <span class="midi-indicator"></span>
+                    <span id="midiStatusText">No MIDI</span>
+                </div>
+                <button class="transport-btn" id="connectMidiBtn" style="padding: 8px 15px; font-size: 12px;">Connect APC40</button>
+                <div class="control-group">
+                    <span class="control-label">BPM</span>
+                    <span class="control-value" id="bpm">120</span>
+                </div>
+                <div class="control-group">
+                    <span class="control-label">Color Mode</span>
+                    <div class="color-mode-selector">
+                        <button class="color-mode-btn active" data-mode="spectrum">Spectrum</button>
+                        <button class="color-mode-btn" data-mode="chromatic">Chromatic</button>
+                        <button class="color-mode-btn" data-mode="harmonic">Harmonic</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="sequencer" id="sequencer">
+            <!-- Tracks will be generated by JavaScript -->
+        </div>
+        
+        <div class="transport">
+            <button class="transport-btn" id="playBtn">▶ Play</button>
+            <button class="transport-btn" id="clearBtn">Clear</button>
+            <button class="transport-btn" id="randomBtn">Random</button>
+            <button class="transport-btn" id="testBtn" style="background: linear-gradient(135deg, #8B008B 0%, #9370DB 100%);">Test LEDs</button>
+            <button class="transport-btn" id="rainbowBtn" style="background: linear-gradient(90deg, red, orange, yellow, green, cyan, blue, violet);">Rainbow Test</button>
+        </div>
+    </div>
+    
+    <script>
+        // Constants
+        const STEPS_PER_PATTERN = 8; // Match APC40's 8 columns
+        const NUM_TRACKS = 5; // Match APC40's 5 rows
+        
+        // Track configuration - ordered from top to bottom as displayed
+        const tracks = [
+            { name: 'Closed Hat', note: 42, icon: '#ffff44' },  // Track 0: Top row (position 1)
+            { name: 'Open Hat', note: 46, icon: '#ff44ff' },    // Track 1: Row 2 (position 2)
+            { name: 'Clap', note: 39, icon: '#44ffff' },        // Track 2: Row 3 (position 3)
+            { name: 'Snare', note: 38, icon: '#44ff44' },       // Track 3: Row 4 (position 4)
+            { name: 'Kick', note: 36, icon: '#ff4444' }         // Track 4: Bottom row (position 5)
+        ];
+        
+        // State variables
+        let isPlaying = false;
+        let currentStep = 0;
+        let intervalId = null;
+        let colorMode = 'spectrum';
+        let patterns = {};
+        let apc40 = null;
+        
+        // APC40 MIDI Controller Class
+        class APC40Controller {
+            constructor() {
+                this.input = null;
+                this.output = null;
+                this.midiAccess = null;
+                this.connected = false;
+                this.ledStates = new Map();
+                this.updateQueue = [];
+                this.isProcessingQueue = false;
+            }
+
+            async connect() {
+                try {
+                    if (!navigator.requestMIDIAccess) {
+                        throw new Error('Web MIDI API not supported in this browser');
+                    }
+
+                    this.midiAccess = await navigator.requestMIDIAccess({ sysex: true });
+                    
+                    for (const output of this.midiAccess.outputs.values()) {
+                        if (output.name.includes('APC40') || output.name.includes('APC mini')) {
+                            this.output = output;
+                            console.log('Found APC40 output:', output.name);
+                            break;
+                        }
+                    }
+
+                    for (const input of this.midiAccess.inputs.values()) {
+                        if (input.name.includes('APC40') || input.name.includes('APC mini')) {
+                            this.input = input;
+                            input.onmidimessage = this.handleMIDIMessage.bind(this);
+                            console.log('Found APC40 input:', input.name);
+                            break;
+                        }
+                    }
+
+                    if (this.output && this.input) {
+                        await this.initializeDevice();
+                        this.connected = true;
+                        return true;
+                    } else {
+                        throw new Error('APC40 not found. Please connect your APC40 and try again.');
+                    }
+                } catch (error) {
+                    console.error('MIDI connection failed:', error);
+                    this.connected = false;
+                    throw error;
+                }
+            }
+
+            async initializeDevice() {
+                const modeSwitch = [0xF0, 0x47, 0x7F, 0x29, 0x60, 0x00, 0x04, 0x41, 0x09, 0x07, 0x01, 0xF7];
+                
+                try {
+                    this.output.send(modeSwitch);
+                    console.log('APC40 mode switch sent');
+                } catch (e) {
+                    console.log('Mode switch may not be supported on this device');
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 100));
+                this.clearAllLEDs();
+            }
+
+            handleMIDIMessage(event) {
+                const [command, note, velocity] = event.data;
+                
+                if (command === 0x90 && velocity > 0) {
+                    this.onButtonPress?.(note, velocity);
+                } else if (command === 0x80 || (command === 0x90 && velocity === 0)) {
+                    this.onButtonRelease?.(note);
+                }
+            }
+
+            setLED(note, color, animationType = 0) {
+                if (!this.output || !this.connected) return;
+                
+                const key = `${note}-${animationType}`;
+                if (this.ledStates.get(key) === color) return;
+                
+                this.ledStates.set(key, color);
+                this.queueLEDUpdate(note, color, animationType);
+            }
+
+            queueLEDUpdate(note, color, animationType) {
+                this.updateQueue.push({ note, color, animationType });
+                
+                if (!this.isProcessingQueue) {
+                    this.processUpdateQueue();
+                }
+            }
+
+            async processUpdateQueue() {
+                this.isProcessingQueue = true;
+                
+                while (this.updateQueue.length > 0) {
+                    const batch = this.updateQueue.splice(0, 8);
+                    
+                    batch.forEach(({ note, color, animationType }) => {
+                        const channel = animationType;
+                        try {
+                            this.output.send([0x90 | channel, note, color]);
+                        } catch (e) {
+                            console.error('Failed to send MIDI:', e);
+                        }
+                    });
+                    
+                    await new Promise(resolve => setTimeout(resolve, 5));
+                }
+                
+                this.isProcessingQueue = false;
+            }
+
+            clearAllLEDs() {
+                if (!this.output || !this.connected) return;
+                
+                for (let note = 0; note < 40; note++) {
+                    this.setLED(note, 0);
+                }
+            }
+
+            disconnect() {
+                if (this.input) {
+                    this.input.onmidimessage = null;
+                }
+                this.clearAllLEDs();
+                this.connected = false;
+                this.input = null;
+                this.output = null;
+            }
+        }
+
+        // APC40 MIDI Note mappings (inverted for physical layout)
+        const APC40_NOTES = {
+            CLIP_GRID: {
+                ROW_1: [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07], // Top physical row
+                ROW_2: [0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F],
+                ROW_3: [0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17],
+                ROW_4: [0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F],
+                ROW_5: [0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27]  // Bottom physical row
+            }
+        };
+
+        const LED_COLORS = {
+            OFF: 0,
+            GREEN: 1,
+            GREEN_BLINK: 2,
+            RED: 3,
+            RED_BLINK: 4,
+            ORANGE: 5,
+            ORANGE_BLINK: 6,
+            YELLOW: 7,
+            WHITE: 6,
+            BLUE: 45,
+            CYAN: 14,
+            MAGENTA: 53,
+            PURPLE: 10,
+            RAINBOW: {
+                RED: 5,
+                RED_ORANGE: 9,
+                ORANGE: 61,
+                YELLOW: 13,
+                GREEN: 21,
+                CYAN: 33,
+                BLUE: 45,
+                VIOLET: 49
+            }
+        };
+
+        // Map steps to APC40 grid
+        const stepToAPC40Note = (trackIndex, stepIndex) => {
+            const rowMap = {
+                0: APC40_NOTES.CLIP_GRID.ROW_5, // Bottom physical row
+                1: APC40_NOTES.CLIP_GRID.ROW_4,
+                2: APC40_NOTES.CLIP_GRID.ROW_3,
+                3: APC40_NOTES.CLIP_GRID.ROW_2,
+                4: APC40_NOTES.CLIP_GRID.ROW_1  // Top physical row
+            };
+            
+            if (rowMap[trackIndex] && stepIndex < 8) {
+                return rowMap[trackIndex][stepIndex];
+            }
+            return -1;
+        };
+        
+        const apc40NoteToTrackStep = (note) => {
+            const rows = [
+                { track: 0, notes: APC40_NOTES.CLIP_GRID.ROW_5 },
+                { track: 1, notes: APC40_NOTES.CLIP_GRID.ROW_4 },
+                { track: 2, notes: APC40_NOTES.CLIP_GRID.ROW_3 },
+                { track: 3, notes: APC40_NOTES.CLIP_GRID.ROW_2 },
+                { track: 4, notes: APC40_NOTES.CLIP_GRID.ROW_1 }
+            ];
+            
+            for (const row of rows) {
+                const stepIndex = row.notes.indexOf(note);
+                if (stepIndex >= 0) {
+                    return { track: row.track, step: stepIndex };
+                }
+            }
+            
+            return null;
+        };
+
+        // Color mapping functions
+        const colorModes = {
+            spectrum: (note, velocity) => {
+                const normalized = (note - 36) / (127 - 36);
+                const hue = normalized * 300;
+                const lightness = 20 + (velocity / 127) * 60;
+                return `hsl(${hue}, 100%, ${lightness}%)`;
+            },
+            
+            chromatic: (note, velocity) => {
+                const noteClass = note % 12;
+                const hue = (noteClass / 12) * 360;
+                const lightness = 20 + (velocity / 127) * 60;
+                return `hsl(${hue}, 100%, ${lightness}%)`;
+            },
+            
+            harmonic: (note, velocity) => {
+                const fifthsOrder = [0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5];
+                const noteClass = note % 12;
+                const fifthIndex = fifthsOrder.indexOf(noteClass);
+                const hue = (fifthIndex / 12) * 360;
+                const lightness = 20 + (velocity / 127) * 60;
+                return `hsl(${hue}, 100%, ${lightness}%)`;
+            }
+        };
+        
+        const getAPC40Color = (note, velocity, mode = 'spectrum', trackIndex = null) => {
+            // Color mode-specific LED mapping using RAINBOW colors (proven to work)
+            switch (mode) {
+                case 'spectrum':
+                    // Frequency-based spectrum mapping: low freq (red) to high freq (violet)
+                    // CORRECTED Track order: 0=ClosedHat(top), 1=OpenHat, 2=Clap, 3=Snare, 4=Kick(bottom)
+                    // Color mapping: Top row = VIOLET (highest freq), Bottom row = RED (lowest freq)
+                    if (trackIndex !== null) {
+                        const spectrumColors = [
+                            LED_COLORS.RAINBOW.VIOLET,   // Track 0: Closed Hat (highest frequency - VIOLET, top row)
+                            LED_COLORS.RAINBOW.BLUE,     // Track 1: Open Hat (high frequency - BLUE)
+                            LED_COLORS.RAINBOW.GREEN,    // Track 2: Clap (mid-high frequency - GREEN)
+                            LED_COLORS.RAINBOW.ORANGE,   // Track 3: Snare (low-mid frequency - ORANGE)
+                            LED_COLORS.RAINBOW.RED,      // Track 4: Kick (lowest frequency - RAINBOW RED, bottom row)
+                        ];
+                        return spectrumColors[trackIndex] || LED_COLORS.RAINBOW.CYAN;
+                    }
+                    // Fallback to velocity-based if no trackIndex
+                    if (velocity > 100) return LED_COLORS.RED;
+                    else if (velocity > 70) return LED_COLORS.ORANGE;
+                    else return LED_COLORS.GREEN;
+
+                case 'chromatic':
+                    const noteClass = note % 12;
+                    // Map chromatic scale to APC40 rainbow colors (tested and working)
+                    const chromaticColors = [
+                        LED_COLORS.RAINBOW.RED,         // C
+                        LED_COLORS.RAINBOW.RED_ORANGE,  // C#
+                        LED_COLORS.RAINBOW.ORANGE,      // D
+                        LED_COLORS.RAINBOW.YELLOW,      // D#
+                        LED_COLORS.RAINBOW.GREEN,       // E
+                        LED_COLORS.RAINBOW.CYAN,        // F
+                        LED_COLORS.RAINBOW.BLUE,        // F#
+                        LED_COLORS.RAINBOW.VIOLET,      // G
+                        LED_COLORS.RAINBOW.RED,         // G# (cycle repeat)
+                        LED_COLORS.RAINBOW.RED_ORANGE,  // A
+                        LED_COLORS.RAINBOW.ORANGE,      // A#
+                        LED_COLORS.RAINBOW.YELLOW,      // B
+                    ];
+                    return chromaticColors[noteClass] || LED_COLORS.GREEN;
+
+                case 'harmonic':
+                    const fifthsOrder = [0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5];
+                    const harmonicNoteClass = note % 12;
+                    const fifthIndex = fifthsOrder.indexOf(harmonicNoteClass);
+                    // Map circle of fifths to rainbow spectrum (warm to cool progression)
+                    const harmonicColors = [
+                        LED_COLORS.RAINBOW.RED,         // F (warm)
+                        LED_COLORS.RAINBOW.RED_ORANGE,  // C
+                        LED_COLORS.RAINBOW.ORANGE,      // G
+                        LED_COLORS.RAINBOW.YELLOW,      // D
+                        LED_COLORS.RAINBOW.GREEN,       // A
+                        LED_COLORS.RAINBOW.CYAN,        // E (cool)
+                        LED_COLORS.RAINBOW.BLUE,        // B
+                        LED_COLORS.RAINBOW.VIOLET,      // F#
+                        LED_COLORS.RAINBOW.RED,         // C# (cycle warm)
+                        LED_COLORS.RAINBOW.RED_ORANGE,  // G#
+                        LED_COLORS.RAINBOW.ORANGE,      // D#
+                        LED_COLORS.RAINBOW.YELLOW,      // A#
+                    ];
+                    return harmonicColors[fifthIndex] || LED_COLORS.GREEN;
+
+                default:
+                    // Fallback velocity-based mapping
+                    if (velocity > 100) return LED_COLORS.RED;
+                    else if (velocity > 70) return LED_COLORS.ORANGE;
+                    else return LED_COLORS.GREEN;
+            }
+        };
+
+        // Update APC40 LED for a step
+        function updateAPC40StepLED(trackIndex, stepIndex) {
+            if (!apc40 || !apc40.connected) return;
+            if (trackIndex >= NUM_TRACKS || stepIndex >= STEPS_PER_PATTERN) return;
+
+            const apc40Note = stepToAPC40Note(trackIndex, stepIndex);
+            if (apc40Note === -1) return;
+
+            const isActive = patterns[trackIndex] && patterns[trackIndex][stepIndex];
+
+            let color;
+            if (stepIndex === currentStep && isPlaying) {
+                // Use basic YELLOW for bright timeline indicator
+                color = LED_COLORS.YELLOW;  // Use basic YELLOW (7) for timeline
+            } else if (isActive) {
+                const velocity = patterns[trackIndex][stepIndex].velocity;
+                const track = tracks[trackIndex];
+                // Use color mode-aware LED mapping with track note, trackIndex, and current color mode
+                color = getAPC40Color(track.note, velocity, colorMode, trackIndex);
+            } else {
+                color = LED_COLORS.OFF;
+            }
+
+            apc40.setLED(apc40Note, color);
+        }
+
+        function updateAllAPC40LEDs() {
+            if (!apc40 || !apc40.connected) return;
+
+            for (let track = 0; track < NUM_TRACKS; track++) {
+                for (let step = 0; step < STEPS_PER_PATTERN; step++) {
+                    updateAPC40StepLED(track, step);
+                }
+            }
+        }
+
+        // Update track icons to match current color mode
+        function updateTrackIcons() {
+            for (let trackIndex = 0; trackIndex < NUM_TRACKS; trackIndex++) {
+                const track = tracks[trackIndex];
+                const trackIcon = document.getElementById(`track-icon-${trackIndex}`);
+
+                if (trackIcon) {
+                    // Use same color logic as the grid steps
+                    const ledColor = getAPC40Color(track.note, 100, colorMode, trackIndex); // Use high velocity for icon
+                    const cssColor = ledColorToCSS(ledColor);
+                    trackIcon.style.background = cssColor;
+                }
+            }
+        }
+
+        // Initialize sequencer
+        function initSequencer() {
+            const sequencer = document.getElementById('sequencer');
+            sequencer.innerHTML = '';
+            
+            tracks.forEach((track, trackIndex) => {
+                const trackDiv = document.createElement('div');
+                trackDiv.className = 'track';
+                
+                const label = document.createElement('div');
+                label.className = 'track-label';
+
+                // Create track icon with dynamic color that updates with color mode
+                const trackIcon = document.createElement('span');
+                trackIcon.className = 'track-icon';
+                trackIcon.id = `track-icon-${trackIndex}`;
+
+                label.innerHTML = `${track.name}`;
+                label.appendChild(trackIcon);
+                trackDiv.appendChild(label);
+                
+                const stepsDiv = document.createElement('div');
+                stepsDiv.className = 'steps';
+                
+                patterns[trackIndex] = patterns[trackIndex] || [];
+                
+                for (let i = 0; i < STEPS_PER_PATTERN; i++) {
+                    const step = document.createElement('div');
+                    step.className = 'step';
+                    step.dataset.track = trackIndex;
+                    step.dataset.step = i;
+                    
+                    const velocityIndicator = document.createElement('div');
+                    velocityIndicator.className = 'velocity-indicator';
+                    step.appendChild(velocityIndicator);
+                    
+                    step.addEventListener('click', () => toggleStep(trackIndex, i, step));
+                    
+                    if (patterns[trackIndex][i]) {
+                        activateStep(step, patterns[trackIndex][i].velocity);
+                    }
+                    
+                    stepsDiv.appendChild(step);
+                }
+                
+                trackDiv.appendChild(stepsDiv);
+                sequencer.appendChild(trackDiv);
+            });
+
+            // Update track icons to match initial color mode
+            updateTrackIcons();
+            updateAllAPC40LEDs();
+        }
+        
+        function toggleStep(trackIndex, stepIndex, element) {
+            if (!patterns[trackIndex]) patterns[trackIndex] = [];
+            
+            if (patterns[trackIndex][stepIndex]) {
+                patterns[trackIndex][stepIndex] = null;
+                element.classList.remove('active');
+                element.style.background = '#333';
+                element.querySelector('.velocity-indicator').style.height = '0';
+            } else {
+                const velocity = 60 + Math.random() * 67;
+                patterns[trackIndex][stepIndex] = { velocity };
+                activateStep(element, velocity);
+            }
+            
+            updateAPC40StepLED(trackIndex, stepIndex);
+        }
+        
+        // Convert APC40 LED colors to CSS colors for UI display
+        function ledColorToCSS(ledColor, isTimeline = false) {
+            // Special case: timeline indicator shows as white in UI but uses YELLOW LED
+            if (isTimeline && ledColor === LED_COLORS.YELLOW) {
+                return '#FFFFFF';
+            }
+            const cssColorMap = {
+                [LED_COLORS.RAINBOW.RED]: '#FF0000',
+                [LED_COLORS.RAINBOW.RED_ORANGE]: '#FF6600',
+                [LED_COLORS.RAINBOW.ORANGE]: '#FF8800',
+                [LED_COLORS.RAINBOW.YELLOW]: '#FFDD00',
+                [LED_COLORS.RAINBOW.GREEN]: '#44FF44',
+                [LED_COLORS.RAINBOW.CYAN]: '#00FFFF',
+                [LED_COLORS.RAINBOW.BLUE]: '#4444FF',
+                [LED_COLORS.RAINBOW.VIOLET]: '#8844FF',
+                [LED_COLORS.RED]: '#FF0000',
+                [LED_COLORS.ORANGE]: '#FF8800',
+                [LED_COLORS.GREEN]: '#00FF00',
+                [LED_COLORS.YELLOW]: '#FFFF00',
+            };
+            return cssColorMap[ledColor] || '#888888';
+        }
+
+        function activateStep(element, velocity) {
+            const trackIndex = parseInt(element.dataset.track);
+            const track = tracks[trackIndex];
+
+            // Use the same color logic as APC40 LEDs for consistency
+            const ledColor = getAPC40Color(track.note, velocity, colorMode, trackIndex);
+            const cssColor = ledColorToCSS(ledColor);
+
+            element.classList.add('active');
+            element.style.background = cssColor;
+            element.style.borderColor = cssColor;
+
+            const velocityHeight = (velocity / 127) * 60;
+            element.querySelector('.velocity-indicator').style.height = `${velocityHeight}%`;
+        }
+        
+        function updateSequencer() {
+            document.querySelectorAll('.step.current').forEach(el => {
+                el.classList.remove('current');
+            });
+            
+            if (apc40 && apc40.connected) {
+                const prevStep = (currentStep - 1 + STEPS_PER_PATTERN) % STEPS_PER_PATTERN;
+                for (let track = 0; track < NUM_TRACKS; track++) {
+                    updateAPC40StepLED(track, prevStep);
+                }
+            }
+            
+            document.querySelectorAll(`.step[data-step="${currentStep}"]`).forEach(el => {
+                el.classList.add('current');
+
+                const trackIndex = parseInt(el.dataset.track);
+                if (patterns[trackIndex] && patterns[trackIndex][currentStep]) {
+                    const velocity = patterns[trackIndex][currentStep].velocity;
+                    const track = tracks[trackIndex];
+
+                    // For timeline indicator, show white flash; for active steps, show normal color
+                    if (el.classList.contains('current')) {
+                        // Timeline indicator - show white flash
+                        el.style.boxShadow = `0 0 30px #FFFFFF`;
+                    } else {
+                        // Regular active step - show color-mode flash
+                        const ledColor = getAPC40Color(track.note, Math.min(127, velocity * 1.5), colorMode, trackIndex);
+                        const flashColor = ledColorToCSS(ledColor);
+                        el.style.boxShadow = `0 0 30px ${flashColor}`;
+                    }
+                    setTimeout(() => {
+                        el.style.boxShadow = '';
+                    }, 100);
+                }
+            });
+            
+            for (let track = 0; track < NUM_TRACKS; track++) {
+                updateAPC40StepLED(track, currentStep);
+            }
+            
+            currentStep = (currentStep + 1) % STEPS_PER_PATTERN;
+        }
+        
+        function play() {
+            if (isPlaying) return;
+            isPlaying = true;
+            const bpm = parseInt(document.getElementById('bpm').textContent);
+            const stepTime = (60 / bpm) * 1000 / 2; // 8th notes
+            
+            document.getElementById('playBtn').classList.add('playing');
+            document.getElementById('playBtn').innerHTML = '⏸ Pause';
+            
+            updateSequencer();
+            intervalId = setInterval(updateSequencer, stepTime);
+        }
+        
+        function stop() {
+            isPlaying = false;
+            if (intervalId) clearInterval(intervalId);
+            document.getElementById('playBtn').classList.remove('playing');
+            document.getElementById('playBtn').innerHTML = '▶ Play';
+            currentStep = 0;
+            
+            document.querySelectorAll('.step.current').forEach(el => {
+                el.classList.remove('current');
+            });
+            
+            updateAllAPC40LEDs();
+        }
+        
+        function clearPattern() {
+            patterns = {};
+            initSequencer();
+        }
+        
+        function randomPattern() {
+            patterns = {};
+            tracks.forEach((track, trackIndex) => {
+                patterns[trackIndex] = [];
+                for (let i = 0; i < STEPS_PER_PATTERN; i++) {
+                    if (Math.random() > 0.7) {
+                        patterns[trackIndex][i] = {
+                            velocity: 60 + Math.random() * 67
+                        };
+                    }
+                }
+            });
+            initSequencer();
+        }
+
+        // MIDI Connection Handler
+        async function connectMIDI() {
+            const statusEl = document.getElementById('midiStatus');
+            const statusText = document.getElementById('midiStatusText');
+            const connectBtn = document.getElementById('connectMidiBtn');
+            
+            try {
+                connectBtn.disabled = true;
+                statusText.textContent = 'Connecting...';
+                
+                if (!apc40) {
+                    apc40 = new APC40Controller();
+                }
+                
+                await apc40.connect();
+                
+                apc40.onButtonPress = (note, velocity) => {
+                    const result = apc40NoteToTrackStep(note);
+                    if (result) {
+                        const { track, step } = result;
+                        const stepEl = document.querySelector(`.step[data-track="${track}"][data-step="${step}"]`);
+                        if (stepEl) {
+                            toggleStep(track, step, stepEl);
+                        }
+                    }
+                };
+                
+                statusEl.classList.add('connected');
+                statusText.textContent = 'APC40 Connected';
+                connectBtn.textContent = 'Disconnect';
+                connectBtn.disabled = false;
+                
+                updateAllAPC40LEDs();
+                
+            } catch (error) {
+                statusText.textContent = 'Connection Failed';
+                connectBtn.textContent = 'Connect APC40';
+                connectBtn.disabled = false;
+                alert('Failed to connect to APC40: ' + error.message);
+            }
+        }
+
+        function disconnectMIDI() {
+            if (apc40) {
+                apc40.disconnect();
+                apc40 = null;
+            }
+            
+            const statusEl = document.getElementById('midiStatus');
+            const statusText = document.getElementById('midiStatusText');
+            const connectBtn = document.getElementById('connectMidiBtn');
+            
+            statusEl.classList.remove('connected');
+            statusText.textContent = 'No MIDI';
+            connectBtn.textContent = 'Connect APC40';
+        }
+
+        // Test functions
+        async function testLEDMapping() {
+            if (!apc40 || !apc40.connected) {
+                alert('Please connect your APC40 first!');
+                return;
+            }
+            
+            console.log('Starting LED mapping test...');
+            
+            apc40.clearAllLEDs();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            alert('Test 1: Lighting each row from bottom to top. Watch which physical row lights up for each color.\n\nPhysical Bottom Row (0x20-0x27) = RED\nSecond Row (0x18-0x1F) = GREEN\nMiddle Row (0x10-0x17) = YELLOW\nFourth Row (0x08-0x0F) = ORANGE\nPhysical Top Row (0x00-0x07) = CYAN');
+            
+            for (let i = 0; i < 8; i++) {
+                apc40.setLED(APC40_NOTES.CLIP_GRID.ROW_5[i], LED_COLORS.RED);
+            }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            for (let i = 0; i < 8; i++) {
+                apc40.setLED(APC40_NOTES.CLIP_GRID.ROW_4[i], LED_COLORS.GREEN);
+            }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            for (let i = 0; i < 8; i++) {
+                apc40.setLED(APC40_NOTES.CLIP_GRID.ROW_3[i], LED_COLORS.YELLOW);
+            }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            for (let i = 0; i < 8; i++) {
+                apc40.setLED(APC40_NOTES.CLIP_GRID.ROW_2[i], LED_COLORS.ORANGE);
+            }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            for (let i = 0; i < 8; i++) {
+                apc40.setLED(APC40_NOTES.CLIP_GRID.ROW_1[i], LED_COLORS.CYAN || LED_COLORS.BLUE || LED_COLORS.GREEN);
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            if (confirm('Test 2: Light up each button in sequence from note 0x00 to 0x27. Press OK to continue.')) {
+                apc40.clearAllLEDs();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                for (let note = 0x00; note <= 0x27; note++) {
+                    if (note > 0) {
+                        apc40.setLED(note - 1, LED_COLORS.OFF);
+                    }
+                    apc40.setLED(note, LED_COLORS.WHITE || LED_COLORS.YELLOW);
+                    console.log(`Lighting note 0x${note.toString(16).padStart(2, '0')} (${note})`);
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+            }
+            
+            apc40.clearAllLEDs();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            alert('Test 3: Showing where steps 1-8 currently map. All steps = RED with different brightness');
+            
+            for (let i = 0; i < STEPS_PER_PATTERN; i++) {
+                const note = stepToAPC40Note(0, i);
+                const velocity = 60 + (i * 10);
+                apc40.setLED(note, LED_COLORS.RED);
+            }
+            
+            console.log('LED mapping test complete! Check console for note numbers.');
+        }
+        
+        async function rainbowTest() {
+            if (!apc40 || !apc40.connected) {
+                alert('Please connect your APC40 first!');
+                return;
+            }
+            
+            console.log('Starting Rainbow Color Test...');
+            
+            apc40.clearAllLEDs();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            alert('Rainbow Test: Each row will display a rainbow spectrum from RED to VIOLET.\n\nThis tests the extended color palette of your APC40.\n\nWatch as each row lights up with 8 colors across the spectrum.');
+            
+            const rainbowSequence = [
+                LED_COLORS.RAINBOW.RED,
+                LED_COLORS.RAINBOW.RED_ORANGE,
+                LED_COLORS.RAINBOW.ORANGE,
+                LED_COLORS.RAINBOW.YELLOW,
+                LED_COLORS.RAINBOW.GREEN,
+                LED_COLORS.RAINBOW.CYAN,
+                LED_COLORS.RAINBOW.BLUE,
+                LED_COLORS.RAINBOW.VIOLET
+            ];
+            
+            const alternativeRainbow = [3, 5, 9, 13, 21, 37, 45, 53];
+            const velocityRainbow = [60, 70, 80, 90, 100, 110, 120, 127];
+            
+            console.log('Row 5 (bottom) - Primary rainbow colors:');
+            for (let i = 0; i < 8; i++) {
+                const note = APC40_NOTES.CLIP_GRID.ROW_5[i];
+                const color = rainbowSequence[i];
+                apc40.setLED(note, color);
+                console.log(`Button ${i+1}: Color value ${color}`);
+            }
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            console.log('Row 4 - Alternative color values:');
+            for (let i = 0; i < 8; i++) {
+                const note = APC40_NOTES.CLIP_GRID.ROW_4[i];
+                const color = alternativeRainbow[i];
+                apc40.setLED(note, color);
+                console.log(`Button ${i+1}: Color value ${color}`);
+            }
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            console.log('Row 3 - Velocity-based colors:');
+            for (let i = 0; i < 8; i++) {
+                const note = APC40_NOTES.CLIP_GRID.ROW_3[i];
+                const color = velocityRainbow[i];
+                apc40.setLED(note, color);
+                console.log(`Button ${i+1}: Velocity ${color}`);
+            }
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            if (confirm('Would you like to see a full scan of all 128 possible color values? This will cycle through colors on Row 2.')) {
+                console.log('Row 2 - Full velocity scan:');
+                for (let color = 0; color < 128; color++) {
+                    for (let i = 0; i < 8; i++) {
+                        const note = APC40_NOTES.CLIP_GRID.ROW_2[i];
+                        const offsetColor = (color + (i * 16)) % 128;
+                        apc40.setLED(note, offsetColor);
+                    }
+                    console.log(`Testing color range: ${color}-${color+7}`);
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
+            
+            console.log('Row 1 (top) - Rainbow wave animation:');
+            for (let cycle = 0; cycle < 3; cycle++) {
+                for (let offset = 0; offset < 8; offset++) {
+                    for (let i = 0; i < 8; i++) {
+                        const note = APC40_NOTES.CLIP_GRID.ROW_1[i];
+                        const colorIndex = (i + offset) % 8;
+                        const color = rainbowSequence[colorIndex];
+                        apc40.setLED(note, color);
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 150));
+                }
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            if (confirm('Final test: Display rainbow on all 5 rows simultaneously?')) {
+                for (let row = 0; row < 5; row++) {
+                    const rowKey = `ROW_${row + 1}`;
+                    for (let i = 0; i < 8; i++) {
+                        const note = APC40_NOTES.CLIP_GRID[rowKey][i];
+                        const color = rainbowSequence[i];
+                        apc40.setLED(note, color);
+                    }
+                }
+                console.log('All rows showing rainbow spectrum');
+            }
+            
+            console.log('Rainbow test complete! Check which row had the best color representation.');
+        }
+
+        // Event listeners
+        document.getElementById('playBtn').addEventListener('click', () => {
+            if (isPlaying) stop();
+            else play();
+        });
+        
+        document.getElementById('clearBtn').addEventListener('click', clearPattern);
+        document.getElementById('randomBtn').addEventListener('click', randomPattern);
+        document.getElementById('testBtn').addEventListener('click', testLEDMapping);
+        document.getElementById('rainbowBtn').addEventListener('click', rainbowTest);
+        
+        document.getElementById('connectMidiBtn').addEventListener('click', async () => {
+            if (apc40 && apc40.connected) {
+                disconnectMIDI();
+            } else {
+                await connectMIDI();
+            }
+        });
+        
+        document.querySelectorAll('.color-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.color-mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                colorMode = btn.dataset.mode;
+
+                // Update UI colors
+                document.querySelectorAll('.step.active').forEach(step => {
+                    const trackIndex = parseInt(step.dataset.track);
+                    const stepIndex = parseInt(step.dataset.step);
+                    if (patterns[trackIndex] && patterns[trackIndex][stepIndex]) {
+                        activateStep(step, patterns[trackIndex][stepIndex].velocity);
+                    }
+                });
+
+                // ✅ CRITICAL FIX: Update APC40 hardware LEDs with new color mode
+                updateTrackIcons();
+                updateAllAPC40LEDs();
+            });
+        });
+        
+        // Initialize with a demo pattern
+        function initDemoPattern() {
+            patterns[0] = [];
+            [0, 4].forEach(i => {
+                if (i < STEPS_PER_PATTERN) patterns[0][i] = { velocity: 100 };
+            });
+            
+            patterns[1] = [];
+            [2, 6].forEach(i => {
+                if (i < STEPS_PER_PATTERN) patterns[1][i] = { velocity: 90 };
+            });
+            
+            patterns[2] = [];
+            for (let i = 0; i < STEPS_PER_PATTERN; i++) {
+                patterns[2][i] = { velocity: 50 + Math.random() * 30 };
+            }
+            
+            initSequencer();
+        }
+        
+        // Initialize
+        initDemoPattern();
+    </script>
+</body>
+</html>
