@@ -1,5 +1,6 @@
 import React from 'react';
 import { Music, Settings, Users, Wifi, WifiOff } from 'lucide-react';
+import { HardwareStatusIndicator } from '../../hardware/ui/HardwareStatusIndicator';
 
 interface HeaderProps {
   sessionCode?: string;
@@ -33,6 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4">
+          {/* Network Connection Status */}
           <div className="flex items-center gap-1 sm:gap-2">
             {isConnected ? (
               <Wifi className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
@@ -42,6 +44,15 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-xs sm:text-sm text-gray-300 hidden sm:inline">
               {isConnected ? 'Connected' : 'Disconnected'}
             </span>
+          </div>
+
+          {/* Hardware Status */}
+          <div className="relative">
+            <HardwareStatusIndicator
+              showDeviceInfo={true}
+              showCompatibilityInfo={true}
+              className="hidden sm:block"
+            />
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">

@@ -68,3 +68,15 @@ export interface LessonStep {
   hint?: string;
   completed: boolean;
 }
+
+// Re-export hardware types for convenient access
+export type {
+  ConnectionStatus,
+  HardwareEventType,
+  ControllerCapabilities,
+  HardwareEvent,
+  HardwareController,
+  SequencerState,
+  ControllerState,
+  HardwareContextType,
+} from '../hardware';
