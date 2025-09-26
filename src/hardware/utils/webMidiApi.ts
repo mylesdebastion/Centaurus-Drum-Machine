@@ -32,8 +32,8 @@ export interface BrowserCompatibility {
 }
 
 export interface DeviceEnumeration {
-  inputs: WebMIDI.MIDIInput[];
-  outputs: WebMIDI.MIDIOutput[];
+  inputs: MIDIInput[];
+  outputs: MIDIOutput[];
 }
 
 export class WebMIDIApiWrapper {
@@ -121,16 +121,16 @@ export class WebMIDIApiWrapper {
       throw new Error('MIDI access not initialized');
     }
 
-    const inputs: WebMIDI.MIDIInput[] = [];
-    const outputs: WebMIDI.MIDIOutput[] = [];
+    const inputs: MIDIInput[] = [];
+    const outputs: MIDIOutput[] = [];
 
     // Collect inputs
-    this.midiAccess.inputs.forEach((input: WebMIDI.MIDIInput) => {
+    this.midiAccess.inputs.forEach((input: MIDIInput) => {
       inputs.push(input);
     });
 
     // Collect outputs
-    this.midiAccess.outputs.forEach((output: WebMIDI.MIDIOutput) => {
+    this.midiAccess.outputs.forEach((output: MIDIOutput) => {
       outputs.push(output);
     });
 

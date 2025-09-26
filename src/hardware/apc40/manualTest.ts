@@ -6,7 +6,7 @@
  */
 
 import { apc40Integration } from './integration';
-import { HardwareManager, useHardwareContext } from '../core/HardwareManager';
+// import { HardwareManager, useHardwareContext } from '../core/HardwareManager'; // Unused for now
 
 declare global {
   interface Window {

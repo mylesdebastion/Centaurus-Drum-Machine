@@ -74,19 +74,6 @@ export function createGridMapping(): GridMapping {
   };
 }
 
-/**
- * Gets the MIDI notes for a specific row of the APC40 grid
- */
-function getRowNotes(row: number): number[] {
-  switch (row) {
-    case 0: return APC40_GRID_NOTES.ROW_0;
-    case 1: return APC40_GRID_NOTES.ROW_1;
-    case 2: return APC40_GRID_NOTES.ROW_2;
-    case 3: return APC40_GRID_NOTES.ROW_3;
-    case 4: return APC40_GRID_NOTES.ROW_4;
-    default: throw new Error(`Invalid APC40 row: ${row}`);
-  }
-}
 
 // Velocity Mapping for Step Intensity
 export const VELOCITY_MAPPING = {
