@@ -120,7 +120,7 @@ export const HardwareStatusIndicator: React.FC<HardwareStatusIndicatorProps> = (
     <div className={className}>
       {/* Main Status Indicator */}
       <div
-        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${status.bgColor} ${status.borderColor} ${status.color} border`}
+        className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${status.bgColor} ${status.borderColor} ${status.color} border`}
         onClick={() => setShowDetails(!showDetails)}
       >
         {status.icon}
@@ -140,7 +140,7 @@ export const HardwareStatusIndicator: React.FC<HardwareStatusIndicatorProps> = (
             {canRetry && (
               <button
                 onClick={handleRetry}
-                className="flex items-center text-sm text-blue-500 hover:text-blue-600"
+                className="flex items-center px-2 py-1 text-sm bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
                 disabled={connectionState.status === 'connecting'}
               >
                 <RefreshCw className="w-3 h-3 mr-1" />
@@ -150,7 +150,7 @@ export const HardwareStatusIndicator: React.FC<HardwareStatusIndicatorProps> = (
             {canConnect && (
               <button
                 onClick={handleConnect}
-                className="flex items-center text-sm text-green-500 hover:text-green-600"
+                className="flex items-center px-2 py-1 text-sm bg-green-50 text-green-600 hover:bg-green-100 rounded-lg transition-colors"
               >
                 <Wifi className="w-3 h-3 mr-1" />
                 Connect
@@ -202,7 +202,7 @@ export const HardwareStatusIndicator: React.FC<HardwareStatusIndicatorProps> = (
           <div className="flex justify-between items-center text-xs border-t pt-2">
             <button
               onClick={() => setShowDetails(false)}
-              className="text-gray-500 hover:text-gray-700"
+              className="px-2 py-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
             >
               Close
             </button>
