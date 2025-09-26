@@ -31,10 +31,16 @@ export interface BrowserCompatibility {
   hasSecureContext: boolean;
 }
 
+export interface DeviceEnumeration {
+  inputs: WebMIDI.MIDIInput[];
+  outputs: WebMIDI.MIDIOutput[];
+}
+
 export class WebMIDIApiWrapper {
   private midiAccess: any = null;
   private devices: Map<string, MIDIDevice> = new Map();
   private eventListeners: Map<string, ((data: any) => void)[]> = new Map();
+  private initialized: boolean = false;
 
   /**
    * Check browser compatibility for Web MIDI API
@@ -76,12 +82,15 @@ export class WebMIDIApiWrapper {
     }
 
     try {
-      this.midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+      // Request MIDI access with SysEx support for APC40 LED control
+      this.midiAccess = await navigator.requestMIDIAccess({ sysex: true });
       this.setupDeviceListeners();
-      this.enumerateDevices();
-      console.log('[WebMIDIApi] Successfully initialized');
+      this.enumerateAllDevices();
+      this.initialized = true;
+      console.log('[WebMIDIApi] Successfully initialized with SysEx support');
       this.emit('initialized');
     } catch (error) {
+      this.initialized = false;
       const errorMessage = `Failed to initialize MIDI access: ${error instanceof Error ? error.message : 'Unknown error'}`;
       hardwareErrorHandler.handleConnectionError(error instanceof Error ? error : errorMessage, {
         operation: 'MIDI API initialization'
@@ -91,10 +100,41 @@ export class WebMIDIApiWrapper {
   }
 
   /**
+   * Check if Web MIDI API is initialized
+   */
+  isInitialized(): boolean {
+    return this.initialized;
+  }
+
+  /**
    * Get all available MIDI devices
    */
   getDevices(): MIDIDevice[] {
     return Array.from(this.devices.values());
+  }
+
+  /**
+   * Enumerate MIDI devices in format expected by APC40Controller
+   */
+  async enumerateDevices(): Promise<DeviceEnumeration> {
+    if (!this.midiAccess) {
+      throw new Error('MIDI access not initialized');
+    }
+
+    const inputs: WebMIDI.MIDIInput[] = [];
+    const outputs: WebMIDI.MIDIOutput[] = [];
+
+    // Collect inputs
+    this.midiAccess.inputs.forEach((input: WebMIDI.MIDIInput) => {
+      inputs.push(input);
+    });
+
+    // Collect outputs
+    this.midiAccess.outputs.forEach((output: WebMIDI.MIDIOutput) => {
+      outputs.push(output);
+    });
+
+    return { inputs, outputs };
   }
 
   /**
@@ -223,9 +263,9 @@ export class WebMIDIApiWrapper {
   }
 
   /**
-   * Enumerate and catalog all MIDI devices
+   * Enumerate and catalog all MIDI devices (internal)
    */
-  private enumerateDevices(): void {
+  private enumerateAllDevices(): void {
     if (!this.midiAccess) return;
 
     // Process inputs
@@ -331,6 +371,7 @@ export class WebMIDIApiWrapper {
     this.eventListeners.clear();
     this.devices.clear();
     this.midiAccess = null;
+    this.initialized = false;
   }
 }
 

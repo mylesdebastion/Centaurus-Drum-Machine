@@ -25,3 +25,11 @@ export { HardwareErrorBoundary, withHardwareErrorBoundary, useHardwareErrorReset
 // Type exports
 export type { UseHardwareReturn, HardwareStats } from './core/useHardware';
 export type { HardwareManagerProps } from './core/HardwareManager';
+
+// APC40 Hardware Controller
+export { APC40Controller } from './apc40/APC40Controller';
+export { apc40Integration } from './apc40/integration';
+export type { 
+  APC40IntegrationOptions, 
+  APC40IntegrationResult 
+} from './apc40/integration';

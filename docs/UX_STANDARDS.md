@@ -3,6 +3,29 @@
 ## Purpose
 This document establishes consistent design patterns and styling standards across the Audiolux Jam Session application to ensure a cohesive user experience.
 
+## Design Philosophy (bolt.new Standards)
+
+**Core Principle**: For all designs and UI components, make them **beautiful, not cookie cutter**. Create components that are **fully featured and worthy for production**.
+
+### Quality Standards
+- **Production-ready from start** - No placeholder content or incomplete implementations
+- **Beautiful and thoughtful** - Custom design decisions, not generic templates
+- **Fully featured** - Complete functionality, proper error states, loading states
+- **Consistent visual system** - Follow established Tailwind component patterns
+
+### Technology Stack Alignment
+- **JSX with Tailwind CSS classes** (established project pattern)
+- **React hooks** (functional components only)
+- **Lucide React icons exclusively** (do not add other icon libraries)
+- **Minimal external dependencies** (extend existing patterns instead)
+
+### Component Development Process
+1. **Review existing components** for established patterns before creating new ones
+2. **Use component classes** from `/src/index.css` (@layer components: `.btn-primary`, `.step-button`, `.track-row`)
+3. **Follow design tokens** from `tailwind.config.js` (primary/accent color scales)
+4. **Extend, don't override** - build on existing visual patterns
+5. **Reference CLAUDE.md** for additional development guidelines
+
 ## Design System
 
 ### Border Radius Standards
@@ -147,19 +170,27 @@ className="gap-2 sm:gap-4"       /* Responsive gaps */
 4. **Apply proper spacing** - Use standard padding/gap patterns
 
 ### Code Review Checklist
-- [ ] Border radius follows standards (`rounded-lg` for buttons)
-- [ ] Color scheme uses established palette
-- [ ] Hover states implemented with transitions
-- [ ] Responsive breakpoints considered
-- [ ] Consistent spacing patterns used
-- [ ] Icon sizes appropriate for context
+- [ ] **bolt.new Quality**: Component is beautiful and production-ready (not cookie cutter)
+- [ ] **Existing Patterns**: Reviewed similar components for established patterns
+- [ ] **Component Classes**: Used existing classes from `/src/index.css` where applicable
+- [ ] **Design Tokens**: Used primary/accent colors from `tailwind.config.js`
+- [ ] **Border Radius**: Follows standards (`rounded-lg` for interactive elements)
+- [ ] **Icons**: Used Lucide React icons exclusively
+- [ ] **Hover States**: Implemented with smooth transitions
+- [ ] **Responsive**: Tested across mobile, tablet, and desktop breakpoints
+- [ ] **Accessibility**: Proper contrast and touch targets (44px minimum)
+- [ ] **Dependencies**: No unnecessary external packages added
 
 ### Anti-Patterns to Avoid
-- ❌ Mixing `rounded-full` with `rounded-lg` in similar contexts
-- ❌ Inconsistent button padding across similar components
-- ❌ Missing hover states on interactive elements
-- ❌ Using custom colors outside established palette
-- ❌ Forgetting transition animations on state changes
+- ❌ **Cookie cutter designs** - Generic, template-like implementations
+- ❌ **Incomplete features** - Placeholder content or missing functionality
+- ❌ **External dependencies** - Adding UI libraries when existing patterns work
+- ❌ **Inconsistent patterns** - Not following established component classes
+- ❌ **Non-Lucide icons** - Using other icon libraries
+- ❌ **Border radius mixing** - Using `rounded-full` with `rounded-lg` in similar contexts
+- ❌ **Custom colors** - Colors outside primary/accent/semantic palette
+- ❌ **Missing hover states** - Interactive elements without transitions
+- ❌ **Poor responsive** - Not testing across all breakpoints
 
 ## Maintenance
 
@@ -170,5 +201,11 @@ This document should be updated when:
 - Major design system updates happen
 
 **Last Updated**: 2025-09-25
-**Version**: 1.0
+**Version**: 1.1 (Added bolt.new design philosophy integration)
 **Applies to**: All UI components in Audiolux Jam Session
+
+## Related Documentation
+- **CLAUDE.md** - Complete development guidelines for Claude Code
+- **tailwind.config.js** - Custom design tokens and color scales
+- **src/index.css** - Tailwind component classes (@layer components)
+- **docs/architecture/component-architecture.md** - Technical component specifications

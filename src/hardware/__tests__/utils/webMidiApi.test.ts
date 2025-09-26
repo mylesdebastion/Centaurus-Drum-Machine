@@ -131,7 +131,7 @@ describe('WebMIDIApiWrapper', () => {
 
       await wrapper.initialize();
 
-      expect(mockRequestMIDIAccess).toHaveBeenCalledWith({ sysex: false });
+      expect(mockRequestMIDIAccess).toHaveBeenCalledWith({ sysex: true });
       expect(initializeSpy).toHaveBeenCalled();
     });
 
