@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Music, Users, Play, BookOpen, Sparkles } from 'lucide-react';
+import { Music, Users, Play, BookOpen, Sparkles, Gamepad2 } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onStartJam: () => void;
@@ -117,6 +117,23 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" />
               Education Mode
             </button>
+          </div>
+
+          {/* Temporary APC40 Test Button */}
+          <div className="mt-4">
+            <a
+              href="/apc40-demo.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-3 px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-all transform hover:scale-105 shadow-lg hover:shadow-xl"
+            >
+              <Gamepad2 className="w-5 h-5 sm:w-6 sm:h-6" />
+              <span className="text-base sm:text-lg">Test APC40 Demo</span>
+              <span className="text-xs sm:text-sm opacity-75">(Beta)</span>
+            </a>
+            <p className="text-xs text-gray-500 mt-2">
+              Temporary link for testing APC40 MIDI controller integration
+            </p>
           </div>
         </div>
 
