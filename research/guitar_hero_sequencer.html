@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guitar Hero Step Sequencer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            gap: 15px;
+            flex-wrap: wrap;
+            z-index: 100;
+            position: relative;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .view-btn {
+            background: #2196F3;
+        }
+
+        .view-btn:hover {
+            background: #1976D2;
+        }
+
+        .clear-btn {
+            background: #f44336;
+        }
+
+        .clear-btn:hover {
+            background: #d32f2f;
+        }
+
+        .random-btn {
+            background: #FF9800;
+        }
+
+        .random-btn:hover {
+            background: #F57C00;
+        }
+
+        .bpm-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .bpm-slider {
+            width: 100px;
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .lane-labels {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            z-index: 10;
+            transition: opacity 0.5s;
+        }
+
+        .lane-labels.flow-mode {
+            opacity: 0;
+        }
+
+        .lane-label {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 10px;
+            padding: 0 10px;
+            border-radius: 5px;
+            background: rgba(0, 0, 0, 0.7);
+        }
+
+        .info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 10;
+        }
+
+        .hit-zone {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 60px;
+            border: 2px solid #ff4444;
+            border-radius: 10px;
+            background: rgba(255, 68, 68, 0.1);
+            z-index: 10;
+            display: none;
+            pointer-events: none;
+        }
+
+        .hit-zone.flow-mode {
+            display: block;
+        }
+
+        @keyframes noteHit {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1); }
+        }
+
+        .note-hit {
+            animation: noteHit 0.2s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="controls">
+            <button id="playBtn" class="play-btn">Play</button>
+            <button id="viewBtn" class="view-btn">Switch to Flow Mode</button>
+            <button id="splitBtn" class="view-btn">Split Screen</button>
+            <button id="rotateBtn" class="view-btn">Rotate Grid</button>
+            <button id="clearBtn" class="clear-btn">Clear</button>
+            <button id="randomBtn" class="random-btn">Randomize</button>
+            <button id="motifBtn" class="motif-btn">Load Motif</button>
+            <div class="bpm-control">
+                <label>BPM:</label>
+                <input type="range" id="bpmSlider" class="bpm-slider" min="60" max="200" value="120">
+                <span id="bpmValue">120</span>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+            <div class="lane-labels" id="laneLabels"></div>
+            <div class="hit-zone" id="hitZone"></div>
+            <div class="split-divider" id="splitDivider"></div>
+            <div class="split-label left" id="leftLabel">Grid Mode</div>
+            <div class="split-label right" id="rightLabel">Flow Mode</div>
+            <div class="info">
+                <div>🎵 Click grid to add/remove notes</div>
+                <div>⏯️ Space: Play/Pause</div>
+                <div>🔄 V: Switch View</div>
+                <div>📱 S: Split Screen</div>
+                <div>🔄 T: Rotate Grid</div>
+                <div>🗑️ C: Clear All</div>
+                <div>🎲 R: Randomize</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class Vec3 {
+            constructor(x = 0, y = 0, z = 0) {
+                this.x = x;
+                this.y = y;
+                this.z = z;
+            }
+            
+            add(v) {
+                return new Vec3(this.x + v.x, this.y + v.y, this.z + v.z);
+            }
+            
+            subtract(v) {
+                return new Vec3(this.x - v.x, this.y - v.y, this.z - v.z);
+            }
+            
+            multiply(scalar) {
+                return new Vec3(this.x * scalar, this.y * scalar, this.z * scalar);
+            }
+            
+            dot(v) {
+                return this.x * v.x + this.y * v.y + this.z * v.z;
+            }
+            
+            cross(v) {
+                return new Vec3(
+                    this.y * v.z - this.z * v.y,
+                    this.z * v.x - this.x * v.z,
+                    this.x * v.y - this.y * v.x
+                );
+            }
+            
+            normalize() {
+                const length = Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+                if (length === 0) return new Vec3();
+                return new Vec3(this.x / length, this.y / length, this.z / length);
+            }
+        }
+
+        class Camera3D {
+            constructor() {
+                this.position = new Vec3(0, 0, 0);
+                this.target = new Vec3(0, 0, -1);
+                this.up = new Vec3(0, 1, 0);
+                this.fov = 60; // degrees
+                this.near = 0.1;
+                this.far = 1000;
+            }
+            
+            lookAt(position, target, up) {
+                this.position = position;
+                this.target = target;
+                this.up = up;
+            }
+            
+            getViewMatrix() {
+                const forward = this.target.subtract(this.position).normalize();
+                const right = forward.cross(this.up).normalize();
+                const realUp = right.cross(forward);
+                
+                return {
+                    right: right,
+                    up: realUp,
+                    forward: forward,
+                    position: this.position
+                };
+            }
+            
+            project(point, canvasWidth, canvasHeight) {
+                const view = this.getViewMatrix();
+                
+                // Transform to camera space
+                const translated = point.subtract(this.position);
+                const x = translated.dot(view.right);
+                const y = translated.dot(view.up);
+                const z = translated.dot(view.forward);
+                
+                // Perspective projection
+                if (z <= this.near) return null; // Behind camera
+                
+                const fovRad = (this.fov * Math.PI) / 180;
+                const scale = Math.tan(fovRad / 2) * z;
+                const aspect = canvasWidth / canvasHeight;
+                
+                const screenX = (x / scale) * (canvasWidth / 2) + (canvasWidth / 2);
+                const screenY = (-y / (scale / aspect)) * (canvasHeight / 2) + (canvasHeight / 2);
+                
+                return { x: screenX, y: screenY, z: z };
+            }
+        }
+
+        class GuitarHeroSequencer {
+            constructor() {
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                
+                // Audio setup
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                this.masterGain = this.audioContext.createGain();
+                this.masterGain.connect(this.audioContext.destination);
+                this.masterGain.gain.value = 0.3;
+
+                // Pattern data
+                this.pattern = Array(8).fill().map(() => Array(16).fill(false));
+                this.currentBeat = 0;
+                this.isPlaying = false;
+                this.bpm = 120;
+                this.lastBeatTime = 0;
+                
+                // View state
+                this.isFlowMode = false;
+                this.isSplitMode = false;
+                this.isRotated = false;
+                this.transitionProgress = 0;
+                this.transitioning = false;
+                
+                // 3D camera
+                this.camera = new Camera3D();
+                
+                // Visual properties
+                this.lanes = 8;
+                this.steps = 16;
+                this.laneHeight = 60;
+                this.stepWidth = 60;
+                
+                // 3D world properties
+                this.worldLaneWidth = 100;
+                this.worldStepDepth = 120;
+                this.worldLaneHeight = 10;
+                
+                // Boomwhacker colors and notes
+                this.laneColors = [
+                    '#C41E3A', // C - Red
+                    '#FF8C00', // D - Orange  
+                    '#FFD700', // E - Yellow
+                    '#32CD32', // F - Light Green
+                    '#228B22', // G - Green
+                    '#4169E1', // A - Blue
+                    '#8A2BE2', // B - Purple
+                    '#DC143C'  // C2 - Dark Red
+                ];
+                
+                this.noteFrequencies = [
+                    261.63, // C4
+                    293.66, // D4
+                    329.63, // E4
+                    349.23, // F4
+                    392.00, // G4
+                    440.00, // A4
+                    493.88, // B4
+                    523.25  // C5
+                ];
+                
+                this.noteNames = ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C2'];
+                
+                // Some popular motifs
+                this.motifs = [
+                    // Basic kick and snare
+                    [
+                        [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
+                        [false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false],
+                        [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+                        [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+                        [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+                        [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+                        [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+                        [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+                    ],
+                    // Ascending scale
+                    [
+                        [true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+                        [false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+                        [false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false],
+                        [false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, false],
+                        [false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false],
+                        [false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, false],
+                        [false, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false],
+                        [false, false, false, false, false, false, false, true, false, false, false, false, false, false, false, false]
+                    ],
+                    // Chord progression
+                    [
+                        [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
+                        [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+                        [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
+                        [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+                        [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
+                        [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+                        [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+                        [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+                    ]
+                ];
+                
+                this.resize();
+                this.setupEventListeners();
+                this.createLaneLabels();
+                this.loadRandomMotif();
+                this.animate();
+            }
+            
+            resize() {
+                const rect = this.canvas.getBoundingClientRect();
+                this.canvas.width = rect.width * window.devicePixelRatio;
+                this.canvas.height = rect.height * window.devicePixelRatio;
+                this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+                
+                this.canvasWidth = rect.width;
+                this.canvasHeight = rect.height;
+                
+                this.calculateGridDimensions();
+            }
+            
+            calculateGridDimensions() {
+                // Calculate grid dimensions for 2D mode based on orientation
+                const availableWidth = this.canvasWidth - 200;
+                const availableHeight = this.canvasHeight - 150;
+                
+                if (this.isRotated) {
+                    // Rotated: lanes are horizontal (left to right), steps are vertical (top to bottom)
+                    this.laneHeight = Math.max(20, Math.min(availableWidth / this.lanes, 80));
+                    this.stepWidth = Math.max(20, Math.min(availableHeight / this.steps, 80));
+                    
+                    this.gridWidth = this.laneHeight * this.lanes;
+                    this.gridHeight = this.stepWidth * this.steps;
+                } else {
+                    // Normal: lanes are vertical (top to bottom), steps are horizontal (left to right)
+                    this.stepWidth = Math.max(20, Math.min(availableWidth / this.steps, 80));
+                    this.laneHeight = Math.max(20, Math.min(availableHeight / this.lanes, 80));
+                    
+                    this.gridWidth = this.stepWidth * this.steps;
+                    this.gridHeight = this.laneHeight * this.lanes;
+                }
+                
+                this.gridX = Math.max(10, (this.canvasWidth - this.gridWidth) / 2);
+                this.gridY = Math.max(10, (this.canvasHeight - this.gridHeight) / 2);
+            }
+            
+            setupEventListeners() {
+                // Canvas events
+                this.canvas.addEventListener('click', (e) => this.handleClick(e));
+                this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                
+                // Button events
+                document.getElementById('playBtn').addEventListener('click', () => this.togglePlay());
+                document.getElementById('viewBtn').addEventListener('click', () => this.toggleView());
+                document.getElementById('splitBtn').addEventListener('click', () => this.toggleSplit());
+                document.getElementById('rotateBtn').addEventListener('click', () => this.toggleRotation());
+                document.getElementById('clearBtn').addEventListener('click', () => this.clearPattern());
+                document.getElementById('randomBtn').addEventListener('click', () => this.randomizePattern());
+                document.getElementById('motifBtn').addEventListener('click', () => this.loadRandomMotif());
+                
+                // BPM control
+                const bpmSlider = document.getElementById('bpmSlider');
+                const bpmValue = document.getElementById('bpmValue');
+                bpmSlider.addEventListener('input', (e) => {
+                    this.bpm = parseInt(e.target.value);
+                    bpmValue.textContent = this.bpm;
+                });
+                
+                // Keyboard shortcuts
+                document.addEventListener('keydown', (e) => {
+                    switch(e.code) {
+                        case 'Space':
+                            e.preventDefault();
+                            this.togglePlay();
+                            break;
+                        case 'KeyV':
+                            this.toggleView();
+                            break;
+                        case 'KeyS':
+                            this.toggleSplit();
+                            break;
+                        case 'KeyT':
+                            this.toggleRotation();
+                            break;
+                        case 'KeyC':
+                            this.clearPattern();
+                            break;
+                        case 'KeyR':
+                            this.randomizePattern();
+                            break;
+                    }
+                });
+                
+                // Window resize
+                window.addEventListener('resize', () => this.resize());
+            }
+            
+            createLaneLabels() {
+                const container = document.getElementById('laneLabels');
+                container.innerHTML = '';
+                
+                for (let i = 0; i < this.lanes; i++) {
+                    const label = document.createElement('div');
+                    label.className = 'lane-label';
+                    label.style.color = this.laneColors[i];
+                    label.textContent = this.noteNames[i];
+                    container.appendChild(label);
+                }
+                
+                this.updateLaneLabels();
+            }
+            
+            updateLaneLabels() {
+                const container = document.getElementById('laneLabels');
+                if (this.isRotated) {
+                    container.classList.add('rotated');
+                } else {
+                    container.classList.remove('rotated');
+                }
+            }
+            
+            handleClick(e) {
+                if (this.isFlowMode && !this.isSplitMode) return;
+                
+                const rect = this.canvas.getBoundingClientRect();
+                let x = e.clientX - rect.left;
+                let y = e.clientY - rect.top;
+                
+                // Adjust coordinates for split mode (only top half is clickable in vertical split)
+                if (this.isSplitMode) {
+                    if (y > this.canvasHeight / 2) return; // Bottom half not clickable
+                    // Scale coordinates to full grid
+                    y = y * 2;
+                }
+                
+                let step, lane;
+                
+                if (this.isRotated) {
+                    // Rotated: lanes are horizontal, steps are vertical
+                    step = Math.floor((y - this.gridY) / this.stepWidth);
+                    lane = Math.floor((x - this.gridX) / this.laneHeight);
+                } else {
+                    // Normal: lanes are vertical, steps are horizontal
+                    step = Math.floor((x - this.gridX) / this.stepWidth);
+                    lane = Math.floor((y - this.gridY) / this.laneHeight);
+                }
+                
+                if (step >= 0 && step < this.steps && lane >= 0 && lane < this.lanes) {
+                    this.pattern[lane][step] = !this.pattern[lane][step];
+                    
+                    // Play note immediately for feedback
+                    if (this.pattern[lane][step]) {
+                        this.playNote(lane);
+                    }
+                }
+            }
+            
+            handleMouseMove(e) {
+                if (this.isFlowMode && !this.isSplitMode) return;
+                
+                const rect = this.canvas.getBoundingClientRect();
+                let x = e.clientX - rect.left;
+                let y = e.clientY - rect.top;
+                
+                // Adjust coordinates for split mode (only top half is interactive in vertical split)
+                if (this.isSplitMode) {
+                    if (y > this.canvasHeight / 2) {
+                        this.hoverStep = -1;
+                        this.hoverLane = -1;
+                        return;
+                    }
+                    y = y * 2;
+                }
+                
+                let step, lane;
+                
+                if (this.isRotated) {
+                    step = Math.floor((y - this.gridY) / this.stepWidth);
+                    lane = Math.floor((x - this.gridX) / this.laneHeight);
+                } else {
+                    step = Math.floor((x - this.gridX) / this.stepWidth);
+                    lane = Math.floor((y - this.gridY) / this.laneHeight);
+                }
+                
+                this.hoverStep = (step >= 0 && step < this.steps) ? step : -1;
+                this.hoverLane = (lane >= 0 && lane < this.lanes) ? lane : -1;
+            }
+            
+            togglePlay() {
+                this.isPlaying = !this.isPlaying;
+                const btn = document.getElementById('playBtn');
+                btn.textContent = this.isPlaying ? 'Pause' : 'Play';
+                
+                if (this.isPlaying) {
+                    this.audioContext.resume();
+                    this.lastBeatTime = performance.now();
+                }
+            }
+            
+            toggleView() {
+                if (this.transitioning) return;
+                
+                // If in split mode, exit split mode first
+                if (this.isSplitMode) {
+                    this.toggleSplit();
+                    return;
+                }
+                
+                this.transitioning = true;
+                this.isFlowMode = !this.isFlowMode;
+                
+                const btn = document.getElementById('viewBtn');
+                btn.textContent = this.isFlowMode ? 'Switch to Grid Mode' : 'Switch to Flow Mode';
+                
+                // Update UI elements
+                const laneLabels = document.getElementById('laneLabels');
+                const hitZone = document.getElementById('hitZone');
+                
+                if (this.isFlowMode) {
+                    laneLabels.classList.add('flow-mode');
+                    hitZone.classList.add('flow-mode');
+                } else {
+                    laneLabels.classList.remove('flow-mode');
+                    hitZone.classList.remove('flow-mode');
+                }
+                
+                // Animate transition
+                const duration = 1500; // 1.5 seconds
+                const startTime = performance.now();
+                const startProgress = this.transitionProgress;
+                const targetProgress = this.isFlowMode ? 1 : 0;
+                
+                const animate = (currentTime) => {
+                    const elapsed = currentTime - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    
+                    // Easing function for smooth transition
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    this.transitionProgress = startProgress + (targetProgress - startProgress) * eased;
+                    
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        this.transitioning = false;
+                        this.transitionProgress = targetProgress;
+                    }
+                };
+                
+                requestAnimationFrame(animate);
+            }
+            
+            toggleSplit() {
+                if (this.transitioning) return;
+                
+                this.isSplitMode = !this.isSplitMode;
+                
+                const splitBtn = document.getElementById('splitBtn');
+                const viewBtn = document.getElementById('viewBtn');
+                
+                if (this.isSplitMode) {
+                    splitBtn.textContent = 'Exit Split Screen';
+                    viewBtn.style.display = 'none';
+                    
+                    // Show split UI elements
+                    document.getElementById('splitDivider').classList.add('active');
+                    document.getElementById('leftLabel').classList.add('active');
+                    document.getElementById('rightLabel').classList.add('active');
+                    
+                    // Force both modes to be visible
+                    this.isFlowMode = false;
+                    this.transitionProgress = 0;
+                    
+                    // Update UI for split mode
+                    const laneLabels = document.getElementById('laneLabels');
+                    const hitZone = document.getElementById('hitZone');
+                    laneLabels.classList.remove('flow-mode');
+                    hitZone.classList.remove('flow-mode');
+                    
+                } else {
+                    splitBtn.textContent = 'Split Screen';
+                    viewBtn.style.display = 'inline-block';
+                    viewBtn.textContent = 'Switch to Flow Mode';
+                    
+                    // Hide split UI elements
+                    document.getElementById('splitDivider').classList.remove('active');
+                    document.getElementById('leftLabel').classList.remove('active');
+                    document.getElementById('rightLabel').classList.remove('active');
+                }
+            }
+            
+            toggleRotation() {
+                this.isRotated = !this.isRotated;
+                
+                const rotateBtn = document.getElementById('rotateBtn');
+                rotateBtn.textContent = this.isRotated ? 'Standard Grid' : 'Rotate Grid';
+                
+                this.updateLaneLabels();
+                
+                // Recalculate grid dimensions for new orientation
+                this.calculateGridDimensions();
+            }
+            
+            clearPattern() {
+                this.pattern = Array(8).fill().map(() => Array(16).fill(false));
+            }
+            
+            randomizePattern() {
+                for (let lane = 0; lane < this.lanes; lane++) {
+                    for (let step = 0; step < this.steps; step++) {
+                        this.pattern[lane][step] = Math.random() < 0.15; // 15% chance
+                    }
+                }
+            }
+            
+            loadRandomMotif() {
+                const motif = this.motifs[Math.floor(Math.random() * this.motifs.length)];
+                this.pattern = motif.map(lane => [...lane]);
+            }
+            
+            playNote(laneIndex) {
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(this.masterGain);
+                
+                oscillator.frequency.setValueAtTime(this.noteFrequencies[laneIndex], this.audioContext.currentTime);
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.5, this.audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
+                
+                oscillator.start(this.audioContext.currentTime);
+                oscillator.stop(this.audioContext.currentTime + 0.3);
+            }
+            
+            update() {
+                if (this.isPlaying) {
+                    const now = performance.now();
+                    const beatDuration = (60 / this.bpm) * 1000; // ms per beat
+                    
+                    if (now - this.lastBeatTime >= beatDuration) {
+                        // Play notes for current beat
+                        for (let lane = 0; lane < this.lanes; lane++) {
+                            if (this.pattern[lane][this.currentBeat]) {
+                                this.playNote(lane);
+                            }
+                        }
+                        
+                        // Advance to next beat
+                        this.currentBeat = (this.currentBeat + 1) % this.steps;
+                        this.lastBeatTime = now;
+                        
+                        // Camera will smoothly interpolate to new position in setupGuitarHeroCamera()
+                    }
+                }
+            }
+            
+            draw() {
+                // Dynamic background with subtle patterns
+                const gradient = this.ctx.createLinearGradient(0, 0, this.canvasWidth, this.canvasHeight);
+                gradient.addColorStop(0, '#0f0f23');
+                gradient.addColorStop(0.3, '#1a1a2e');
+                gradient.addColorStop(0.7, '#16213e');
+                gradient.addColorStop(1, '#0f0f23');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+                
+                // Add subtle animated particles
+                this.drawParticles();
+                
+                if (this.isSplitMode) {
+                    this.drawSplitScreen();
+                } else {
+                    // Hide split UI elements when not in split mode
+                    document.getElementById('splitDivider').classList.remove('active');
+                    document.getElementById('leftLabel').classList.remove('active');
+                    document.getElementById('rightLabel').classList.remove('active');
+                    
+                    if (this.transitionProgress < 1) {
+                        this.draw2D();
+                    }
+                    
+                    if (this.transitionProgress > 0) {
+                        this.draw3D();
+                    }
+                }
+            }
+            
+            drawParticles() {
+                const time = performance.now() * 0.001;
+                const particleCount = 20;
+                
+                this.ctx.save();
+                for (let i = 0; i < particleCount; i++) {
+                    const x = (Math.sin(time * 0.5 + i) * 100 + this.canvasWidth / 2) + Math.sin(time * 0.3 + i * 2) * 200;
+                    const y = (Math.cos(time * 0.7 + i * 1.5) * 50 + this.canvasHeight / 2) + Math.cos(time * 0.4 + i) * 150;
+                    const size = Math.sin(time + i) * 2 + 3;
+                    const opacity = Math.sin(time * 2 + i) * 0.1 + 0.05;
+                    
+                    this.ctx.fillStyle = `rgba(102, 126, 234, ${opacity})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, size, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+                this.ctx.restore();
+            }
+            
+            drawSplitScreen() {
+                // Show split UI elements
+                document.getElementById('splitDivider').classList.add('active');
+                document.getElementById('leftLabel').classList.add('active');
+                document.getElementById('rightLabel').classList.add('active');
+                
+                // Draw top half (2D grid)
+                this.ctx.save();
+                this.ctx.beginPath();
+                this.ctx.rect(0, 0, this.canvasWidth, this.canvasHeight / 2);
+                this.ctx.clip();
+                
+                // Scale and position for top half
+                this.ctx.scale(1, 0.5);
+                this.draw2D();
+                this.ctx.restore();
+                
+                // Draw bottom half (3D flow)
+                this.ctx.save();
+                this.ctx.beginPath();
+                this.ctx.rect(0, this.canvasHeight / 2, this.canvasWidth, this.canvasHeight / 2);
+                this.ctx.clip();
+                
+                // Translate and scale for bottom half
+                this.ctx.translate(0, this.canvasHeight / 2);
+                this.ctx.scale(1, 0.5);
+                this.draw3D();
+                this.ctx.restore();
+            }
+            
+            draw2D() {
+                this.ctx.save();
+                
+                // Fade out during transition (only if not in split mode)
+                if (this.transitionProgress > 0 && !this.isSplitMode) {
+                    this.ctx.globalAlpha = 1 - this.transitionProgress;
+                }
+                
+                this.drawGrid2D();
+                this.drawNotes2D();
+                this.drawPlayhead2D();
+                
+                this.ctx.restore();
+            }
+            
+            draw3D() {
+                this.ctx.save();
+                
+                // Fade in during transition (only if not in split mode)
+                if (this.transitionProgress < 1 && !this.isSplitMode) {
+                    this.ctx.globalAlpha = this.transitionProgress;
+                }
+                
+                // Set up camera for Guitar Hero view
+                this.setupGuitarHeroCamera();
+                this.drawWorld3D();
+                
+                this.ctx.restore();
+            }
+            
+            setupGuitarHeroCamera() {
+                // Calculate smooth camera position with beat synchronization
+                const beatDuration = (60 / this.bpm) * 1000; // ms per beat
+                const timeSinceLastBeat = performance.now() - this.lastBeatTime;
+                const beatProgress = Math.min(timeSinceLastBeat / beatDuration, 1);
+                
+                // Smooth interpolation between current and next beat positions
+                const currentBeatZ = -this.currentBeat * this.worldStepDepth;
+                const nextBeatZ = -((this.currentBeat + 1) % this.steps) * this.worldStepDepth;
+                
+                // Handle wrap-around for smooth looping
+                let targetZ = nextBeatZ;
+                if (this.currentBeat === this.steps - 1) {
+                    // When wrapping from last beat to first, continue forward motion
+                    targetZ = -this.steps * this.worldStepDepth;
+                }
+                
+                // Smooth interpolation with easing
+                const easedProgress = this.easeInOutQuad(beatProgress);
+                const interpolatedZ = currentBeatZ + (targetZ - currentBeatZ) * easedProgress;
+                
+                const cameraDistance = 200;
+                const cameraHeight = 150;
+                
+                const cameraPos = new Vec3(0, cameraHeight, interpolatedZ + cameraDistance);
+                const targetPos = new Vec3(0, 0, interpolatedZ - 400); // Look ahead
+                const upVector = new Vec3(0, 1, 0);
+                
+                this.camera.lookAt(cameraPos, targetPos, upVector);
+            }
+            
+            easeInOutQuad(t) {
+                return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+            }
+            
+            drawWorld3D() {
+                // Draw 3D grid/lanes extending into the distance
+                this.drawLanes3D();
+                this.drawNotes3D();
+                this.drawPlayhead3D();
+            }
+            
+            drawLanes3D() {
+                // Draw the track extending into the distance
+                const totalWorldWidth = (this.lanes - 1) * this.worldLaneWidth;
+                const startX = -totalWorldWidth / 2;
+                const trackDepth = this.steps * this.worldStepDepth;
+                
+                // Draw lane dividers
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                this.ctx.lineWidth = 2;
+                
+                for (let lane = 0; lane <= this.lanes; lane++) {
+                    const x = startX + lane * this.worldLaneWidth;
+                    
+                    const nearPoint = this.camera.project(new Vec3(x, 0, 0), this.canvasWidth, this.canvasHeight);
+                    const farPoint = this.camera.project(new Vec3(x, 0, -trackDepth), this.canvasWidth, this.canvasHeight);
+                    
+                    if (nearPoint && farPoint) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(nearPoint.x, nearPoint.y);
+                        this.ctx.lineTo(farPoint.x, farPoint.y);
+                        this.ctx.stroke();
+                    }
+                }
+                
+                // Draw beat lines (every 4 beats)
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                this.ctx.lineWidth = 1;
+                
+                for (let step = 0; step < this.steps; step += 4) {
+                    const z = -step * this.worldStepDepth;
+                    
+                    const leftPoint = this.camera.project(new Vec3(startX, 0, z), this.canvasWidth, this.canvasHeight);
+                    const rightPoint = this.camera.project(new Vec3(startX + totalWorldWidth, 0, z), this.canvasWidth, this.canvasHeight);
+                    
+                    if (leftPoint && rightPoint) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(leftPoint.x, leftPoint.y);
+                        this.ctx.lineTo(rightPoint.x, rightPoint.y);
+                        this.ctx.stroke();
+                    }
+                }
+            }
+            
+            drawNotes3D() {
+                const totalWorldWidth = (this.lanes - 1) * this.worldLaneWidth;
+                const startX = -totalWorldWidth / 2;
+                const noteSize = 40;
+                
+                for (let lane = 0; lane < this.lanes; lane++) {
+                    for (let step = 0; step < this.steps; step++) {
+                        if (this.pattern[lane][step]) {
+                            const x = startX + lane * this.worldLaneWidth;
+                            const z = -step * this.worldStepDepth;
+                            const y = this.worldLaneHeight;
+                            
+                            const isActive = this.isPlaying && step === this.currentBeat;
+                            
+                            // Project the 3D position to screen coordinates
+                            const screenPos = this.camera.project(new Vec3(x, y, z), this.canvasWidth, this.canvasHeight);
+                            
+                            if (screenPos && screenPos.z > 0) {
+                                // Calculate size based on distance (perspective)
+                                const distance = screenPos.z;
+                                const scale = Math.max(0.1, 300 / distance);
+                                const scaledSize = noteSize * scale;
+                                
+                                // Note shadow
+                                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                                this.ctx.fillRect(
+                                    screenPos.x - scaledSize/2 + 2,
+                                    screenPos.y - scaledSize/2 + 2,
+                                    scaledSize,
+                                    scaledSize
+                                );
+                                
+                                // Note body
+                                if (isActive) {
+                                    this.ctx.fillStyle = '#ffffff';
+                                } else {
+                                    this.ctx.fillStyle = this.laneColors[lane];
+                                }
+                                
+                                this.ctx.fillRect(
+                                    screenPos.x - scaledSize/2,
+                                    screenPos.y - scaledSize/2,
+                                    scaledSize,
+                                    scaledSize
+                                );
+                                
+                                // Note border for 3D effect
+                                this.ctx.strokeStyle = isActive ? '#cccccc' : this.lightenColor(this.laneColors[lane]);
+                                this.ctx.lineWidth = Math.max(1, scale * 2);
+                                this.ctx.strokeRect(
+                                    screenPos.x - scaledSize/2,
+                                    screenPos.y - scaledSize/2,
+                                    scaledSize,
+                                    scaledSize
+                                );
+                                
+                                // Inner highlight
+                                this.ctx.fillStyle = isActive ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.3)';
+                                this.ctx.fillRect(
+                                    screenPos.x - scaledSize/2 + scaledSize * 0.2,
+                                    screenPos.y - scaledSize/2 + scaledSize * 0.2,
+                                    scaledSize * 0.3,
+                                    scaledSize * 0.3
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            
+            drawPlayhead3D() {
+                // Draw the hit zone line - this appears to stay stationary while world moves
+                const totalWorldWidth = (this.lanes - 1) * this.worldLaneWidth;
+                const startX = -totalWorldWidth / 2;
+                
+                // The hit zone is always at a fixed distance in front of the camera
+                const hitZoneDistance = 100; // Distance in front of camera
+                const cameraZ = this.camera.position.z;
+                const hitZoneZ = cameraZ - hitZoneDistance;
+                
+                this.ctx.strokeStyle = '#ff4444';
+                this.ctx.lineWidth = 4;
+                
+                const leftPoint = this.camera.project(new Vec3(startX - 50, 0, hitZoneZ), this.canvasWidth, this.canvasHeight);
+                const rightPoint = this.camera.project(new Vec3(startX + totalWorldWidth + 50, 0, hitZoneZ), this.canvasWidth, this.canvasHeight);
+                
+                if (leftPoint && rightPoint) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(leftPoint.x, leftPoint.y);
+                    this.ctx.lineTo(rightPoint.x, rightPoint.y);
+                    this.ctx.stroke();
+                    
+                    // Add a glow effect for the hit zone
+                    this.ctx.shadowColor = '#ff4444';
+                    this.ctx.shadowBlur = 10;
+                    this.ctx.stroke();
+                    this.ctx.shadowBlur = 0;
+                }
+            }
+            
+            drawGrid2D() {
+                // Draw lane backgrounds with enhanced styling
+                for (let lane = 0; lane < this.lanes; lane++) {
+                    let x, y, width, height;
+                    
+                    if (this.isRotated) {
+                        // Rotated: lanes go horizontally
+                        x = this.gridX + lane * this.laneHeight;
+                        y = this.gridY;
+                        width = this.laneHeight;
+                        height = this.gridHeight;
+                    } else {
+                        // Normal: lanes go vertically
+                        x = this.gridX;
+                        y = this.gridY + lane * this.laneHeight;
+                        width = this.gridWidth;
+                        height = this.laneHeight;
+                    }
+                    
+                    // Gradient lane backgrounds
+                    const gradient = this.isRotated 
+                        ? this.ctx.createLinearGradient(x, y, x, y + height)
+                        : this.ctx.createLinearGradient(x, y, x + width, y);
+                    
+                    const baseColor = this.laneColors[lane];
+                    gradient.addColorStop(0, `${baseColor}08`);
+                    gradient.addColorStop(0.5, `${baseColor}15`);
+                    gradient.addColorStop(1, `${baseColor}08`);
+                    
+                    this.ctx.fillStyle = gradient;
+                    this.ctx.fillRect(x, y, width, height);
+                    
+                    // Lane borders with glow effect
+                    this.ctx.strokeStyle = `${baseColor}40`;
+                    this.ctx.lineWidth = 1;
+                    this.ctx.beginPath();
+                    
+                    if (this.isRotated) {
+                        this.ctx.moveTo(x, y);
+                        this.ctx.lineTo(x, y + height);
+                    } else {
+                        this.ctx.moveTo(x, y);
+                        this.ctx.lineTo(x + width, y);
+                    }
+                    this.ctx.stroke();
+                }
+                
+                // Draw step grid lines with enhanced styling
+                for (let step = 0; step <= this.steps; step++) {
+                    const isDownbeat = step % 4 === 0;
+                    
+                    this.ctx.lineWidth = isDownbeat ? 2 : 1;
+                    this.ctx.strokeStyle = isDownbeat ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)';
+                    
+                    if (isDownbeat) {
+                        this.ctx.shadowColor = 'rgba(255,255,255,0.3)';
+                        this.ctx.shadowBlur = 3;
+                    }
+                    
+                    this.ctx.beginPath();
+                    
+                    if (this.isRotated) {
+                        const y = this.gridY + step * this.stepWidth;
+                        this.ctx.moveTo(this.gridX, y);
+                        this.ctx.lineTo(this.gridX + this.gridWidth, y);
+                    } else {
+                        const x = this.gridX + step * this.stepWidth;
+                        this.ctx.moveTo(x, this.gridY);
+                        this.ctx.lineTo(x, this.gridY + this.gridHeight);
+                    }
+                    
+                    this.ctx.stroke();
+                    this.ctx.shadowBlur = 0;
+                }
+            }
+            
+            drawNotes2D() {
+                for (let lane = 0; lane < this.lanes; lane++) {
+                    for (let step = 0; step < this.steps; step++) {
+                        if (this.pattern[lane][step]) {
+                            let x, y, noteWidth, noteHeight, centerX, centerY;
+                            
+                            if (this.isRotated) {
+                                // Rotated: lanes horizontal, steps vertical
+                                x = this.gridX + lane * this.laneHeight;
+                                y = this.gridY + step * this.stepWidth;
+                                noteWidth = Math.max(10, this.laneHeight * 0.75);
+                                noteHeight = Math.max(10, this.stepWidth * 0.75);
+                                centerX = x + this.laneHeight / 2;
+                                centerY = y + this.stepWidth / 2;
+                            } else {
+                                // Normal: lanes vertical, steps horizontal
+                                x = this.gridX + step * this.stepWidth;
+                                y = this.gridY + lane * this.laneHeight;
+                                noteWidth = Math.max(10, this.stepWidth * 0.75);
+                                noteHeight = Math.max(10, this.laneHeight * 0.75);
+                                centerX = x + this.stepWidth / 2;
+                                centerY = y + this.laneHeight / 2;
+                            }
+                            
+                            const isActive = this.isPlaying && step === this.currentBeat;
+                            
+                            // Enhanced note shadow with blur
+                            this.ctx.save();
+                            this.ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+                            this.ctx.shadowBlur = 8;
+                            this.ctx.shadowOffsetX = 3;
+                            this.ctx.shadowOffsetY = 3;
+                            
+                            // Note body with gradient and glow
+                            const radius = Math.max(noteWidth, noteHeight) / 2;
+                            const gradient = this.ctx.createRadialGradient(
+                                centerX - noteWidth * 0.2, centerY - noteHeight * 0.2, 0,
+                                centerX, centerY, Math.max(radius, 1)
+                            );
+                            
+                            if (isActive) {
+                                gradient.addColorStop(0, '#ffffff');
+                                gradient.addColorStop(0.7, '#f0f0f0');
+                                gradient.addColorStop(1, '#e0e0e0');
+                                
+                                this.ctx.shadowColor = '#ffffff';
+                                this.ctx.shadowBlur = 15;
+                            } else {
+                                const color = this.laneColors[lane];
+                                gradient.addColorStop(0, this.lightenColor(color));
+                                gradient.addColorStop(0.7, color);
+                                gradient.addColorStop(1, this.darkenColor(color));
+                            }
+                            
+                            this.ctx.fillStyle = gradient;
+                            this.ctx.beginPath();
+                            this.ctx.roundRect(
+                                centerX - noteWidth/2,
+                                centerY - noteHeight/2,
+                                noteWidth,
+                                noteHeight,
+                                8
+                            );
+                            this.ctx.fill();
+                            
+                            this.ctx.restore();
+                            
+                            // Note border with enhanced styling
+                            this.ctx.strokeStyle = isActive ? '#ffffff' : this.lightenColor(this.laneColors[lane]);
+                            this.ctx.lineWidth = isActive ? 3 : 2;
+                            this.ctx.beginPath();
+                            this.ctx.roundRect(
+                                centerX - noteWidth/2,
+                                centerY - noteHeight/2,
+                                noteWidth,
+                                noteHeight,
+                                8
+                            );
+                            this.ctx.stroke();
+                            
+                            // Inner highlight for 3D effect
+                            const highlightGradient = this.ctx.createLinearGradient(
+                                centerX - noteWidth/2, centerY - noteHeight/2,
+                                centerX + noteWidth/2, centerY + noteHeight/2
+                            );
+                            highlightGradient.addColorStop(0, isActive ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.4)');
+                            highlightGradient.addColorStop(1, 'rgba(255,255,255,0)');
+                            
+                            this.ctx.fillStyle = highlightGradient;
+                            this.ctx.beginPath();
+                            this.ctx.roundRect(
+                                centerX - noteWidth/2 + 4,
+                                centerY - noteHeight/2 + 4,
+                                noteWidth * 0.4,
+                                noteHeight * 0.4,
+                                4
+                            );
+                            this.ctx.fill();
+                        }
+                    }
+                }
+                
+                // Enhanced hover effect
+                if ((!this.isFlowMode || this.isSplitMode) && this.hoverStep >= 0 && this.hoverLane >= 0) {
+                    let x, y, width, height;
+                    
+                    if (this.isRotated) {
+                        x = this.gridX + this.hoverLane * this.laneHeight;
+                        y = this.gridY + this.hoverStep * this.stepWidth;
+                        width = this.laneHeight;
+                        height = this.stepWidth;
+                    } else {
+                        x = this.gridX + this.hoverStep * this.stepWidth;
+                        y = this.gridY + this.hoverLane * this.laneHeight;
+                        width = this.stepWidth;
+                        height = this.laneHeight;
+                    }
+                    
+                    const maxDimension = Math.max(width, height);
+                    const gradient = this.ctx.createRadialGradient(
+                        x + width/2, y + height/2, 0,
+                        x + width/2, y + height/2, Math.max(maxDimension, 1)
+                    );
+                    gradient.addColorStop(0, 'rgba(255,255,255,0.3)');
+                    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+                    
+                    this.ctx.fillStyle = gradient;
+                    this.ctx.fillRect(x, y, width, height);
+                }
+            }
+            
+            drawPlayhead2D() {
+                this.ctx.strokeStyle = '#ff4444';
+                this.ctx.lineWidth = 3;
+                
+                if (this.isRotated) {
+                    // Rotated: playhead moves vertically
+                    const y = this.gridY + this.currentBeat * this.stepWidth + this.stepWidth / 2;
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.gridX - 10, y);
+                    this.ctx.lineTo(this.gridX + this.gridWidth + 10, y);
+                    this.ctx.stroke();
+                    
+                    // Playhead arrow
+                    this.ctx.fillStyle = '#ff4444';
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.gridX - 10, y);
+                    this.ctx.lineTo(this.gridX - 25, y - 8);
+                    this.ctx.lineTo(this.gridX - 25, y + 8);
+                    this.ctx.closePath();
+                    this.ctx.fill();
+                } else {
+                    // Normal: playhead moves horizontally
+                    const x = this.gridX + this.currentBeat * this.stepWidth + this.stepWidth / 2;
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, this.gridY - 10);
+                    this.ctx.lineTo(x, this.gridY + this.gridHeight + 10);
+                    this.ctx.stroke();
+                    
+                    // Playhead arrow
+                    this.ctx.fillStyle = '#ff4444';
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, this.gridY - 10);
+                    this.ctx.lineTo(x - 8, this.gridY - 25);
+                    this.ctx.lineTo(x + 8, this.gridY - 25);
+                    this.ctx.closePath();
+                    this.ctx.fill();
+                }
+            }
+            
+            lightenColor(color) {
+                const hex = color.replace('#', '');
+                const r = parseInt(hex.substr(0, 2), 16);
+                const g = parseInt(hex.substr(2, 2), 16);
+                const b = parseInt(hex.substr(4, 2), 16);
+                
+                return `rgb(${Math.min(255, r + 60)}, ${Math.min(255, g + 60)}, ${Math.min(255, b + 60)})`;
+            }
+            
+            darkenColor(color) {
+                const hex = color.replace('#', '');
+                const r = parseInt(hex.substr(0, 2), 16);
+                const g = parseInt(hex.substr(2, 2), 16);
+                const b = parseInt(hex.substr(4, 2), 16);
+                
+                return `rgb(${Math.max(0, r - 40)}, ${Math.max(0, g - 40)}, ${Math.max(0, b - 40)})`;
+            }
+            
+            animate() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+        
+        // Initialize the application
+        window.addEventListener('load', () => {
+            new GuitarHeroSequencer();
+        });
+    </script>
+</body>
+</html>
