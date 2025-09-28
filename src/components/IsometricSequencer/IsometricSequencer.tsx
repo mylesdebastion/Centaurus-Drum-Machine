@@ -221,15 +221,15 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
-    // Animated stars
-    const time = performance.now() * 0.001;
-    const starCount = 100;
+    // Animated stars - very slow, subtle movement
+    const time = performance.now() * 0.0001; // Extremely slow movement
+    const starCount = 150; // More stars for better distribution
 
     for (let i = 0; i < starCount; i++) {
-      const x = (Math.sin(time * 0.1 + i) * 0.3 + 0.5) * width;
-      const y = (Math.cos(time * 0.15 + i * 1.3) * 0.3 + 0.5) * height;
-      const size = Math.sin(time * 2 + i) * 1 + 2;
-      const twinkle = Math.sin(time * 3 + i * 2) * 0.3 + 0.7;
+      const x = (Math.sin(time * 0.02 + i * 0.7) * 0.8 + 0.5) * width; // Very slow drift
+      const y = (Math.cos(time * 0.03 + i * 1.1) * 0.8 + 0.5) * height; // Very slow drift
+      const size = Math.sin(time * 0.8 + i) * 0.8 + 1.5; // Slow size variation
+      const twinkle = Math.sin(time * 1.2 + i * 1.5) * 0.2 + 0.6; // Very slow twinkle
 
       ctx.fillStyle = `rgba(255, 255, 255, ${twinkle})`;
       ctx.beginPath();
@@ -335,8 +335,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     const interpolatedZ = currentBeatZ + (targetZ - currentBeatZ) * easedProgress;
 
     // Position labels fixed relative to camera position so they stay at bottom
-    const labelZ = interpolatedZ + 200; // Fixed distance ahead of current position
-    const labelY = -5;  // Below ground level for bottom positioning
+    const labelZ = interpolatedZ + 180; // Closer to action for better visibility
+    const labelY = -15; // Further below ground level for clearer bottom positioning
 
     for (let lane = 0; lane < lanes; lane++) {
       const x = startX + lane * worldLaneWidth + worldLaneWidth / 2; // Center of lane
@@ -395,10 +395,10 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     const easedProgress = beatProgress < 0.5 ? 2 * beatProgress * beatProgress : -1 + (4 - 2 * beatProgress) * beatProgress;
     const interpolatedZ = currentBeatZ + (targetZ - currentBeatZ) * easedProgress;
 
-    // Optimized camera positioning to ensure all 12 lanes are visible horizontally
-    const cameraDistance = 800; // Moved even further back to see lane B
-    const cameraHeight = 280;   // Higher for better overview of all 12 lanes
-    const lookAheadDistance = 450; // Adjusted for wider field of view
+    // Optimized camera positioning to show grid alignment clearly
+    const cameraDistance = 750; // Slightly closer for better grid line visibility
+    const cameraHeight = 260;   // Slightly lower to emphasize grid alignment
+    const lookAheadDistance = 400; // Reduced for better focus on current beat area
 
     // Position camera to ensure strike zone (active notes) is clearly visible
     const strikeZoneZ = interpolatedZ + 50; // Strike zone positioned slightly ahead
@@ -426,25 +426,16 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     // Save context state
     ctx.save();
 
-    // Draw lane dividers with note-specific colors
+    // Draw lane dividers with note-specific colors (only interior dividers)
     ctx.lineWidth = 4;
     ctx.lineCap = 'round';
 
-    for (let lane = 0; lane <= lanes; lane++) {
-      const x = startX + lane * worldLaneWidth;
+    // Only draw interior dividers between lanes (lanes-1 dividers for lanes lanes)
+    for (let divider = 1; divider < lanes; divider++) {
+      const x = startX + divider * worldLaneWidth;
 
-      // Get color for this lane divider (interpolate between adjacent lane colors)
-      let laneColor = '#666666'; // Default gray for edge dividers
-      if (lane > 0 && lane < lanes) {
-        // Use the color of the lane to the left for interior dividers
-        laneColor = boomwhackerColors[lane - 1];
-      } else if (lane === 0 && lanes > 0) {
-        // Left edge gets first lane color
-        laneColor = boomwhackerColors[0];
-      } else if (lane === lanes && lanes > 0) {
-        // Right edge gets last lane color
-        laneColor = boomwhackerColors[lanes - 1];
-      }
+      // Use the color of the lane to the left of this divider
+      const laneColor = boomwhackerColors[divider - 1];
 
       // Convert hex to rgba for transparency
       const r = parseInt(laneColor.substr(1, 2), 16);
@@ -488,13 +479,22 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
 
     ctx.shadowBlur = 0;
 
-    // Draw beat lines with enhanced visibility
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.lineWidth = 2;
+    // Draw beat lines with enhanced visibility - every beat
     ctx.setLineDash([5, 5]); // Dashed lines for better visibility
 
-    for (let step = 0; step < steps; step += 4) {
+    for (let step = 0; step < steps; step++) {
       const z = -step * worldStepDepth;
+
+      // Different styling for different beat types
+      if (step % 4 === 0) {
+        // Strong beats (downbeats) - brighter and thicker
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.lineWidth = 3;
+      } else {
+        // Regular beats - more subtle
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1;
+      }
 
       // Sample multiple points across the width for better line rendering
       const points = [];
@@ -579,21 +579,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       }
     }
 
-    // Draw strike zone as illuminated platform at active note position
-    const currentBeatZ = -currentBeat * worldStepDepth;
-    const beatDuration = (60 / bpm) * 1000;
-    const timeSinceLastBeat = performance.now() - lastBeatTime.current;
-    const beatProgress = Math.min(timeSinceLastBeat / beatDuration, 1);
-
-    // Position strike zone where active notes should be
-    const nextBeatZ = -((currentBeat + 1) % steps) * worldStepDepth;
-    let targetZ = nextBeatZ;
-    if (currentBeat === steps - 1) {
-      targetZ = -steps * worldStepDepth;
-    }
-
-    const easedProgress = beatProgress < 0.5 ? 2 * beatProgress * beatProgress : -1 + (4 - 2 * beatProgress) * beatProgress;
-    const hitZoneZ = currentBeatZ + (targetZ - currentBeatZ) * easedProgress + 50; // Strike zone ahead of notes
+    // Draw strike zone perfectly aligned with current beat grid line
+    const hitZoneZ = -currentBeat * worldStepDepth; // Align exactly with current beat grid line
 
     ctx.strokeStyle = '#FF0080';
     ctx.lineWidth = 8;
