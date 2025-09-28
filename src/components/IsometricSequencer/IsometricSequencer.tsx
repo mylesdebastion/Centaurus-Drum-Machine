@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music } from 'lucide-react';
+import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap } from 'lucide-react';
 
 interface IsometricSequencerProps {
   onBack: () => void;
@@ -45,7 +45,7 @@ class Camera3D {
   position = new Vec3(0, 0, 0);
   target = new Vec3(0, 0, -1);
   up = new Vec3(0, 1, 0);
-  fov = 75; // Wider field of view for better visibility
+  fov = 90; // Maximum wide field of view to see all 12 lanes including B
   near = 1;  // Moved near plane further to prevent clipping
   far = 2000; // Extended far plane for better depth range
 
@@ -107,33 +107,49 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   const [bpm, setBpm] = useState(120);
   const [currentBeat, setCurrentBeat] = useState(0);
   const [pattern, setPattern] = useState<boolean[][]>(
-    Array(8).fill(null).map(() => Array(16).fill(false))
+    Array(12).fill(null).map(() => Array(16).fill(false))
   );
 
   // Constants
-  const lanes = 8;
+  const lanes = 12;
   const steps = 16;
-  const worldLaneWidth = 100;
+  const worldLaneWidth = 80; // Reduced to accommodate 12 lanes
   const worldStepDepth = 120;
   const worldLaneHeight = 10;
 
-  // Neon color palette for night theme
-  const neonColors = [
-    '#00FFFF', // Cyan
-    '#FF00FF', // Magenta
-    '#00FF00', // Lime
-    '#FFFF00', // Yellow
-    '#FF8000', // Orange
-    '#FF0080', // Pink
-    '#8000FF', // Purple
-    '#80FF00'  // Green-yellow
+  // Official Boomwhacker colors for complete chromatic scale
+  const boomwhackerColors = [
+    '#ff4444', // C - Red
+    '#ff8844', // C# - Orange-Red
+    '#ffaa44', // D - Orange
+    '#ffcc44', // D# - Yellow-Orange
+    '#ffff44', // E - Yellow
+    '#aaff44', // F - Yellow-Green
+    '#66ff44', // F# - Green-Yellow
+    '#44ff44', // G - Green
+    '#44ffaa', // G# - Blue-Green
+    '#44aaff', // A - Blue
+    '#4466ff', // A# - Blue-Purple
+    '#6644ff'  // B - Purple
   ];
 
+  // Complete chromatic scale frequencies (C4 to B4)
   const noteFrequencies = [
-    261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25
+    261.63, // C4
+    277.18, // C#4
+    293.66, // D4
+    311.13, // D#4
+    329.63, // E4
+    349.23, // F4
+    369.99, // F#4
+    392.00, // G4
+    415.30, // G#4
+    440.00, // A4
+    466.16, // A#4
+    493.88  // B4
   ];
 
-  const noteNames = ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C2'];
+  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
   const camera = useRef(new Camera3D());
   const lastBeatTime = useRef(0);
@@ -296,6 +312,72 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     return `rgb(${Math.min(255, r)}, ${Math.min(255, g)}, ${Math.min(255, b)})`;
   }, []);
 
+  // Draw 3D text labels for lanes
+  const draw3DLaneLabels = useCallback((
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    startX: number
+  ) => {
+    // Position labels much closer to camera and fixed relative to camera position
+    const currentBeatZ = -currentBeat * worldStepDepth;
+    const beatDuration = (60 / bpm) * 1000;
+    const timeSinceLastBeat = performance.now() - lastBeatTime.current;
+    const beatProgress = Math.min(timeSinceLastBeat / beatDuration, 1);
+
+    const nextBeatZ = -((currentBeat + 1) % steps) * worldStepDepth;
+    let targetZ = nextBeatZ;
+    if (currentBeat === steps - 1) {
+      targetZ = -steps * worldStepDepth;
+    }
+
+    const easedProgress = beatProgress < 0.5 ? 2 * beatProgress * beatProgress : -1 + (4 - 2 * beatProgress) * beatProgress;
+    const interpolatedZ = currentBeatZ + (targetZ - currentBeatZ) * easedProgress;
+
+    // Position labels fixed relative to camera position so they stay at bottom
+    const labelZ = interpolatedZ + 200; // Fixed distance ahead of current position
+    const labelY = -5;  // Below ground level for bottom positioning
+
+    for (let lane = 0; lane < lanes; lane++) {
+      const x = startX + lane * worldLaneWidth + worldLaneWidth / 2; // Center of lane
+
+      const labelPos = camera.current.project(new Vec3(x, labelY, labelZ), width, height);
+
+      if (labelPos && labelPos.z > 0.1) {
+        const distance = labelPos.z;
+        const scale = Math.max(0.8, 300 / distance);
+        const fontSize = Math.max(16, 28 * scale);
+
+        ctx.save();
+
+        // Set up text styling with lane-specific color
+        ctx.fillStyle = boomwhackerColors[lane];
+        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Add strong glow effect for better visibility
+        ctx.shadowColor = boomwhackerColors[lane];
+        ctx.shadowBlur = 20;
+
+        // Draw the note name
+        ctx.fillText(noteNames[lane], labelPos.x, labelPos.y);
+
+        // Add second layer for extra brightness
+        ctx.shadowBlur = 12;
+        ctx.fillText(noteNames[lane], labelPos.x, labelPos.y);
+
+        // Add third layer for maximum visibility
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.globalAlpha = 0.8;
+        ctx.fillText(noteNames[lane], labelPos.x, labelPos.y);
+
+        ctx.restore();
+      }
+    }
+  }, [lanes, worldLaneWidth, noteNames, boomwhackerColors, currentBeat, bpm, steps, worldStepDepth]);
+
   // Setup camera for 3D view
   const setupCamera = useCallback(() => {
     const beatDuration = (60 / bpm) * 1000;
@@ -313,10 +395,10 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     const easedProgress = beatProgress < 0.5 ? 2 * beatProgress * beatProgress : -1 + (4 - 2 * beatProgress) * beatProgress;
     const interpolatedZ = currentBeatZ + (targetZ - currentBeatZ) * easedProgress;
 
-    // Optimized camera positioning to ensure active notes are visible
-    const cameraDistance = 400; // Increased for better view of active notes
-    const cameraHeight = 180;   // Slightly lower for better note visibility
-    const lookAheadDistance = 300; // Reduced to focus on nearby notes
+    // Optimized camera positioning to ensure all 12 lanes are visible horizontally
+    const cameraDistance = 800; // Moved even further back to see lane B
+    const cameraHeight = 280;   // Higher for better overview of all 12 lanes
+    const lookAheadDistance = 450; // Adjusted for wider field of view
 
     // Position camera to ensure strike zone (active notes) is clearly visible
     const strikeZoneZ = interpolatedZ + 50; // Strike zone positioned slightly ahead
@@ -344,15 +426,34 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     // Save context state
     ctx.save();
 
-    // Draw lane dividers as glowing crystal formations with enhanced visibility
-    ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+    // Draw lane dividers with note-specific colors
     ctx.lineWidth = 4;
-    ctx.shadowColor = '#00FFFF';
-    ctx.shadowBlur = 10;
     ctx.lineCap = 'round';
 
     for (let lane = 0; lane <= lanes; lane++) {
       const x = startX + lane * worldLaneWidth;
+
+      // Get color for this lane divider (interpolate between adjacent lane colors)
+      let laneColor = '#666666'; // Default gray for edge dividers
+      if (lane > 0 && lane < lanes) {
+        // Use the color of the lane to the left for interior dividers
+        laneColor = boomwhackerColors[lane - 1];
+      } else if (lane === 0 && lanes > 0) {
+        // Left edge gets first lane color
+        laneColor = boomwhackerColors[0];
+      } else if (lane === lanes && lanes > 0) {
+        // Right edge gets last lane color
+        laneColor = boomwhackerColors[lanes - 1];
+      }
+
+      // Convert hex to rgba for transparency
+      const r = parseInt(laneColor.substr(1, 2), 16);
+      const g = parseInt(laneColor.substr(3, 2), 16);
+      const b = parseInt(laneColor.substr(5, 2), 16);
+
+      ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.8)`;
+      ctx.shadowColor = laneColor;
+      ctx.shadowBlur = 10;
 
       // Use multiple points for better line visibility
       const points = [];
@@ -375,12 +476,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
 
         // Add secondary glow for better visibility
         ctx.shadowBlur = 20;
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.4)`;
         ctx.lineWidth = 8;
         ctx.stroke();
 
         // Reset for next line
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
         ctx.lineWidth = 4;
         ctx.shadowBlur = 10;
       }
@@ -459,7 +559,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
               blockSize,
               blockSize,
               blockSize * 0.6,
-              neonColors[lane],
+              boomwhackerColors[lane],
               isActive
             );
 
@@ -500,9 +600,10 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     ctx.shadowColor = '#FF0080';
     ctx.shadowBlur = 20;
 
-    // Draw a more visible strike zone
-    const leftPoint = camera.current.project(new Vec3(startX - 60, 0, hitZoneZ), width, height);
-    const rightPoint = camera.current.project(new Vec3(startX + totalWorldWidth + 60, 0, hitZoneZ), width, height);
+    // Draw a more visible strike zone that extends across all 12 lanes
+    const strikeZoneExtension = 120; // Extended further to ensure all lanes are covered
+    const leftPoint = camera.current.project(new Vec3(startX - strikeZoneExtension, 0, hitZoneZ), width, height);
+    const rightPoint = camera.current.project(new Vec3(startX + totalWorldWidth + strikeZoneExtension, 0, hitZoneZ), width, height);
 
     if (leftPoint && rightPoint) {
       // Draw main strike line
@@ -527,7 +628,10 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     }
 
     ctx.shadowBlur = 0;
-  }, [pattern, lanes, steps, currentBeat, isPlaying, setupCamera, drawIsometricBlock, neonColors]);
+
+    // Draw 3D lane labels
+    draw3DLaneLabels(ctx, width, height, startX);
+  }, [pattern, lanes, steps, currentBeat, isPlaying, setupCamera, drawIsometricBlock, boomwhackerColors, draw3DLaneLabels]);
 
   // Main render loop
   const render = useCallback(() => {
@@ -611,13 +715,166 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   };
 
   const clearPattern = () => {
-    setPattern(Array(8).fill(null).map(() => Array(16).fill(false)));
+    setPattern(Array(12).fill(null).map(() => Array(16).fill(false)));
   };
 
   const randomizePattern = () => {
     setPattern(prev => prev.map(lane =>
       lane.map(() => Math.random() < 0.15)
     ));
+  };
+
+  // Musical patterns and chord progressions
+  const generateMelody = () => {
+    // Clear current pattern
+    const newPattern: boolean[][] = Array(12).fill(null).map(() => Array(16).fill(false));
+
+    // Define scale indices in C major (using chromatic positions)
+    const cMajorScale = [0, 2, 4, 5, 7, 9, 11]; // C, D, E, F, G, A, B
+    const cMajorChords = {
+      I: [0, 4, 7],    // C major (C, E, G)
+      ii: [2, 5, 9],   // D minor (D, F, A)
+      iii: [4, 7, 11], // E minor (E, G, B)
+      IV: [5, 9, 0],   // F major (F, A, C)
+      V: [7, 11, 2],   // G major (G, B, D)
+      vi: [9, 0, 4],   // A minor (A, C, E)
+      vii: [11, 2, 5]  // B diminished (B, D, F)
+    };
+
+    // Popular chord progressions
+    const progressions = [
+      ['I', 'V', 'vi', 'IV'],     // Pop progression (C-G-Am-F)
+      ['vi', 'IV', 'I', 'V'],     // Pop progression variation (Am-F-C-G)
+      ['I', 'vi', 'ii', 'V'],     // Classic jazz turnaround
+      ['I', 'IV', 'V', 'I'],      // Basic major progression
+      ['vi', 'ii', 'V', 'I'],     // Minor to major resolution
+      ['I', 'iii', 'vi', 'IV']    // Circle progression
+    ];
+
+    // Melodic motifs and patterns
+    const melodyPatterns = [
+      // Ascending scale runs
+      () => {
+        for (let i = 0; i < 8 && i < steps; i++) {
+          const note = cMajorScale[i % cMajorScale.length];
+          newPattern[note][i * 2] = true;
+        }
+      },
+      // Descending scale runs
+      () => {
+        for (let i = 0; i < 8 && i < steps; i++) {
+          const note = cMajorScale[6 - (i % cMajorScale.length)];
+          newPattern[note][i * 2] = true;
+        }
+      },
+      // Arpeggios
+      () => {
+        const chord = cMajorChords.I;
+        for (let i = 0; i < steps; i += 2) {
+          const note = chord[i % chord.length];
+          newPattern[note][i] = true;
+        }
+      },
+      // Call and response pattern
+      () => {
+        // Call (first 8 beats)
+        [0, 4, 7].forEach((note, idx) => {
+          newPattern[note][idx * 2] = true;
+        });
+        // Response (second 8 beats)
+        [7, 4, 0].forEach((note, idx) => {
+          newPattern[note][8 + idx * 2] = true;
+        });
+      }
+    ];
+
+    // Choose random pattern type
+    const patternType = Math.random();
+
+    if (patternType < 0.4) {
+      // Generate chord progression (40% chance)
+      const progression = progressions[Math.floor(Math.random() * progressions.length)];
+
+      progression.forEach((chordName, beatIndex) => {
+        const chord = cMajorChords[chordName as keyof typeof cMajorChords];
+        const startBeat = beatIndex * 4; // Each chord lasts 4 beats
+
+        // Add chord tones
+        chord.forEach((note, noteIndex) => {
+          if (startBeat + noteIndex < steps) {
+            newPattern[note][startBeat + noteIndex] = true;
+          }
+        });
+
+        // Add some rhythmic variation
+        if (Math.random() < 0.6) {
+          const rootNote = chord[0];
+          if (startBeat + 2 < steps) {
+            newPattern[rootNote][startBeat + 2] = true;
+          }
+        }
+      });
+
+    } else if (patternType < 0.7) {
+      // Generate melodic pattern (30% chance)
+      const pattern = melodyPatterns[Math.floor(Math.random() * melodyPatterns.length)];
+      pattern();
+
+      // Add some bass notes
+      for (let i = 0; i < steps; i += 4) {
+        if (Math.random() < 0.8) {
+          newPattern[0][i] = true; // Add C bass note
+        }
+      }
+
+    } else {
+      // Generate mixed pattern with melody and harmony (30% chance)
+      // Add bass line
+      const bassNotes = [0, 5, 7, 0]; // C, F, G, C
+      bassNotes.forEach((note, idx) => {
+        const beat = idx * 4;
+        if (beat < steps) {
+          newPattern[note][beat] = true;
+          // Add rhythmic bass
+          if (beat + 2 < steps && Math.random() < 0.5) {
+            newPattern[note][beat + 2] = true;
+          }
+        }
+      });
+
+      // Add melody on top
+      const melodyNotes = [4, 7, 9, 7, 4, 2, 0]; // E, G, A, G, E, D, C
+      melodyNotes.forEach((note, idx) => {
+        const beat = idx * 2 + 1; // Offset from bass
+        if (beat < steps) {
+          newPattern[note][beat] = true;
+        }
+      });
+
+      // Add some harmony
+      if (Math.random() < 0.6) {
+        for (let i = 8; i < steps; i += 2) {
+          const harmonynote = cMajorScale[Math.floor(Math.random() * cMajorScale.length)];
+          newPattern[harmonynote][i] = true;
+        }
+      }
+    }
+
+    // Add some subtle percussion/rhythm elements on non-scale tones occasionally
+    if (Math.random() < 0.3) {
+      for (let i = 0; i < steps; i += 4) {
+        if (Math.random() < 0.4) {
+          // Add chromatic passing tones sparingly
+          const chromaticNotes = [1, 3, 6, 8, 10]; // C#, D#, F#, G#, A#
+          const chromatic = chromaticNotes[Math.floor(Math.random() * chromaticNotes.length)];
+          if (i + 1 < steps) {
+            newPattern[chromatic][i + 1] = true;
+          }
+        }
+      }
+    }
+
+    setPattern(newPattern);
   };
 
   return (
@@ -662,23 +919,6 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           style={{ display: 'block' }}
         />
 
-        {/* Lane labels */}
-        <div className="absolute left-4 top-1/2 transform -translate-y-1/2 space-y-3 pointer-events-none">
-          {noteNames.map((name, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-center w-10 h-10 rounded-lg text-sm font-bold border-2 shadow-lg"
-              style={{
-                backgroundColor: `${neonColors[index]}20`,
-                borderColor: neonColors[index],
-                color: neonColors[index],
-                textShadow: `0 0 8px ${neonColors[index]}`
-              }}
-            >
-              {name}
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* Controls */}
@@ -706,11 +946,19 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           <Shuffle className="w-5 h-5" />
           Random
         </button>
+
+        <button
+          onClick={generateMelody}
+          className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 rounded-lg transition-all transform hover:scale-105 font-semibold"
+        >
+          <Zap className="w-5 h-5" />
+          Melody
+        </button>
       </div>
 
       {/* Instructions */}
       <div className="text-center p-4 bg-gray-900 text-gray-400 text-sm">
-        Click anywhere on the 3D view to add/remove notes • Watch notes flow toward you in the neon night sky
+        Click anywhere on the 3D view to add/remove notes • Use Melody for musical patterns • Random for noise • Clear to reset
       </div>
     </div>
   );
