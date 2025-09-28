@@ -207,7 +207,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   // 3D mouse interaction detection
   const getMouseWorldPosition = useCallback((mouseX: number, mouseY: number, canvasWidth: number, canvasHeight: number) => {
     const totalWorldWidth = effectiveLanes * worldLaneWidth;
-    const startX = -totalWorldWidth / 2 + worldLaneWidth / 2;
+    const startX = -totalWorldWidth / 2 + worldLaneWidth / 2; // Center the first lane
 
     // Find closest lane
     let closestLane = -1;
@@ -215,7 +215,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     let minDistance = Infinity;
 
     for (let laneIndex = 0; laneIndex < effectiveLanes; laneIndex++) {
-      const laneX = startX + laneIndex * worldLaneWidth;
+      const laneX = startX + laneIndex * worldLaneWidth; // Directly on the lane line
 
       for (let step = 0; step < steps; step++) {
         const stepZ = -step * worldStepDepth;
@@ -539,7 +539,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     setupCamera();
 
     const totalWorldWidth = effectiveLanes * worldLaneWidth;
-    const startX = -totalWorldWidth / 2 + worldLaneWidth / 2;
+    const startX = -totalWorldWidth / 2 + worldLaneWidth / 2; // Center the first lane
     const trackDepth = steps * worldStepDepth;
 
     // Save context state
@@ -551,12 +551,12 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
 
     // Draw dividers based on current mode
     if (showAllNotes) {
-      // When showing all notes, draw all 11 dividers with dimming for out-of-key notes
+      // When showing all notes, draw all 12 lane lines with dimming for out-of-key notes
       const currentScale = getCurrentScale();
 
-      for (let divider = 1; divider < 12; divider++) {
-        const x = startX + divider * worldLaneWidth;
-        const chromaticLane = divider - 1;
+      for (let laneIndex = 0; laneIndex < 12; laneIndex++) {
+        const x = startX + laneIndex * worldLaneWidth;
+        const chromaticLane = laneIndex;
         const laneColor = boomwhackerColors[chromaticLane];
 
         // Check if this lane is in the current key
@@ -601,17 +601,17 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           }
 
           // Reset for next line
-          ctx.lineWidth = 4;
+          ctx.lineWidth = 6; // Thicker lines for better visibility
           ctx.shadowBlur = 10;
         }
       }
     } else {
-      // Scale mode - only draw interior dividers between active lanes
-      for (let divider = 1; divider < effectiveLanes; divider++) {
-        const x = startX + divider * worldLaneWidth;
+      // Scale mode - draw lane lines for each active note in the scale
+      for (let laneIndex = 0; laneIndex < effectiveLanes; laneIndex++) {
+        const x = startX + laneIndex * worldLaneWidth;
 
-        // Use the color of the active lane to the left of this divider
-        const activeLaneIndex = activeLanes[divider - 1];
+        // Use the color of this active lane
+        const activeLaneIndex = activeLanes[laneIndex];
         const laneColor = boomwhackerColors[activeLaneIndex];
 
         // Convert hex to rgba for transparency
@@ -650,7 +650,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           ctx.stroke();
 
           // Reset for next line
-          ctx.lineWidth = 4;
+          ctx.lineWidth = 6; // Thicker lines for better visibility
           ctx.shadowBlur = 10;
         }
       }
@@ -720,7 +720,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       for (let cycle = 0; cycle < 2; cycle++) {
         for (let step = 0; step < steps; step++) {
           if (pattern[chromaticLane][step]) {
-            const x = startX + laneIndex * worldLaneWidth;
+            const x = startX + laneIndex * worldLaneWidth; // Directly on the lane line
             const z = -(step + cycle * steps) * worldStepDepth; // Offset second cycle
             const floatOffset = Math.sin(time * 2 + laneIndex + step) * 5;
             const y = worldLaneHeight + floatOffset;
@@ -753,6 +753,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
               ctx.save();
               ctx.globalAlpha = finalOpacity;
 
+              // Use correct color mapping:
+              // - In "all notes" mode: use chromatic lane color (chromaticLane)
+              // - In scale mode: use the color of the active lane at this visual position (activeLanes[laneIndex])
+              const cubeColor = showAllNotes ? boomwhackerColors[chromaticLane] : boomwhackerColors[activeLanes[laneIndex]];
+
               drawIsometricBlock(
                 ctx,
                 screenPos.x - blockSize / 2,
@@ -760,7 +765,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
                 blockSize,
                 blockSize,
                 blockSize * 0.6,
-                boomwhackerColors[chromaticLane],
+                cubeColor,
                 isActive
               );
 
@@ -823,7 +828,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       // Find the visual lane index for this chromatic lane
       const visualLaneIndex = activeLanes.indexOf(hoveredNote.lane);
       if (visualLaneIndex >= 0) {
-        const x = startX + visualLaneIndex * worldLaneWidth;
+        const x = startX + visualLaneIndex * worldLaneWidth; // Directly on the lane line
         const z = -hoveredNote.step * worldStepDepth;
         const y = worldLaneHeight;
 
@@ -848,9 +853,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           } else {
             // Ghost note for placement
             ctx.globalAlpha = 0.5;
-            ctx.strokeStyle = boomwhackerColors[hoveredNote.lane];
+            // Use correct color mapping for ghost note to match the lane it appears in
+            const ghostColor = showAllNotes ? boomwhackerColors[hoveredNote.lane] : boomwhackerColors[activeLanes[visualLaneIndex]];
+            ctx.strokeStyle = ghostColor;
             ctx.lineWidth = 3;
-            ctx.shadowColor = boomwhackerColors[hoveredNote.lane];
+            ctx.shadowColor = ghostColor;
             ctx.shadowBlur = 10;
           }
 
@@ -865,7 +872,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           ctx.stroke();
 
           // Add center dot for better visibility
-          ctx.fillStyle = existingNote ? '#FFFFFF' : boomwhackerColors[hoveredNote.lane];
+          const dotColor = existingNote ? '#FFFFFF' : (showAllNotes ? boomwhackerColors[hoveredNote.lane] : boomwhackerColors[activeLanes[visualLaneIndex]]);
+          ctx.fillStyle = dotColor;
           ctx.beginPath();
           ctx.arc(screenPos.x, screenPos.y, 4, 0, Math.PI * 2);
           ctx.fill();
@@ -878,7 +886,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     // Draw 3D lane labels
     draw3DLaneLabels(ctx, width, height, startX);
     ctx.restore();
-  }, [pattern, effectiveLanes, activeLanes, steps, currentBeat, isPlaying, setupCamera, drawIsometricBlock, boomwhackerColors, draw3DLaneLabels, hoveredNote, selectedRoot, selectedScale, getCurrentScale]);
+  }, [pattern, effectiveLanes, activeLanes, steps, currentBeat, isPlaying, setupCamera, drawIsometricBlock, boomwhackerColors, draw3DLaneLabels, hoveredNote, selectedRoot, selectedScale, getCurrentScale, showAllNotes]);
 
   // Main render loop
   const render = useCallback(() => {
