@@ -1,0 +1,571 @@
+import { LEDColor, LEDStripConfig, WLEDState, LEDVisualizationSettings } from '../types/led';
+
+export class SingleLaneVisualizer {
+  private config: LEDStripConfig;
+  private settings: LEDVisualizationSettings;
+  private lastUpdateTime: number = 0;
+  private isUpdating: boolean = false;
+
+  constructor(
+    config: LEDStripConfig,
+    private totalSteps: number = 16,
+    settings?: Partial<LEDVisualizationSettings>
+  ) {
+    this.config = config;
+    this.settings = {
+      updateRate: 30,
+      brightness: 0.8,
+      activeIntensity: 1.0,
+      baseIntensity: 0.1,
+      playheadColor: { r: 255, g: 255, b: 255 },
+      beatMarkerColor: { r: 255, g: 255, b: 0 },
+      protocol: 'http', // Default to HTTP for browser compatibility
+      udpPort: 21324, // Default WLED UDP port (matches Python code)
+      ...settings
+    };
+  }
+
+  /**
+   * Update the LED strip with current pattern state
+   */
+  async updateStrip(
+    pattern: boolean[],
+    currentStep: number,
+    isPlaying: boolean,
+    laneColor: string,
+    isSolo: boolean = false,
+    isMuted: boolean = false
+  ): Promise<boolean> {
+    // Rate limiting
+    const now = Date.now();
+    if (now - this.lastUpdateTime < 1000 / this.settings.updateRate) {
+      return true;
+    }
+
+    if (this.isUpdating) {
+      return true; // Skip if already updating
+    }
+
+    try {
+      this.isUpdating = true;
+      this.lastUpdateTime = now;
+
+      // Don't update if muted (unless solo)
+      if (isMuted && !isSolo) {
+        await this.turnOff();
+        return true;
+      }
+
+      const ledArray = this.generateLEDArray(
+        pattern,
+        currentStep,
+        isPlaying,
+        laneColor,
+        isSolo
+      );
+
+      const success = await this.sendToWLED(ledArray);
+
+      if (success) {
+        this.config.status = 'connected';
+        this.config.lastSeen = new Date();
+      } else {
+        this.config.status = 'error';
+      }
+
+      return success;
+    } catch (error) {
+      console.warn(`Failed to update LED strip ${this.config.id} at ${this.config.ipAddress}:`, error);
+      this.config.status = 'error';
+      return false;
+    } finally {
+      this.isUpdating = false;
+    }
+  }
+
+  /**
+   * Generate LED color array for current state - creates array for full LED strip
+   */
+  private generateLEDArray(
+    pattern: boolean[],
+    currentStep: number,
+    isPlaying: boolean,
+    laneColor: string,
+    isSolo: boolean
+  ): LEDColor[] {
+    const ledArray: LEDColor[] = new Array(this.config.ledCount);
+
+    const baseColor = this.hexToRgb(laneColor, this.settings.baseIntensity);
+    const activeColor = this.hexToRgb(laneColor, this.settings.activeIntensity);
+
+    // Calculate how many LEDs per step
+    const ledsPerStep = Math.floor(this.config.ledCount / this.totalSteps);
+    const remainingLEDs = this.config.ledCount % this.totalSteps;
+
+    for (let step = 0; step < this.totalSteps; step++) {
+      // Calculate LED indices for this step
+      const startLED = step * ledsPerStep + Math.min(step, remainingLEDs);
+      const endLED = startLED + ledsPerStep + (step < remainingLEDs ? 1 : 0);
+
+      let stepColor: LEDColor;
+
+      if (pattern[step]) {
+        // Active note
+        stepColor = { ...activeColor };
+
+        // Extra bright if currently playing this step
+        if (isPlaying && step === currentStep) {
+          // Flash white for active note being played
+          stepColor = this.applyBrightness(this.settings.playheadColor, this.settings.brightness);
+        }
+      } else {
+        // Inactive step - show dim base color
+        stepColor = { ...baseColor };
+
+        // Playhead indicator on inactive steps
+        if (isPlaying && step === currentStep) {
+          // Dim gray playhead for empty steps
+          stepColor = this.applyBrightness(this.settings.playheadColor, 0.3);
+        }
+      }
+
+      // Beat emphasis (every 4th step)
+      if (step % 4 === 0 && this.settings.brightness > 0) {
+        // Slightly brighten downbeats
+        stepColor = this.adjustBrightness(stepColor, 1.2);
+      }
+
+      // Apply global brightness
+      stepColor = this.applyBrightness(stepColor, this.settings.brightness);
+
+      // Fill all LEDs for this step
+      for (let led = startLED; led < endLED; led++) {
+        ledArray[led] = { ...stepColor };
+      }
+    }
+
+    // Fill any remaining LEDs with off
+    for (let led = this.totalSteps * ledsPerStep; led < this.config.ledCount; led++) {
+      ledArray[led] = { r: 0, g: 0, b: 0 };
+    }
+
+    return ledArray;
+  }
+
+  /**
+   * Send LED data to WLED device using UDP WARLS protocol or HTTP JSON
+   */
+  private async sendToWLED(ledArray: LEDColor[]): Promise<boolean> {
+    if (this.settings.protocol === 'udp') {
+      return this.sendUDPData(ledArray);
+    } else {
+      return this.sendHTTPData(ledArray);
+    }
+  }
+
+  /**
+   * Send LED data via UDP WARLS protocol through WebSocket bridge
+   */
+  private async sendUDPData(ledArray: LEDColor[]): Promise<boolean> {
+    return this.sendWebSocketData(ledArray);
+  }
+
+  /**
+   * Send LED data via WebSocket bridge to UDP WARLS
+   */
+  private async sendWebSocketData(ledArray: LEDColor[]): Promise<boolean> {
+    try {
+      // Check if WebSocket bridge is available
+      if (!window.wledBridge || window.wledBridge.readyState !== WebSocket.OPEN) {
+        // Try to connect to WebSocket bridge
+        await this.connectWebSocketBridge();
+      }
+
+      if (!window.wledBridge || window.wledBridge.readyState !== WebSocket.OPEN) {
+        console.warn(`⚠️ WebSocket bridge not available for ${this.config.ipAddress}. Install bridge: node scripts/wled-websocket-bridge.js`);
+        return false;
+      }
+
+      // Send data through WebSocket bridge
+      const message = {
+        ipAddress: this.config.ipAddress,
+        ledData: ledArray
+      };
+
+      return new Promise((resolve) => {
+        const handleResponse = (event: MessageEvent) => {
+          try {
+            const response = JSON.parse(event.data);
+            window.wledBridge?.removeEventListener('message', handleResponse);
+
+            if (response.success) {
+              console.log(`✅ WebSocket bridge sent data to ${this.config.ipAddress}`);
+              resolve(true);
+            } else {
+              console.warn(`❌ WebSocket bridge failed for ${this.config.ipAddress}:`, response.error);
+              resolve(false);
+            }
+          } catch (error) {
+            console.warn(`🚫 WebSocket response error for ${this.config.ipAddress}:`, error);
+            resolve(false);
+          }
+        };
+
+        window.wledBridge?.addEventListener('message', handleResponse);
+        window.wledBridge?.send(JSON.stringify(message));
+
+        // Timeout after 2 seconds
+        setTimeout(() => {
+          window.wledBridge?.removeEventListener('message', handleResponse);
+          console.warn(`⏰ WebSocket bridge timeout for ${this.config.ipAddress}`);
+          resolve(false);
+        }, 2000);
+      });
+
+    } catch (error) {
+      console.warn(`🚫 WebSocket WARLS communication error for ${this.config.ipAddress}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Connect to WebSocket bridge - tries multiple ports
+   */
+  private async connectWebSocketBridge(): Promise<void> {
+    const ports = [21325, 21326, 21327, 21328, 21329]; // Try multiple ports
+
+    for (const port of ports) {
+      try {
+        await this.tryWebSocketConnection(port);
+        console.log(`🌉 Connected to WLED WebSocket bridge on port ${port}`);
+        return;
+      } catch (error) {
+        console.log(`⚠️ Port ${port} not available, trying next...`);
+      }
+    }
+
+    throw new Error('WebSocket bridge not found on any port');
+  }
+
+  /**
+   * Try connecting to WebSocket on specific port
+   */
+  private async tryWebSocketConnection(port: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(`ws://localhost:${port}`);
+      let connected = false;
+
+      const timeout = setTimeout(() => {
+        if (!connected) {
+          ws.close();
+          reject(new Error(`Timeout connecting to port ${port}`));
+        }
+      }, 1000);
+
+      ws.onopen = () => {
+        connected = true;
+        clearTimeout(timeout);
+        console.log(`🌉 Connected to WLED WebSocket bridge on port ${port}`);
+        window.wledBridge = ws;
+        resolve();
+      };
+
+      ws.onerror = () => {
+        clearTimeout(timeout);
+        reject(new Error(`Failed to connect to port ${port}`));
+      };
+
+      ws.onclose = () => {
+        console.log('🔌 WebSocket bridge disconnected');
+        window.wledBridge = null;
+      };
+    });
+  }
+
+  /**
+   * Send LED data via HTTP JSON - multiple approaches for maximum compatibility
+   */
+  private async sendHTTPData(ledArray: LEDColor[]): Promise<boolean> {
+    try {
+      // Method 1: Try individual pixel control using segment data
+      const segmentData: WLEDState = {
+        on: true,
+        bri: Math.round(this.settings.brightness * 255),
+        seg: [{
+          id: 0,
+          start: 0,
+          stop: ledArray.length,
+          fx: 0, // Solid color effect
+          col: ledArray.map(led => [led.r, led.g, led.b])
+        }]
+      };
+
+      const segmentResponse = await fetch(`http://${this.config.ipAddress}/json/state`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(segmentData),
+        signal: AbortSignal.timeout(2000)
+      });
+
+      // Debug logging
+      console.log(`🔄 Sending HTTP JSON data to ${this.config.ipAddress}:`, {
+        studentName: this.config.studentName,
+        laneIndex: this.config.laneIndex,
+        protocol: 'HTTP JSON (Segment)',
+        brightness: segmentData.bri,
+        ledCount: ledArray.length,
+        activeSteps: ledArray.filter(led => led.r > 50 || led.g > 50 || led.b > 50).length,
+        url: `http://${this.config.ipAddress}/json/state`,
+        sampleColors: ledArray.slice(0, 4).map(led => `rgb(${led.r},${led.g},${led.b})`)
+      });
+
+      if (segmentResponse.ok) {
+        console.log(`✅ HTTP LED data sent successfully to ${this.config.ipAddress} (status: ${segmentResponse.status})`);
+        return true;
+      } else {
+        console.warn(`❌ HTTP segment method failed for ${this.config.ipAddress}: ${segmentResponse.status} ${segmentResponse.statusText}`);
+
+        // Method 2: Fallback to simple color setting if segment method fails
+        return this.sendSimpleColorHTTP(ledArray);
+      }
+    } catch (error) {
+      console.warn(`🚫 HTTP WLED communication error for ${this.config.ipAddress}:`, error);
+
+      // Method 2: Fallback to simple color setting
+      return this.sendSimpleColorHTTP(ledArray);
+    }
+  }
+
+  /**
+   * Fallback HTTP method: Set simple colors for troubleshooting
+   */
+  private async sendSimpleColorHTTP(ledArray: LEDColor[]): Promise<boolean> {
+    try {
+      // Calculate average color from the LED array
+      let totalR = 0, totalG = 0, totalB = 0, activeCount = 0;
+
+      for (const led of ledArray) {
+        if (led.r > 10 || led.g > 10 || led.b > 10) { // Only count non-black LEDs
+          totalR += led.r;
+          totalG += led.g;
+          totalB += led.b;
+          activeCount++;
+        }
+      }
+
+      const avgColor = activeCount > 0 ? [
+        Math.round(totalR / activeCount),
+        Math.round(totalG / activeCount),
+        Math.round(totalB / activeCount)
+      ] : [0, 0, 0];
+
+      const simpleData = {
+        on: true,
+        bri: Math.round(this.settings.brightness * 255),
+        seg: [{
+          id: 0,
+          col: [avgColor, [0, 0, 0], [0, 0, 0]]
+        }]
+      };
+
+      const response = await fetch(`http://${this.config.ipAddress}/json/state`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(simpleData),
+        signal: AbortSignal.timeout(2000)
+      });
+
+      console.log(`🔄 Fallback HTTP simple color to ${this.config.ipAddress}:`, avgColor);
+
+      if (response.ok) {
+        console.log(`✅ HTTP simple color sent to ${this.config.ipAddress}`);
+        return true;
+      } else {
+        console.warn(`❌ HTTP simple color failed for ${this.config.ipAddress}: ${response.status}`);
+        return false;
+      }
+
+    } catch (error) {
+      console.warn(`🚫 HTTP simple color error for ${this.config.ipAddress}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Turn off the LED strip
+   */
+  async turnOff(): Promise<boolean> {
+    try {
+      const response = await fetch(`http://${this.config.ipAddress}/json/state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ on: false }),
+        signal: AbortSignal.timeout(1000)
+      });
+      return response.ok;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Generate rainbow flow test pattern
+   */
+  async sendRainbowTestPattern(): Promise<boolean> {
+    console.log(`🌈 Sending rainbow flow test to ${this.config.ipAddress} (${this.config.studentName || 'Unnamed'})`);
+
+    const ledArray: LEDColor[] = new Array(this.config.ledCount);
+    const time = Date.now() / 1000; // Time in seconds for animation
+
+    for (let i = 0; i < this.config.ledCount; i++) {
+      // Create rainbow that flows along the strip
+      const hue = ((i / this.config.ledCount) + (time * 0.2)) % 1.0; // 0-1 range
+      const color = this.hsvToRgb(hue, 1.0, 1.0); // Full saturation and brightness
+      ledArray[i] = color;
+    }
+
+    try {
+      const success = await this.sendToWLED(ledArray);
+      if (success) {
+        console.log(`✅ Rainbow test pattern sent to ${this.config.ipAddress}`);
+      } else {
+        console.error(`❌ Failed to send rainbow pattern to ${this.config.ipAddress}`);
+      }
+      return success;
+    } catch (error) {
+      console.error(`🚫 Rainbow test error for ${this.config.ipAddress}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Convert HSV to RGB color
+   */
+  private hsvToRgb(h: number, s: number, v: number): LEDColor {
+    const c = v * s;
+    const x = c * (1 - Math.abs(((h * 6) % 2) - 1));
+    const m = v - c;
+
+    let r = 0, g = 0, b = 0;
+
+    if (h >= 0 && h < 1/6) {
+      r = c; g = x; b = 0;
+    } else if (h >= 1/6 && h < 2/6) {
+      r = x; g = c; b = 0;
+    } else if (h >= 2/6 && h < 3/6) {
+      r = 0; g = c; b = x;
+    } else if (h >= 3/6 && h < 4/6) {
+      r = 0; g = x; b = c;
+    } else if (h >= 4/6 && h < 5/6) {
+      r = x; g = 0; b = c;
+    } else {
+      r = c; g = 0; b = x;
+    }
+
+    return {
+      r: Math.round((r + m) * 255),
+      g: Math.round((g + m) * 255),
+      b: Math.round((b + m) * 255)
+    };
+  }
+
+  /**
+   * Test connection to WLED device
+   */
+  async testConnection(): Promise<boolean> {
+    console.log(`🔍 Testing connection to ${this.config.ipAddress} (${this.config.studentName || 'Unnamed'})`);
+
+    try {
+      const response = await fetch(`http://${this.config.ipAddress}/json/info`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(2000)
+      });
+
+      if (response.ok) {
+        const info = await response.json();
+        console.log(`✅ WLED device connected at ${this.config.ipAddress}:`, {
+          name: info.name,
+          version: info.ver,
+          ledCount: info.leds?.count,
+          ip: info.ip
+        });
+        this.config.status = 'connected';
+        this.config.lastSeen = new Date();
+        return true;
+      } else {
+        console.warn(`❌ WLED connection failed for ${this.config.ipAddress}: ${response.status} ${response.statusText}`);
+        this.config.status = 'error';
+        return false;
+      }
+    } catch (error) {
+      console.warn(`🚫 WLED connection error for ${this.config.ipAddress}:`, error);
+      this.config.status = 'disconnected';
+      return false;
+    }
+  }
+
+  /**
+   * Update strip configuration
+   */
+  updateConfig(newConfig: Partial<LEDStripConfig>): void {
+    this.config = { ...this.config, ...newConfig };
+  }
+
+  /**
+   * Update visualization settings
+   */
+  updateSettings(newSettings: Partial<LEDVisualizationSettings>): void {
+    this.settings = { ...this.settings, ...newSettings };
+  }
+
+  /**
+   * Get current configuration
+   */
+  getConfig(): LEDStripConfig {
+    return { ...this.config };
+  }
+
+  /**
+   * Convert hex color to RGB with intensity
+   */
+  private hexToRgb(hex: string, intensity: number = 1): LEDColor {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (!result) {
+      return { r: 0, g: 0, b: 0 };
+    }
+
+    return {
+      r: Math.round(parseInt(result[1], 16) * intensity),
+      g: Math.round(parseInt(result[2], 16) * intensity),
+      b: Math.round(parseInt(result[3], 16) * intensity)
+    };
+  }
+
+  /**
+   * Apply brightness multiplier to color
+   */
+  private applyBrightness(color: LEDColor, brightness: number): LEDColor {
+    return {
+      r: Math.min(255, Math.round(color.r * brightness)),
+      g: Math.min(255, Math.round(color.g * brightness)),
+      b: Math.min(255, Math.round(color.b * brightness))
+    };
+  }
+
+  /**
+   * Adjust existing color brightness
+   */
+  private adjustBrightness(color: LEDColor, multiplier: number): LEDColor {
+    return {
+      r: Math.min(255, Math.round(color.r * multiplier)),
+      g: Math.min(255, Math.round(color.g * multiplier)),
+      b: Math.min(255, Math.round(color.b * multiplier))
+    };
+  }
+}

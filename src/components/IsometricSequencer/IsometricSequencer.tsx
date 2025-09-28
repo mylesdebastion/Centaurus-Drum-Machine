@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap } from 'lucide-react';
+import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap, Lightbulb } from 'lucide-react';
+import { SingleLaneVisualizer } from '../../utils/SingleLaneVisualizer';
+import { LEDStripManager } from '../LEDStripManager/LEDStripManager';
 
 interface IsometricSequencerProps {
   onBack: () => void;
@@ -114,6 +116,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   );
   const [mousePos, setMousePos] = useState<{x: number, y: number} | null>(null);
   const [hoveredNote, setHoveredNote] = useState<{lane: number, step: number} | null>(null);
+
+  // LED visualization state
+  const [showLEDManager, setShowLEDManager] = useState(false);
+  const [ledVisualizers, setLEDVisualizers] = useState<SingleLaneVisualizer[]>([]);
+  const [ledEnabled, setLEDEnabled] = useState(false);
 
   // Constants
   const lanes = 12;
@@ -886,7 +893,23 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     // Draw 3D lane labels
     draw3DLaneLabels(ctx, width, height, startX);
     ctx.restore();
-  }, [pattern, effectiveLanes, activeLanes, steps, currentBeat, isPlaying, setupCamera, drawIsometricBlock, boomwhackerColors, draw3DLaneLabels, hoveredNote, selectedRoot, selectedScale, getCurrentScale, showAllNotes]);
+  }, [
+    pattern,
+    effectiveLanes,
+    activeLanes,
+    steps,
+    currentBeat,
+    isPlaying,
+    setupCamera,
+    drawIsometricBlock,
+    boomwhackerColors,
+    draw3DLaneLabels,
+    hoveredNote,
+    selectedRoot,
+    selectedScale,
+    getCurrentScale,
+    showAllNotes
+  ]);
 
   // Main render loop
   const render = useCallback(() => {
@@ -940,6 +963,47 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       }
     };
   }, [render]);
+
+  // Update LED strips
+  useEffect(() => {
+    if (!ledEnabled || ledVisualizers.length === 0) return;
+
+    const updateLEDs = async () => {
+      const activeLanes = getActiveLanes();
+
+      for (const visualizer of ledVisualizers) {
+        const config = visualizer.getConfig();
+
+        // Check if this visualizer's lane is currently active
+        const isLaneActive = showAllNotes || activeLanes.includes(config.laneIndex);
+        if (!isLaneActive) continue;
+
+        // Get the pattern for this specific lane
+        const lanePattern = pattern[config.laneIndex] || [];
+        const laneColor = boomwhackerColors[config.laneIndex];
+
+        try {
+          await visualizer.updateStrip(
+            lanePattern,
+            currentBeat,
+            isPlaying,
+            laneColor,
+            false, // TODO: implement solo logic if needed
+            false  // TODO: implement mute logic if needed
+          );
+        } catch (error) {
+          console.warn(`Failed to update LED strip for lane ${config.laneIndex}:`, error);
+        }
+      }
+    };
+
+    updateLEDs();
+  }, [ledEnabled, ledVisualizers, pattern, currentBeat, isPlaying, boomwhackerColors, showAllNotes, getActiveLanes]);
+
+  // Handle LED visualizers change
+  const handleLEDVisualizersChange = useCallback((newVisualizers: SingleLaneVisualizer[]) => {
+    setLEDVisualizers(newVisualizers);
+  }, []);
 
   // Canvas mouse handlers
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1262,8 +1326,43 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
               All Notes
             </label>
           </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowLEDManager(!showLEDManager)}
+              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${
+                showLEDManager
+                  ? 'bg-yellow-600 hover:bg-yellow-500'
+                  : 'bg-gray-700 hover:bg-gray-600'
+              }`}
+            >
+              <Lightbulb className="w-4 h-4" />
+              LED
+            </button>
+            <input
+              type="checkbox"
+              id="ledEnabled"
+              checked={ledEnabled}
+              onChange={(e) => setLEDEnabled(e.target.checked)}
+              className="w-4 h-4"
+            />
+            <label htmlFor="ledEnabled" className="text-sm text-gray-300">
+              Enable
+            </label>
+          </div>
         </div>
       </div>
+
+      {/* LED Strip Manager Panel */}
+      {showLEDManager && (
+        <div className="border-b border-gray-700">
+          <LEDStripManager
+            boomwhackerColors={boomwhackerColors}
+            noteNames={noteNames}
+            onStripsChange={handleLEDVisualizersChange}
+          />
+        </div>
+      )}
 
       {/* Canvas */}
       <div className="flex-1 relative">
