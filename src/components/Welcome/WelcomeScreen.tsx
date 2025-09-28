@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
-import { Music, Users, Play, BookOpen, Sparkles, Gamepad2 } from 'lucide-react';
+import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onStartJam: () => void;
   onJoinJam: (code: string) => void;
   onEducationMode: () => void;
+  onIsometricMode: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onStartJam,
   onJoinJam,
-  onEducationMode
+  onEducationMode,
+  onIsometricMode
 }) => {
   const [joinCode, setJoinCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
@@ -119,8 +121,17 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             </button>
           </div>
 
-          {/* Temporary APC40 Test Button */}
-          <div className="mt-4">
+          {/* Experimental Features */}
+          <div className="mt-6 space-y-4">
+            <button
+              onClick={onIsometricMode}
+              className="inline-flex items-center gap-3 px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all transform hover:scale-105 shadow-lg hover:shadow-xl"
+            >
+              <Boxes className="w-5 h-5 sm:w-6 sm:h-6" />
+              <span className="text-base sm:text-lg">Isometric 3D Sequencer</span>
+              <span className="text-xs sm:text-sm opacity-75">(Experimental)</span>
+            </button>
+
             <a
               href="/apc40-demo.html"
               target="_blank"
@@ -131,8 +142,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               <span className="text-base sm:text-lg">Test APC40 Demo</span>
               <span className="text-xs sm:text-sm opacity-75">(Beta)</span>
             </a>
-            <p className="text-xs text-gray-500 mt-2">
-              Temporary link for testing APC40 MIDI controller integration
+
+            <p className="text-xs text-gray-500 mt-2 text-center">
+              Experimental features for testing new functionality
             </p>
           </div>
         </div>
