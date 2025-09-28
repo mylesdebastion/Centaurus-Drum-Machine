@@ -106,7 +106,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState(120);
   const [currentBeat, setCurrentBeat] = useState(0);
-  const [selectedKey, setSelectedKey] = useState('C'); // Default to C major
+  const [selectedRoot, setSelectedRoot] = useState('C'); // Root note (C, D, E, etc.)
+  const [selectedScale, setSelectedScale] = useState('major'); // Scale type (major, minor, etc.)
   const [showAllNotes, setShowAllNotes] = useState(false); // Toggle between scale and chromatic
   const [pattern, setPattern] = useState<boolean[][]>(
     Array(12).fill(null).map(() => Array(16).fill(false))
@@ -155,28 +156,49 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
 
   const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
-  // Major scale patterns (chromatic indices)
-  const majorScales = {
-    'C': [0, 2, 4, 5, 7, 9, 11],  // C D E F G A B
-    'C#': [1, 3, 5, 6, 8, 10, 0], // C# D# F F# G# A# C
-    'D': [2, 4, 6, 7, 9, 11, 1],  // D E F# G A B C#
-    'D#': [3, 5, 7, 8, 10, 0, 2], // D# F G G# A# C D
-    'E': [4, 6, 8, 9, 11, 1, 3],  // E F# G# A B C# D#
-    'F': [5, 7, 9, 10, 0, 2, 4],  // F G A A# C D E
-    'F#': [6, 8, 10, 11, 1, 3, 5], // F# G# A# B C# D# F
-    'G': [7, 9, 11, 0, 2, 4, 6],  // G A B C D E F#
-    'G#': [8, 10, 0, 1, 3, 5, 7], // G# A# C C# D# F G
-    'A': [9, 11, 1, 2, 4, 6, 8],  // A B C# D E F# G#
-    'A#': [10, 0, 2, 3, 5, 7, 9], // A# C D D# F G A
-    'B': [11, 1, 3, 4, 6, 8, 10]  // B C# D# E F# G# A#
+  // Root note positions (0 = C, 1 = C#, 2 = D, etc.)
+  const rootNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const rootPositions = {
+    'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
+    'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11
   };
+
+  // Scale interval patterns (semitones from root)
+  const scalePatterns = {
+    'major': [0, 2, 4, 5, 7, 9, 11],        // Major scale (Ionian)
+    'minor': [0, 2, 3, 5, 7, 8, 10],        // Natural minor scale (Aeolian)
+    'dorian': [0, 2, 3, 5, 7, 9, 10],       // Dorian mode
+    'phrygian': [0, 1, 3, 5, 7, 8, 10],     // Phrygian mode
+    'lydian': [0, 2, 4, 6, 7, 9, 11],       // Lydian mode
+    'mixolydian': [0, 2, 4, 5, 7, 9, 10],   // Mixolydian mode
+    'locrian': [0, 1, 3, 5, 6, 8, 10],      // Locrian mode
+    'harmonic_minor': [0, 2, 3, 5, 7, 8, 11], // Harmonic minor
+    'melodic_minor': [0, 2, 3, 5, 7, 9, 11],  // Melodic minor
+    'pentatonic_major': [0, 2, 4, 7, 9],      // Major pentatonic
+    'pentatonic_minor': [0, 3, 5, 7, 10],     // Minor pentatonic
+    'blues': [0, 3, 5, 6, 7, 10]              // Blues scale
+  };
+
+  // Function to get current scale notes
+  const getCurrentScale = () => {
+    const rootPos = rootPositions[selectedRoot as keyof typeof rootPositions];
+    const pattern = scalePatterns[selectedScale as keyof typeof scalePatterns];
+    return pattern.map(interval => (rootPos + interval) % 12);
+  };
+
+  // Legacy majorScales for backward compatibility (now computed dynamically)
+  const majorScales = rootNotes.reduce((acc, root) => {
+    const rootPos = rootPositions[root as keyof typeof rootPositions];
+    acc[root] = scalePatterns.major.map(interval => (rootPos + interval) % 12);
+    return acc;
+  }, {} as Record<string, number[]>);
 
   // Get active lanes based on current mode
   const getActiveLanes = () => {
     if (showAllNotes) {
       return Array.from({ length: 12 }, (_, i) => i);
     }
-    return majorScales[selectedKey as keyof typeof majorScales];
+    return getCurrentScale();
   };
 
   const activeLanes = getActiveLanes();
@@ -424,16 +446,37 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
         const scale = Math.max(0.8, 300 / distance);
         const fontSize = Math.max(16, 28 * scale);
 
+        // Check if this lane is in the selected scale for dimming
+        const isShowingAllNotes = effectiveLanes === 12;
+        const hasSelectedScale = selectedRoot !== 'C' || selectedScale !== 'major';
+        const currentScaleNotes = getCurrentScale();
+        const isInKey = !isShowingAllNotes || !hasSelectedScale || currentScaleNotes.includes(chromaticLane);
+        const labelOpacity = isInKey ? 1.0 : 0.4;
+
         ctx.save();
 
-        // Set up text styling with lane-specific color
-        ctx.fillStyle = boomwhackerColors[chromaticLane];
+        // Apply dimming to the color
+        const color = boomwhackerColors[chromaticLane];
+        const rgb = color.match(/\w\w/g);
+        if (rgb) {
+          const [r, g, b] = rgb.map(x => parseInt(x, 16));
+          ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${labelOpacity})`;
+        } else {
+          ctx.fillStyle = color;
+        }
+
         ctx.font = `bold ${fontSize}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        // Add strong glow effect for better visibility
-        ctx.shadowColor = boomwhackerColors[chromaticLane];
+        // Add glow effect, dimmed for out-of-key notes
+        const shadowOpacity = isInKey ? 1.0 : 0.3;
+        if (rgb) {
+          const [r, g, b] = rgb.map(x => parseInt(x, 16));
+          ctx.shadowColor = `rgba(${r}, ${g}, ${b}, ${shadowOpacity})`;
+        } else {
+          ctx.shadowColor = boomwhackerColors[chromaticLane];
+        }
         ctx.shadowBlur = 20;
 
         // Draw the note name
@@ -452,7 +495,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
         ctx.restore();
       }
     }
-  }, [effectiveLanes, activeLanes, worldLaneWidth, noteNames, boomwhackerColors, currentBeat, bpm, steps, worldStepDepth]);
+  }, [effectiveLanes, activeLanes, worldLaneWidth, noteNames, boomwhackerColors, currentBeat, bpm, steps, worldStepDepth, selectedRoot, selectedScale, getCurrentScale]);
 
   // Setup camera for 3D view
   const setupCamera = useCallback(() => {
@@ -506,52 +549,110 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     ctx.lineWidth = 4;
     ctx.lineCap = 'round';
 
-    // Only draw interior dividers between active lanes
-    for (let divider = 1; divider < effectiveLanes; divider++) {
-      const x = startX + divider * worldLaneWidth;
+    // Draw dividers based on current mode
+    if (showAllNotes) {
+      // When showing all notes, draw all 11 dividers with dimming for out-of-key notes
+      const currentScale = getCurrentScale();
 
-      // Use the color of the active lane to the left of this divider
-      const activeLaneIndex = activeLanes[divider - 1];
-      const laneColor = boomwhackerColors[activeLaneIndex];
+      for (let divider = 1; divider < 12; divider++) {
+        const x = startX + divider * worldLaneWidth;
+        const chromaticLane = divider - 1;
+        const laneColor = boomwhackerColors[chromaticLane];
 
-      // Convert hex to rgba for transparency
-      const r = parseInt(laneColor.substr(1, 2), 16);
-      const g = parseInt(laneColor.substr(3, 2), 16);
-      const b = parseInt(laneColor.substr(5, 2), 16);
+        // Check if this lane is in the current key
+        const isInKey = currentScale.includes(chromaticLane);
+        const opacity = isInKey ? 0.8 : 0.3; // Dim out-of-key lanes
 
-      ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.8)`;
-      ctx.shadowColor = laneColor;
-      ctx.shadowBlur = 10;
+        // Convert hex to rgba for transparency
+        const r = parseInt(laneColor.substr(1, 2), 16);
+        const g = parseInt(laneColor.substr(3, 2), 16);
+        const b = parseInt(laneColor.substr(5, 2), 16);
 
-      // Use multiple points for better line visibility - extended for continuous loop
-      const points = [];
-      const extendedDepth = trackDepth * 2; // Extend to cover both cycles
-      for (let i = 0; i <= 20; i++) { // More points for longer lines
-        const z = -(i / 20) * extendedDepth;
-        const point = camera.current.project(new Vec3(x, 0, z), width, height);
-        if (point && point.z > 0.1) { // Improved near clipping
-          points.push(point);
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+        ctx.shadowColor = isInKey ? laneColor : 'transparent';
+        ctx.shadowBlur = isInKey ? 10 : 0;
+
+        // Use multiple points for better line visibility - extended for continuous loop
+        const points = [];
+        const extendedDepth = trackDepth * 2; // Extend to cover both cycles
+        for (let i = 0; i <= 20; i++) { // More points for longer lines
+          const z = -(i / 20) * extendedDepth;
+          const point = camera.current.project(new Vec3(x, 0, z), width, height);
+          if (point && point.z > 0.1) { // Improved near clipping
+            points.push(point);
+          }
+        }
+
+        // Draw continuous line if we have enough points
+        if (points.length >= 2) {
+          ctx.beginPath();
+          ctx.moveTo(points[0].x, points[0].y);
+          for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+          }
+          ctx.stroke();
+
+          // Add secondary glow for in-key notes only
+          if (isInKey) {
+            ctx.shadowBlur = 20;
+            ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.4)`;
+            ctx.lineWidth = 8;
+            ctx.stroke();
+          }
+
+          // Reset for next line
+          ctx.lineWidth = 4;
+          ctx.shadowBlur = 10;
         }
       }
+    } else {
+      // Scale mode - only draw interior dividers between active lanes
+      for (let divider = 1; divider < effectiveLanes; divider++) {
+        const x = startX + divider * worldLaneWidth;
 
-      // Draw continuous line if we have enough points
-      if (points.length >= 2) {
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) {
-          ctx.lineTo(points[i].x, points[i].y);
-        }
-        ctx.stroke();
+        // Use the color of the active lane to the left of this divider
+        const activeLaneIndex = activeLanes[divider - 1];
+        const laneColor = boomwhackerColors[activeLaneIndex];
 
-        // Add secondary glow for better visibility
-        ctx.shadowBlur = 20;
-        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.4)`;
-        ctx.lineWidth = 8;
-        ctx.stroke();
+        // Convert hex to rgba for transparency
+        const r = parseInt(laneColor.substr(1, 2), 16);
+        const g = parseInt(laneColor.substr(3, 2), 16);
+        const b = parseInt(laneColor.substr(5, 2), 16);
 
-        // Reset for next line
-        ctx.lineWidth = 4;
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.8)`;
+        ctx.shadowColor = laneColor;
         ctx.shadowBlur = 10;
+
+        // Use multiple points for better line visibility - extended for continuous loop
+        const points = [];
+        const extendedDepth = trackDepth * 2; // Extend to cover both cycles
+        for (let i = 0; i <= 20; i++) { // More points for longer lines
+          const z = -(i / 20) * extendedDepth;
+          const point = camera.current.project(new Vec3(x, 0, z), width, height);
+          if (point && point.z > 0.1) { // Improved near clipping
+            points.push(point);
+          }
+        }
+
+        // Draw continuous line if we have enough points
+        if (points.length >= 2) {
+          ctx.beginPath();
+          ctx.moveTo(points[0].x, points[0].y);
+          for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+          }
+          ctx.stroke();
+
+          // Add secondary glow for better visibility
+          ctx.shadowBlur = 20;
+          ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.4)`;
+          ctx.lineWidth = 8;
+          ctx.stroke();
+
+          // Reset for next line
+          ctx.lineWidth = 4;
+          ctx.shadowBlur = 10;
+        }
       }
     }
 
@@ -608,6 +709,13 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     for (let laneIndex = 0; laneIndex < effectiveLanes; laneIndex++) {
       const chromaticLane = activeLanes[laneIndex];
 
+      // Check if this lane is in the selected scale for dimming
+      const isShowingAllNotes = effectiveLanes === 12;
+      const hasSelectedScale = selectedRoot !== 'C' || selectedScale !== 'major';
+      const currentScaleNotes = getCurrentScale();
+      const isInKey = !isShowingAllNotes || !hasSelectedScale || currentScaleNotes.includes(chromaticLane);
+      const noteOpacity = isInKey ? 1.0 : 0.4;
+
       // Draw two copies of the pattern for seamless looping
       for (let cycle = 0; cycle < 2; cycle++) {
         for (let step = 0; step < steps; step++) {
@@ -638,11 +746,12 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
               // Ensure minimum size for visibility
               blockSize = Math.max(blockSize, isActive ? 30 : 15);
 
-              // Slightly fade the second cycle for depth perception
-              const opacity = cycle === 0 ? 1.0 : 0.7;
+              // Slightly fade the second cycle for depth perception and apply key-based dimming
+              const baseOpacity = cycle === 0 ? 1.0 : 0.7;
+              const finalOpacity = baseOpacity * noteOpacity;
 
               ctx.save();
-              ctx.globalAlpha = opacity;
+              ctx.globalAlpha = finalOpacity;
 
               drawIsometricBlock(
                 ctx,
@@ -768,7 +877,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
 
     // Draw 3D lane labels
     draw3DLaneLabels(ctx, width, height, startX);
-  }, [pattern, effectiveLanes, activeLanes, steps, currentBeat, isPlaying, setupCamera, drawIsometricBlock, boomwhackerColors, draw3DLaneLabels, hoveredNote]);
+    ctx.restore();
+  }, [pattern, effectiveLanes, activeLanes, steps, currentBeat, isPlaying, setupCamera, drawIsometricBlock, boomwhackerColors, draw3DLaneLabels, hoveredNote, selectedRoot, selectedScale, getCurrentScale]);
 
   // Main render loop
   const render = useCallback(() => {
@@ -924,8 +1034,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     // Clear current pattern
     const newPattern: boolean[][] = Array(12).fill(null).map(() => Array(16).fill(false));
 
-    // Use the selected key's scale
-    const currentScale = majorScales[selectedKey as keyof typeof majorScales];
+    // Use the current root and scale
+    const currentScale = getCurrentScale();
     // Build chords for the selected key
     const keyChords = {
       I: [currentScale[0], currentScale[2], currentScale[4]],    // I major (1, 3, 5)
@@ -1105,14 +1215,29 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-300">Key:</span>
+            <span className="text-sm text-gray-300">Root:</span>
             <select
-              value={selectedKey}
-              onChange={(e) => setSelectedKey(e.target.value)}
-              className="bg-gray-700 text-white px-2 py-1 rounded text-sm"
+              value={selectedRoot}
+              onChange={(e) => setSelectedRoot(e.target.value)}
+              className="bg-gray-700 text-white px-2 py-1 rounded text-sm min-w-[3rem]"
             >
-              {Object.keys(majorScales).map(key => (
-                <option key={key} value={key}>{key} Major</option>
+              {rootNotes.map(root => (
+                <option key={root} value={root}>{root}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-300">Scale:</span>
+            <select
+              value={selectedScale}
+              onChange={(e) => setSelectedScale(e.target.value)}
+              className="bg-gray-700 text-white px-2 py-1 rounded text-sm min-w-[5rem]"
+            >
+              {Object.entries(scalePatterns).map(([scale, pattern]) => (
+                <option key={scale} value={scale}>
+                  {scale.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </option>
               ))}
             </select>
           </div>
