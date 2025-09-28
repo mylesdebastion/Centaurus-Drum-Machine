@@ -45,9 +45,9 @@ class Camera3D {
   position = new Vec3(0, 0, 0);
   target = new Vec3(0, 0, -1);
   up = new Vec3(0, 1, 0);
-  fov = 60;
-  near = 0.1;
-  far = 1000;
+  fov = 75; // Wider field of view for better visibility
+  near = 1;  // Moved near plane further to prevent clipping
+  far = 2000; // Extended far plane for better depth range
 
   lookAt(position: Vec3, target: Vec3, up: Vec3) {
     this.position = position;
@@ -313,18 +313,22 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     const easedProgress = beatProgress < 0.5 ? 2 * beatProgress * beatProgress : -1 + (4 - 2 * beatProgress) * beatProgress;
     const interpolatedZ = currentBeatZ + (targetZ - currentBeatZ) * easedProgress;
 
-    // Improved camera positioning for better grid visibility
-    const cameraDistance = 300; // Increased distance
-    const cameraHeight = 200;   // Increased height
-    const lookAheadDistance = 600; // Increased look ahead
+    // Optimized camera positioning to ensure active notes are visible
+    const cameraDistance = 400; // Increased for better view of active notes
+    const cameraHeight = 180;   // Slightly lower for better note visibility
+    const lookAheadDistance = 300; // Reduced to focus on nearby notes
 
-    const cameraPos = new Vec3(0, cameraHeight, interpolatedZ + cameraDistance);
-    const targetPos = new Vec3(0, 0, interpolatedZ - lookAheadDistance);
+    // Position camera to ensure strike zone (active notes) is clearly visible
+    const strikeZoneZ = interpolatedZ + 50; // Strike zone positioned slightly ahead
+    const cameraPos = new Vec3(0, cameraHeight, strikeZoneZ + cameraDistance);
+    const targetPos = new Vec3(0, 0, strikeZoneZ - lookAheadDistance);
     const upVector = new Vec3(0, 1, 0);
 
-    // Ensure camera never gets too close to the grid
-    const minZ = Math.max(cameraPos.z, 50);
-    cameraPos.z = minZ;
+    // Ensure camera maintains minimum distance from strike zone
+    const minCameraZ = strikeZoneZ + 200;
+    if (cameraPos.z < minCameraZ) {
+      cameraPos.z = minCameraZ;
+    }
 
     camera.current.lookAt(cameraPos, targetPos, upVector);
   }, [bpm, currentBeat]);
@@ -431,10 +435,22 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
 
           const screenPos = camera.current.project(new Vec3(x, y, z), width, height);
 
-          if (screenPos && screenPos.z > 0) {
+          if (screenPos && screenPos.z > 0.1) { // Improved near clipping
             const distance = screenPos.z;
-            const scale = Math.max(0.1, 300 / distance);
-            const blockSize = 40 * scale;
+            const scale = Math.max(0.2, 400 / distance); // Improved scaling for better visibility
+            let blockSize = 40 * scale;
+
+            // Make active notes much larger and more visible
+            if (isActive) {
+              blockSize *= 1.5; // 50% larger for active notes
+
+              // Add pulsing effect for active notes
+              const pulseScale = 1 + Math.sin(time * 8) * 0.3;
+              blockSize *= pulseScale;
+            }
+
+            // Ensure minimum size for visibility
+            blockSize = Math.max(blockSize, isActive ? 30 : 15);
 
             drawIsometricBlock(
               ctx,
@@ -446,29 +462,68 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
               neonColors[lane],
               isActive
             );
+
+            // Add extra glow for active notes
+            if (isActive) {
+              ctx.save();
+              ctx.shadowColor = '#FFFFFF';
+              ctx.shadowBlur = 40;
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+              ctx.beginPath();
+              ctx.arc(screenPos.x, screenPos.y, blockSize * 0.8, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.restore();
+            }
           }
         }
       }
     }
 
-    // Draw strike zone as illuminated platform
-    const hitZoneDistance = 100;
-    const cameraZ = camera.current.position.z;
-    const hitZoneZ = cameraZ - hitZoneDistance;
+    // Draw strike zone as illuminated platform at active note position
+    const currentBeatZ = -currentBeat * worldStepDepth;
+    const beatDuration = (60 / bpm) * 1000;
+    const timeSinceLastBeat = performance.now() - lastBeatTime.current;
+    const beatProgress = Math.min(timeSinceLastBeat / beatDuration, 1);
+
+    // Position strike zone where active notes should be
+    const nextBeatZ = -((currentBeat + 1) % steps) * worldStepDepth;
+    let targetZ = nextBeatZ;
+    if (currentBeat === steps - 1) {
+      targetZ = -steps * worldStepDepth;
+    }
+
+    const easedProgress = beatProgress < 0.5 ? 2 * beatProgress * beatProgress : -1 + (4 - 2 * beatProgress) * beatProgress;
+    const hitZoneZ = currentBeatZ + (targetZ - currentBeatZ) * easedProgress + 50; // Strike zone ahead of notes
 
     ctx.strokeStyle = '#FF0080';
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 8;
     ctx.shadowColor = '#FF0080';
-    ctx.shadowBlur = 15;
+    ctx.shadowBlur = 20;
 
-    const leftPoint = camera.current.project(new Vec3(startX - 50, 0, hitZoneZ), width, height);
-    const rightPoint = camera.current.project(new Vec3(startX + totalWorldWidth + 50, 0, hitZoneZ), width, height);
+    // Draw a more visible strike zone
+    const leftPoint = camera.current.project(new Vec3(startX - 60, 0, hitZoneZ), width, height);
+    const rightPoint = camera.current.project(new Vec3(startX + totalWorldWidth + 60, 0, hitZoneZ), width, height);
 
     if (leftPoint && rightPoint) {
+      // Draw main strike line
       ctx.beginPath();
       ctx.moveTo(leftPoint.x, leftPoint.y);
       ctx.lineTo(rightPoint.x, rightPoint.y);
       ctx.stroke();
+
+      // Draw additional glow effect
+      ctx.strokeStyle = 'rgba(255, 0, 128, 0.3)';
+      ctx.lineWidth = 16;
+      ctx.stroke();
+
+      // Draw center indicator
+      const centerX = (leftPoint.x + rightPoint.x) / 2;
+      const centerY = (leftPoint.y + rightPoint.y) / 2;
+      ctx.fillStyle = '#FF0080';
+      ctx.shadowBlur = 30;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     ctx.shadowBlur = 0;
