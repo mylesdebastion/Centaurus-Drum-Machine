@@ -122,8 +122,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   const [showLEDManager, setShowLEDManager] = useState(false);
   const [ledVisualizers, setLEDVisualizers] = useState<SingleLaneVisualizer[]>([]);
   const [ledEnabled, setLEDEnabled] = useState(false);
-  // Animation mode toggle
-  const [smoothScrolling, setSmoothScrolling] = useState(false);
+  // Animation mode toggle (default to smooth scrolling for better musical flow)
+  const [smoothScrolling, setSmoothScrolling] = useState(true);
 
   // Constants
   const lanes = 12;

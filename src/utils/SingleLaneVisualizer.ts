@@ -190,40 +190,51 @@ export class SingleLaneVisualizer {
       ledArray[0] = { ...strikeZoneColor };
     }
 
-    // Animated strike bar that moves with beat timing (matching 3D visualization)
-    // Like the 3D strike zone, it resets to the front of each beat and slides back toward position 0
+    // Stationary strike bar that pulses white when grid lines pass through (better musical timing)
     if (isPlaying) {
-      const strikeBarColor = { r: 255, g: 0, b: 128 }; // Same pink/magenta as 3D (#FF0080)
+      // Strike bar stays at a fixed position - 1/4 of the way up the strip (musical "downbeat" reference)
+      const strikeBarPosition = Math.round(ledsPerBeat * 0.25);
 
-      // Calculate strike bar position using exact same logic as grid lines
-      // Start at the beginning of each beat section and slide toward strike zone (position 0)
-      const sectionSize = ledsPerBeat; // Use same precise calculation as other elements
+      // Check if any grid line is passing through the strike bar area (pulse trigger)
+      let pulseIntensity = 0.3; // Base intensity
 
-      // Strike bar starts at the front of the current beat section
-      const currentBeatStart = sectionSize; // Always start one beat section ahead
+      for (let beat = 1; beat < beatsToShow; beat++) {
+        const baseBeatPosition = beat * ledsPerBeat;
+        const progressOffset = easedProgress * ledsPerBeat;
+        const gridPosition = Math.round(baseBeatPosition - progressOffset);
 
-      // Move toward strike zone with same eased progress as grid lines
-      const progressOffset = easedProgress * sectionSize;
-      const strikeBarPosition = Math.round(currentBeatStart - progressOffset);
-
-      // Only draw if within valid range
-      if (strikeBarPosition >= 0 && strikeBarPosition < this.config.ledCount) {
-        // Draw strike bar with center point and glow effect (3-5 LEDs wide)
-        const barWidth = Math.max(3, Math.round(sectionSize / 16)); // Proportional to strip size
-        const barStart = Math.max(0, strikeBarPosition - Math.floor(barWidth / 2));
-        const barEnd = Math.min(this.config.ledCount - 1, strikeBarPosition + Math.floor(barWidth / 2));
-
-        for (let i = barStart; i <= barEnd; i++) {
-          // Center of bar is brightest, edges are dimmer for glow effect
-          const distanceFromCenter = Math.abs(i - strikeBarPosition);
-          const intensity = Math.max(0.3, 1.0 - (distanceFromCenter / Math.floor(barWidth / 2) * 0.7));
-
-          ledArray[i] = {
-            r: Math.round(strikeBarColor.r * intensity),
-            g: Math.round(strikeBarColor.g * intensity),
-            b: Math.round(strikeBarColor.b * intensity)
-          };
+        // If grid line is near strike bar, increase pulse intensity
+        const distanceFromStrikeBar = Math.abs(gridPosition - strikeBarPosition);
+        if (distanceFromStrikeBar <= 2) { // Grid line within 2 LEDs of strike bar
+          // Bright white pulse when grid line passes through
+          pulseIntensity = 1.0;
+          break;
         }
+      }
+
+      // Also pulse on strong beats (every 4th step for downbeat emphasis)
+      if (currentStep % 4 === 0 && beatProgress > 0.8) {
+        pulseIntensity = Math.max(pulseIntensity, 0.8);
+      }
+
+      // Draw strike bar with pulse effect
+      const strikeBarColor = pulseIntensity > 0.7
+        ? { r: 255, g: 255, b: 255 } // White pulse
+        : { r: 255, g: 0, b: 128 }; // Pink/magenta base
+
+      const barWidth = Math.max(3, Math.round(ledsPerBeat / 16));
+      const barStart = Math.max(0, strikeBarPosition - Math.floor(barWidth / 2));
+      const barEnd = Math.min(this.config.ledCount - 1, strikeBarPosition + Math.floor(barWidth / 2));
+
+      for (let i = barStart; i <= barEnd; i++) {
+        const distanceFromCenter = Math.abs(i - strikeBarPosition);
+        const intensity = Math.max(0.2, pulseIntensity - (distanceFromCenter / Math.floor(barWidth / 2) * 0.3));
+
+        ledArray[i] = {
+          r: Math.round(strikeBarColor.r * intensity),
+          g: Math.round(strikeBarColor.g * intensity),
+          b: Math.round(strikeBarColor.b * intensity)
+        };
       }
     }
 
