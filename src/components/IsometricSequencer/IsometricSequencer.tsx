@@ -806,9 +806,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     // Draw strike zone perfectly aligned with current beat grid line
     const hitZoneZ = -currentBeat * worldStepDepth; // Align exactly with current beat grid line
 
-    ctx.strokeStyle = '#FF0080';
+    ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = 8;
-    ctx.shadowColor = '#FF0080';
+    ctx.shadowColor = '#FFFFFF';
     ctx.shadowBlur = 20;
 
     // Draw a more visible strike zone that extends across all 12 lanes
@@ -824,7 +824,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       ctx.stroke();
 
       // Draw additional glow effect
-      ctx.strokeStyle = 'rgba(255, 0, 128, 0.3)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
       ctx.lineWidth = 16;
       ctx.stroke();
 
@@ -1003,15 +1003,18 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       const beatDuration = (60 / bpm) * 1000;
 
       if (now - lastBeatTime.current >= beatDuration) {
-        // Play notes for current beat - only for active lanes
+        // Increment beat first so audio and visuals are synchronized
+        const nextBeat = (currentBeat + 1) % steps;
+        setCurrentBeat(nextBeat);
+
+        // Play notes for the new current beat - only for active lanes
         for (let laneIndex = 0; laneIndex < effectiveLanes; laneIndex++) {
           const chromaticLane = activeLanes[laneIndex];
-          if (pattern[chromaticLane][currentBeat]) {
+          if (pattern[chromaticLane][nextBeat]) {
             playNote(chromaticLane);
           }
         }
 
-        setCurrentBeat(prev => (prev + 1) % steps);
         lastBeatTime.current = now;
       }
     }
