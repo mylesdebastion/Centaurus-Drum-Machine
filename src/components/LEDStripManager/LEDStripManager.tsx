@@ -1,18 +1,25 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { LEDStripConfig, ClassroomControls, LEDVisualizationSettings } from '../../types/led';
 import { SingleLaneVisualizer } from '../../utils/SingleLaneVisualizer';
+import { VirtualLEDStrip } from './VirtualLEDStrip';
 import { Plus, Trash2, Wifi, WifiOff, Volume2, VolumeX, Eye, Settings } from 'lucide-react';
 
 interface LEDStripManagerProps {
   boomwhackerColors: string[];
   noteNames: string[];
   onStripsChange: (visualizers: SingleLaneVisualizer[]) => void;
+  pattern?: boolean[][];
+  currentStep?: number;
+  isPlaying?: boolean;
 }
 
 export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
   boomwhackerColors,
   noteNames,
-  onStripsChange
+  onStripsChange,
+  pattern = [],
+  currentStep = 0,
+  isPlaying = false
 }) => {
   const [stripConfigs, setStripConfigs] = useState<LEDStripConfig[]>([
     {
@@ -139,6 +146,7 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
   const [globalTimestamp, setGlobalTimestamp] = useState(Date.now());
   const [maxColorCount, setMaxColorCount] = useState(1);
   const [bridgeStatus, setBridgeStatus] = useState<'disconnected' | 'connected' | 'connecting'>('disconnected');
+  const [testingStrips, setTestingStrips] = useState<Set<string>>(new Set());
 
   // Generate unique ID for new strips
   const generateStripId = useCallback(() => {
@@ -196,13 +204,32 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
 
     console.log(`🌈 Sending rainbow test pattern to ${config.ipAddress} (${config.studentName || 'Unnamed'})`);
 
+    // Show test pattern in virtual LED strip
+    setTestingStrips(prev => new Set(prev).add(stripId));
+
     const visualizer = new SingleLaneVisualizer(config, 16, settings);
 
     try {
       await visualizer.sendRainbowTestPattern();
       console.log(`✅ Rainbow test pattern sent to ${config.ipAddress}`);
+
+      // Hide test pattern after 3 seconds
+      setTimeout(() => {
+        setTestingStrips(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(stripId);
+          return newSet;
+        });
+      }, 3000);
     } catch (error) {
       console.error(`❌ Failed to send rainbow test pattern to ${config.ipAddress}:`, error);
+
+      // Hide test pattern on error
+      setTestingStrips(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(stripId);
+        return newSet;
+      });
     }
   }, [stripConfigs, settings]);
 
@@ -348,6 +375,28 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
   const findVisualizerForConfig = useCallback((config: LEDStripConfig) => {
     return visualizers.find(v => v.getConfig().id === config.id);
   }, [visualizers]);
+
+  // Get the pattern data for a specific strip configuration
+  const getStripPattern = useCallback((config: LEDStripConfig) => {
+    if (!pattern || pattern.length === 0) {
+      return [];
+    }
+
+    if (config.multiNotesMode && config.assignedLanes.length > 0) {
+      // Multi-notes mode: combine patterns from all assigned lanes
+      const combinedPattern: boolean[] = [];
+      for (let step = 0; step < 16; step++) {
+        // A step is active if ANY of the assigned lanes has a note at this step
+        combinedPattern[step] = config.assignedLanes.some(laneIndex =>
+          pattern[laneIndex] && pattern[laneIndex][step]
+        );
+      }
+      return combinedPattern;
+    } else {
+      // Single lane mode
+      return pattern[config.laneIndex] || [];
+    }
+  }, [pattern]);
 
   // Get the current display color for a strip configuration
   // Using colorAnimationFrame to trigger re-renders for color cycling
@@ -607,43 +656,45 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
       {/* Strip Configurations */}
       <div className="space-y-3">
         {stripConfigs.map((config) => (
-          <div key={config.id} className="flex items-center gap-4 p-3 bg-gray-800 rounded-lg">
-            {/* Status Icon */}
-            <div className="flex items-center gap-2">
-              {getStatusIcon(config.status)}
-            </div>
+          <div key={config.id} className="flex flex-col gap-2 p-3 bg-gray-800 rounded-lg">
+            {/* Main controls row */}
+            <div className="flex items-center gap-4">
+              {/* Status Icon */}
+              <div className="flex items-center gap-2">
+                {getStatusIcon(config.status)}
+              </div>
 
-            {/* Lane Color - Dynamic for multi-notes mode */}
-            <div
-              className="w-6 h-6 rounded border-2 border-gray-600 transition-colors duration-300"
-              style={{ backgroundColor: getCurrentStripColor(config) }}
-              title={
-                config.multiNotesMode && config.assignedLanes.length > 1
-                  ? `Multi-notes: ${config.assignedLanes.map(i => noteNames[i]).join(', ')}`
-                  : config.multiNotesMode && config.assignedLanes.length === 1
-                  ? `Multi-notes: ${noteNames[config.assignedLanes[0]]}`
-                  : noteNames[config.laneIndex]
-              }
-            />
+              {/* Lane Color - Dynamic for multi-notes mode */}
+              <div
+                className="w-6 h-6 rounded border-2 border-gray-600 transition-colors duration-300"
+                style={{ backgroundColor: getCurrentStripColor(config) }}
+                title={
+                  config.multiNotesMode && config.assignedLanes.length > 1
+                    ? `Multi-notes: ${config.assignedLanes.map(i => noteNames[i]).join(', ')}`
+                    : config.multiNotesMode && config.assignedLanes.length === 1
+                    ? `Multi-notes: ${noteNames[config.assignedLanes[0]]}`
+                    : noteNames[config.laneIndex]
+                }
+              />
 
-            {/* Lane Selection or Multi-Notes Mode */}
-            <div className="flex flex-col gap-1">
-              {/* Multi-notes mode toggle */}
-              <label className="flex items-center gap-1 text-xs">
-                <input
-                  type="checkbox"
-                  checked={config.multiNotesMode}
-                  onChange={(e) => {
-                    updateStripConfig(config.id, 'multiNotesMode', e.target.checked);
-                    if (!e.target.checked) {
-                      // Reset to single lane when disabling multi-notes mode
-                      updateStripConfig(config.id, 'assignedLanes', [config.laneIndex]);
-                    }
-                  }}
-                  className="rounded w-3 h-3"
-                />
-                Multi-notes
-              </label>
+              {/* Lane Selection or Multi-Notes Mode */}
+              <div className="flex flex-col gap-1">
+                {/* Multi-notes mode toggle */}
+                <label className="flex items-center gap-1 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={config.multiNotesMode}
+                    onChange={(e) => {
+                      updateStripConfig(config.id, 'multiNotesMode', e.target.checked);
+                      if (!e.target.checked) {
+                        // Reset to single lane when disabling multi-notes mode
+                        updateStripConfig(config.id, 'assignedLanes', [config.laneIndex]);
+                      }
+                    }}
+                    className="rounded w-3 h-3"
+                  />
+                  Multi-notes
+                </label>
 
               {config.multiNotesMode ? (
                 /* Multi-notes lane assignment */
@@ -721,9 +772,9 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
             <button
               onClick={() => updateStripConfig(config.id, 'reverseDirection', !config.reverseDirection)}
               className="px-2 py-1 rounded text-xs transition-colors bg-gray-600 hover:bg-gray-500"
-              title={`LED Direction: ${config.reverseDirection ? 'Start at beginning' : 'Start at end'}`}
+              title={`LED Direction: ${config.reverseDirection ? 'Data flows left to right' : 'Data flows right to left'}`}
             >
-              {config.reverseDirection ? '↑' : '↓'}
+              {config.reverseDirection ? '→' : '←'}
             </button>
 
             {/* Controls */}
@@ -768,6 +819,18 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
+            </div>
+
+            {/* Virtual LED Strip Visualization */}
+            <VirtualLEDStrip
+              config={config}
+              pattern={getStripPattern(config)}
+              currentStep={currentStep}
+              isPlaying={isPlaying}
+              boomwhackerColors={boomwhackerColors}
+              showTestPattern={testingStrips.has(config.id)}
+              visualizer={findVisualizerForConfig(config)}
+            />
           </div>
         ))}
 

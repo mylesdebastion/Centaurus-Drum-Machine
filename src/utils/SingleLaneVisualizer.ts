@@ -385,21 +385,41 @@ export class SingleLaneVisualizer {
       { r: 200, g: 0, b: 255 }    // B - Purple
     ];
 
+    // Helper function to calculate LED position accounting for direction
+    const calculateLedPosition = (stepProgress: number): number => {
+      if (this.config.reverseDirection) {
+        // Reverse direction: step 0 at LED 0, step (totalSteps-1) at LED (ledCount-1)
+        const position = Math.round(stepProgress * (this.config.ledCount - 1));
+        if (isPlaying && stepProgress === 0) {
+          console.log(`🔍 Direction Fix Debug - REVERSE: step 0 → LED ${position} (should be at beginning)`);
+        }
+        return position;
+      } else {
+        // Normal direction: step 0 at LED (ledCount-1), step (totalSteps-1) at LED 0
+        const position = Math.round((1 - stepProgress) * (this.config.ledCount - 1));
+        if (isPlaying && stepProgress === 0) {
+          console.log(`🔍 Direction Fix Debug - NORMAL: step 0 → LED ${position} (should be at end)`);
+        }
+        return position;
+      }
+    };
+
     // Calculate timeline position - steps through beats instead of smooth scroll
     let timelineIndex = -1;
     if (isPlaying) {
       // Timeline steps to the current beat position, not smoothly
-      timelineIndex = Math.round((currentStep / this.totalSteps) * (this.config.ledCount - 1));
+      const timelineProgress = currentStep / this.totalSteps;
+      timelineIndex = calculateLedPosition(timelineProgress);
     }
 
     // Place notes at fixed LED positions based on step timing using consistent grid
     for (let stepIndex = 0; stepIndex < this.totalSteps; stepIndex++) {
       if (pattern[stepIndex]) {
-        // Calculate LED position using same grid formula as timeline and dividers
-        // This ensures perfect alignment and pushes rounding errors to the end
-        const centerLedIndex = Math.round((stepIndex / this.totalSteps) * (this.config.ledCount - 1));
+        // Calculate LED position using direction-aware formula
+        const stepProgress = stepIndex / this.totalSteps;
+        const centerLedIndex = calculateLedPosition(stepProgress);
 
-        if (centerLedIndex >= 1 && centerLedIndex < this.config.ledCount - 1) {
+        if (centerLedIndex >= 0 && centerLedIndex < this.config.ledCount) {
           // Check if timeline is hitting this note (within 2 pixels)
           const isTimelineNearNote = isPlaying && timelineIndex >= 0 &&
             Math.abs(timelineIndex - centerLedIndex) <= 2;
@@ -435,8 +455,9 @@ export class SingleLaneVisualizer {
     // Add dim white dividers between steps with precise grid alignment
     // Use consistent grid calculation to avoid rounding errors with timeline
     for (let stepIndex = 1; stepIndex < this.totalSteps; stepIndex++) {
-      // Calculate divider position using same formula as timeline for consistency
-      const dividerLedIndex = Math.round((stepIndex / this.totalSteps) * (this.config.ledCount - 1));
+      // Calculate divider position using same direction-aware formula
+      const stepProgress = stepIndex / this.totalSteps;
+      const dividerLedIndex = calculateLedPosition(stepProgress);
 
       if (dividerLedIndex >= 0 && dividerLedIndex < this.config.ledCount) {
         // Only place divider if there's no note at this position
@@ -485,16 +506,29 @@ export class SingleLaneVisualizer {
       { r: 200, g: 0, b: 255 }    // B - Purple
     ];
 
+    // Helper function to calculate LED position accounting for direction (same as in static visualization)
+    const calculateLedPosition = (stepProgress: number): number => {
+      if (this.config.reverseDirection) {
+        // Reverse direction: step 0 at LED 0, step (totalSteps-1) at LED (ledCount-1)
+        return Math.round(stepProgress * (this.config.ledCount - 1));
+      } else {
+        // Normal direction: step 0 at LED (ledCount-1), step (totalSteps-1) at LED 0
+        return Math.round((1 - stepProgress) * (this.config.ledCount - 1));
+      }
+    };
+
     // Timeline position
     let timelineIndex = -1;
     if (isPlaying) {
-      timelineIndex = Math.round((currentStep / this.totalSteps) * (this.config.ledCount - 1));
+      const timelineProgress = currentStep / this.totalSteps;
+      timelineIndex = calculateLedPosition(timelineProgress);
     }
 
     // Process each step position using consistent grid
     for (let stepIndex = 0; stepIndex < this.totalSteps; stepIndex++) {
-      // Calculate LED position using same grid formula as timeline and dividers
-      const centerLedIndex = Math.round((stepIndex / this.totalSteps) * (this.config.ledCount - 1));
+      // Calculate LED position using direction-aware formula
+      const stepProgress = stepIndex / this.totalSteps;
+      const centerLedIndex = calculateLedPosition(stepProgress);
 
       // Collect all active lanes for this step
       const activeLanes: number[] = [];
@@ -540,7 +574,8 @@ export class SingleLaneVisualizer {
     // Add dim white dividers between steps with precise grid alignment
     // Use consistent grid calculation to avoid rounding errors with timeline
     for (let stepIndex = 1; stepIndex < this.totalSteps; stepIndex++) {
-      const dividerLedIndex = Math.round((stepIndex / this.totalSteps) * (this.config.ledCount - 1));
+      const stepProgress = stepIndex / this.totalSteps;
+      const dividerLedIndex = calculateLedPosition(stepProgress);
 
       if (dividerLedIndex >= 0 && dividerLedIndex < this.config.ledCount) {
         const hasNote = ledArray[dividerLedIndex].r > 0 || ledArray[dividerLedIndex].g > 0 || ledArray[dividerLedIndex].b > 0;
@@ -626,29 +661,17 @@ export class SingleLaneVisualizer {
     return { r, g, b };
   }
 
-  /**
-   * Apply direction reversal to LED array if configured
-   */
-  private applyDirectionReversal(ledArray: LEDColor[]): LEDColor[] {
-    if (this.config.reverseDirection) {
-      // Reverse the array - start at beginning instead of end
-      return [...ledArray].reverse();
-    }
-    // Default behavior: start at end (no reversal)
-    return ledArray;
-  }
 
   /**
    * Send LED data to WLED device using UDP WARLS protocol or HTTP JSON
    */
   private async sendToWLED(ledArray: LEDColor[]): Promise<boolean> {
-    // Apply direction reversal if configured
-    const finalLedArray = this.applyDirectionReversal(ledArray);
+    // Direction is now handled directly in the positioning logic, no need for array reversal
 
     if (this.settings.protocol === 'udp') {
-      return this.sendUDPData(finalLedArray);
+      return this.sendUDPData(ledArray);
     } else {
-      return this.sendHTTPData(finalLedArray);
+      return this.sendHTTPData(ledArray);
     }
   }
 

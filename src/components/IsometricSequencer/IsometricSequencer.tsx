@@ -1401,6 +1401,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
             boomwhackerColors={boomwhackerColors}
             noteNames={noteNames}
             onStripsChange={handleLEDVisualizersChange}
+            pattern={pattern}
+            currentStep={currentBeat}
+            isPlaying={isPlaying}
           />
         </div>
       )}
