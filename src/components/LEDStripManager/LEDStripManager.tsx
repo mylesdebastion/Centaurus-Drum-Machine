@@ -11,6 +11,8 @@ interface LEDStripManagerProps {
   pattern?: boolean[][];
   currentStep?: number;
   isPlaying?: boolean;
+  selectedRoot?: string;
+  selectedScale?: string;
 }
 
 export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
@@ -19,7 +21,9 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
   onStripsChange,
   pattern = [],
   currentStep = 0,
-  isPlaying = false
+  isPlaying = false,
+  selectedRoot = 'C',
+  selectedScale = 'major'
 }) => {
   const [stripConfigs, setStripConfigs] = useState<LEDStripConfig[]>([
     {
@@ -36,21 +40,9 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
     },
     {
       id: 'default_wledtube2',
-      laneIndex: 1, // D note
+      laneIndex: 2, // D note (C major scale degree 2)
       ipAddress: '192.168.8.152',
       studentName: 'WLEDTUBE2',
-      enabled: true,
-      status: 'disconnected',
-      ledCount: 90,
-      multiNotesMode: false,
-      assignedLanes: [1],
-      reverseDirection: true
-    },
-    {
-      id: 'default_wledtube3',
-      laneIndex: 2, // E note
-      ipAddress: '192.168.8.153',
-      studentName: 'WLEDTUBE3',
       enabled: true,
       status: 'disconnected',
       ledCount: 90,
@@ -59,22 +51,10 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
       reverseDirection: true
     },
     {
-      id: 'default_wledtube4',
-      laneIndex: 3, // F note
-      ipAddress: '192.168.8.154',
-      studentName: 'WLEDTUBE4',
-      enabled: true,
-      status: 'disconnected',
-      ledCount: 90,
-      multiNotesMode: false,
-      assignedLanes: [3],
-      reverseDirection: true
-    },
-    {
-      id: 'default_wledtube5',
-      laneIndex: 4, // G note
-      ipAddress: '192.168.8.155',
-      studentName: 'WLEDTUBE5',
+      id: 'default_wledtube3',
+      laneIndex: 4, // E note (C major scale degree 3)
+      ipAddress: '192.168.8.153',
+      studentName: 'WLEDTUBE3',
       enabled: true,
       status: 'disconnected',
       ledCount: 90,
@@ -83,10 +63,10 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
       reverseDirection: true
     },
     {
-      id: 'default_wledtube6',
-      laneIndex: 5, // A note
-      ipAddress: '192.168.8.156',
-      studentName: 'WLEDTUBE6',
+      id: 'default_wledtube4',
+      laneIndex: 5, // F note (C major scale degree 4)
+      ipAddress: '192.168.8.154',
+      studentName: 'WLEDTUBE4',
       enabled: true,
       status: 'disconnected',
       ledCount: 90,
@@ -95,15 +75,39 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
       reverseDirection: true
     },
     {
+      id: 'default_wledtube5',
+      laneIndex: 7, // G note (C major scale degree 5)
+      ipAddress: '192.168.8.155',
+      studentName: 'WLEDTUBE5',
+      enabled: true,
+      status: 'disconnected',
+      ledCount: 90,
+      multiNotesMode: false,
+      assignedLanes: [7],
+      reverseDirection: true
+    },
+    {
+      id: 'default_wledtube6',
+      laneIndex: 9, // A note (C major scale degree 6)
+      ipAddress: '192.168.8.156',
+      studentName: 'WLEDTUBE6',
+      enabled: true,
+      status: 'disconnected',
+      ledCount: 90,
+      multiNotesMode: false,
+      assignedLanes: [9],
+      reverseDirection: true
+    },
+    {
       id: 'default_wledtube7',
-      laneIndex: 6, // B note
+      laneIndex: 11, // B note (C major scale degree 7)
       ipAddress: '192.168.8.157',
       studentName: 'WLEDTUBE7',
       enabled: true,
       status: 'disconnected',
       ledCount: 90,
       multiNotesMode: false,
-      assignedLanes: [6],
+      assignedLanes: [11],
       reverseDirection: true
     },
     {
@@ -115,7 +119,7 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
       status: 'disconnected',
       ledCount: 90,
       multiNotesMode: true, // Enable multi-notes mode for all C major scale notes
-      assignedLanes: [0, 1, 2, 3, 4, 5, 6], // C, D, E, F, G, A, B (C major scale)
+      assignedLanes: [0, 2, 4, 5, 7, 9, 11], // C, D, E, F, G, A, B (C major scale)
       reverseDirection: true
     }
   ]);
@@ -147,6 +151,66 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
   const [maxColorCount, setMaxColorCount] = useState(1);
   const [bridgeStatus, setBridgeStatus] = useState<'disconnected' | 'connected' | 'connecting'>('disconnected');
   const [testingStrips, setTestingStrips] = useState<Set<string>>(new Set());
+
+  // Scale calculation functions (mirrored from IsometricSequencer)
+  const rootPositions = {
+    'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
+    'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11
+  };
+
+  const scalePatterns = {
+    'major': [0, 2, 4, 5, 7, 9, 11],        // Major scale (Ionian)
+    'minor': [0, 2, 3, 5, 7, 8, 10],        // Natural minor scale (Aeolian)
+    'dorian': [0, 2, 3, 5, 7, 9, 10],       // Dorian mode
+    'phrygian': [0, 1, 3, 5, 7, 8, 10],     // Phrygian mode
+    'lydian': [0, 2, 4, 6, 7, 9, 11],       // Lydian mode
+    'mixolydian': [0, 2, 4, 5, 7, 9, 10],   // Mixolydian mode
+    'locrian': [0, 1, 3, 5, 6, 8, 10],      // Locrian mode
+    'harmonic_minor': [0, 2, 3, 5, 7, 8, 11], // Harmonic minor
+    'melodic_minor': [0, 2, 3, 5, 7, 9, 11],  // Melodic minor
+    'pentatonic_major': [0, 2, 4, 7, 9],      // Major pentatonic
+    'pentatonic_minor': [0, 3, 5, 7, 10],     // Minor pentatonic
+    'blues': [0, 3, 5, 6, 7, 10]              // Blues scale
+  };
+
+  // Function to get current scale notes
+  const getCurrentScale = () => {
+    const rootPos = rootPositions[selectedRoot as keyof typeof rootPositions];
+    const pattern = scalePatterns[selectedScale as keyof typeof scalePatterns];
+    return pattern.map(interval => (rootPos + interval) % 12);
+  };
+
+  // Update TUBES1-7 lane mappings when scale changes
+  useEffect(() => {
+    const currentScaleNotes = getCurrentScale();
+
+    setStripConfigs(prevConfigs => {
+      return prevConfigs.map(config => {
+        // Only update WLEDTUBE1-7 (not WLEDTUBE8 which is multi-notes)
+        if (config.studentName?.match(/^WLEDTUBE[1-7]$/)) {
+          const tubeNumber = parseInt(config.studentName.replace('WLEDTUBE', ''));
+          const scaleIndex = tubeNumber - 1; // TUBE1 = scale degree 1 (index 0)
+
+          if (scaleIndex < currentScaleNotes.length) {
+            const newLaneIndex = currentScaleNotes[scaleIndex];
+            return {
+              ...config,
+              laneIndex: newLaneIndex,
+              assignedLanes: [newLaneIndex]
+            };
+          }
+        }
+        // Update WLEDTUBE8 multi-notes mode to use current scale
+        else if (config.studentName === 'WLEDTUBE8' && config.multiNotesMode) {
+          return {
+            ...config,
+            assignedLanes: currentScaleNotes
+          };
+        }
+        return config;
+      });
+    });
+  }, [selectedRoot, selectedScale]);
 
   // Generate unique ID for new strips
   const generateStripId = useCallback(() => {
@@ -830,6 +894,7 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
               boomwhackerColors={boomwhackerColors}
               showTestPattern={testingStrips.has(config.id)}
               visualizer={findVisualizerForConfig(config)}
+              fullPattern={pattern} // Pass full pattern for multi-notes individual lane access
             />
           </div>
         ))}

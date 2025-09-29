@@ -1404,6 +1404,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
             pattern={pattern}
             currentStep={currentBeat}
             isPlaying={isPlaying}
+            selectedRoot={selectedRoot}
+            selectedScale={selectedScale}
           />
         </div>
       )}

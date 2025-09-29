@@ -9,6 +9,7 @@ interface VirtualLEDStripProps {
   boomwhackerColors: string[];
   showTestPattern?: boolean;
   visualizer?: any; // SingleLaneVisualizer instance to get actual LED data
+  fullPattern?: boolean[][]; // Full 2D pattern for multi-notes individual lane access
 }
 
 export const VirtualLEDStrip: React.FC<VirtualLEDStripProps> = ({
@@ -18,7 +19,8 @@ export const VirtualLEDStrip: React.FC<VirtualLEDStripProps> = ({
   isPlaying = false,
   boomwhackerColors,
   showTestPattern = false,
-  visualizer
+  visualizer,
+  fullPattern
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [animationFrame, setAnimationFrame] = useState(0);
@@ -34,7 +36,6 @@ export const VirtualLEDStrip: React.FC<VirtualLEDStripProps> = ({
 
   // Calculate LED size - each LED gets equal space across the full width
   const ledSize = canvasWidth / safeLedCount;
-  const actualWidth = canvasWidth;
 
   useEffect(() => {
     if (showTestPattern || (config.multiNotesMode && config.assignedLanes.length > 1)) {
@@ -89,50 +90,8 @@ export const VirtualLEDStrip: React.FC<VirtualLEDStripProps> = ({
         }
       };
 
-      // Get lane color - handle multi-notes mode with color cycling
-      let laneColor: LEDColor;
-      if (config.multiNotesMode && config.assignedLanes.length > 1) {
-        // Multi-notes color cycling logic (matching SingleLaneVisualizer)
-        const totalCycleTime = 2000; // 2 second cycle
-        const holdTime = 0.85;
-        const fadeTime = 0.15;
-
-        const currentTime = Date.now();
-        const cycleTime = (currentTime / totalCycleTime) % 1.0;
-        const stepsPerColor = 1.0 / config.assignedLanes.length;
-        const currentColorIndex = Math.floor(cycleTime / stepsPerColor) % config.assignedLanes.length;
-        const stepProgress = (cycleTime % stepsPerColor) / stepsPerColor;
-
-        let blendFactor: number;
-        if (stepProgress < holdTime) {
-          blendFactor = 0;
-        } else {
-          blendFactor = (stepProgress - holdTime) / fadeTime;
-          blendFactor = Math.min(blendFactor, 1.0);
-        }
-
-        // Get primary and secondary colors for blending
-        const primaryColorHex = boomwhackerColors[config.assignedLanes[currentColorIndex]];
-        const nextColorIndex = (currentColorIndex + 1) % config.assignedLanes.length;
-        const secondaryColorHex = boomwhackerColors[config.assignedLanes[nextColorIndex]];
-
-        const primaryRgb = hexToRgb(primaryColorHex);
-        const secondaryRgb = hexToRgb(secondaryColorHex);
-
-        // Blend colors
-        laneColor = {
-          r: Math.round(primaryRgb.r * (1 - blendFactor) + secondaryRgb.r * blendFactor),
-          g: Math.round(primaryRgb.g * (1 - blendFactor) + secondaryRgb.g * blendFactor),
-          b: Math.round(primaryRgb.b * (1 - blendFactor) + secondaryRgb.b * blendFactor)
-        };
-      } else {
-        // Single lane mode
-        const laneIndex = config.multiNotesMode && config.assignedLanes.length > 0
-          ? config.assignedLanes[0]
-          : config.laneIndex;
-        const hexColor = boomwhackerColors[laneIndex % boomwhackerColors.length];
-        laneColor = hexToRgb(hexColor);
-      }
+      // For multi-notes mode, we need to handle colors per note, not per strip
+      // This will be used as a fallback color only
 
       // Calculate timeline position
       let timelineIndex = -1;
@@ -141,35 +100,108 @@ export const VirtualLEDStrip: React.FC<VirtualLEDStripProps> = ({
         timelineIndex = calculateLedPosition(timelineProgress);
       }
 
-      // Place notes at fixed LED positions
-      for (let stepIndex = 0; stepIndex < Math.min(totalSteps, pattern.length); stepIndex++) {
-        if (pattern[stepIndex]) {
+      // Handle note placement differently for multi-notes vs single lane
+      if (config.multiNotesMode && config.assignedLanes.length > 0) {
+        // Multi-notes mode: check individual lanes for their specific patterns
+        for (let stepIndex = 0; stepIndex < totalSteps; stepIndex++) {
           const stepProgress = stepIndex / totalSteps;
           const centerLedIndex = calculateLedPosition(stepProgress);
 
           if (centerLedIndex >= 0 && centerLedIndex < safeLedCount) {
-            // Check if timeline is hitting this note
-            const isTimelineNearNote = isPlaying && timelineIndex >= 0 &&
-              Math.abs(timelineIndex - centerLedIndex) <= 1;
+            // Check which specific lanes have notes at this step using fullPattern
+            const activeLanesAtStep: number[] = [];
 
-            let noteColor: LEDColor;
-            if (isTimelineNearNote) {
-              // Timeline is hitting this note - full brightness
-              noteColor = laneColor;
+            if (fullPattern && Array.isArray(fullPattern[0])) {
+              // Access individual lane patterns from fullPattern
+              for (const laneIndex of config.assignedLanes) {
+                if (fullPattern[stepIndex] && fullPattern[stepIndex][laneIndex]) {
+                  activeLanesAtStep.push(laneIndex);
+                }
+              }
             } else {
-              // Queued note - dimmed (25% brightness)
-              noteColor = {
-                r: Math.round(laneColor.r * 0.25),
-                g: Math.round(laneColor.g * 0.25),
-                b: Math.round(laneColor.b * 0.25)
-              };
+              // Fallback to combined pattern if fullPattern not available
+              if (pattern[stepIndex]) {
+                // Can't determine specific lanes, so use first assigned lane
+                activeLanesAtStep.push(config.assignedLanes[0]);
+              }
             }
 
-            // Make notes 3 pixels wide (center + neighbors)
-            for (let offset = -1; offset <= 1; offset++) {
-              const ledIndex = centerLedIndex + offset;
-              if (ledIndex >= 0 && ledIndex < safeLedCount) {
-                ledArray[ledIndex] = noteColor;
+            // Render each active lane as a separate note with its own color
+            for (const laneIndex of activeLanesAtStep) {
+              // Check if timeline is hitting this note
+              const isTimelineNearNote = isPlaying && timelineIndex >= 0 &&
+                Math.abs(timelineIndex - centerLedIndex) <= 1;
+
+              // Use the specific lane's color - no cycling
+              const hexColor = boomwhackerColors[laneIndex % boomwhackerColors.length];
+              let noteColor = hexToRgb(hexColor);
+
+              // Dim the note if timeline is not hitting it
+              if (!isTimelineNearNote) {
+                noteColor = {
+                  r: Math.round(noteColor.r * 0.25),
+                  g: Math.round(noteColor.g * 0.25),
+                  b: Math.round(noteColor.b * 0.25)
+                };
+              }
+
+              // Make notes 3 pixels wide (center + neighbors)
+              // When multiple lanes active at same step, blend colors
+              for (let offset = -1; offset <= 1; offset++) {
+                const ledIndex = centerLedIndex + offset;
+                if (ledIndex >= 0 && ledIndex < safeLedCount) {
+                  const existingColor = ledArray[ledIndex];
+                  if (existingColor.r === 0 && existingColor.g === 0 && existingColor.b === 0) {
+                    // No existing color, use this lane's color
+                    ledArray[ledIndex] = noteColor;
+                  } else {
+                    // Blend with existing color (average for multiple active lanes)
+                    ledArray[ledIndex] = {
+                      r: Math.round((existingColor.r + noteColor.r) / 2),
+                      g: Math.round((existingColor.g + noteColor.g) / 2),
+                      b: Math.round((existingColor.b + noteColor.b) / 2)
+                    };
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else {
+        // Single lane mode
+        const laneIndex = config.laneIndex;
+        const hexColor = boomwhackerColors[laneIndex % boomwhackerColors.length];
+        const laneColor = hexToRgb(hexColor);
+
+        for (let stepIndex = 0; stepIndex < Math.min(totalSteps, pattern.length); stepIndex++) {
+          if (pattern[stepIndex]) {
+            const stepProgress = stepIndex / totalSteps;
+            const centerLedIndex = calculateLedPosition(stepProgress);
+
+            if (centerLedIndex >= 0 && centerLedIndex < safeLedCount) {
+              // Check if timeline is hitting this note
+              const isTimelineNearNote = isPlaying && timelineIndex >= 0 &&
+                Math.abs(timelineIndex - centerLedIndex) <= 1;
+
+              let noteColor: LEDColor;
+              if (isTimelineNearNote) {
+                // Timeline is hitting this note - full brightness
+                noteColor = laneColor;
+              } else {
+                // Queued note - dimmed (25% brightness)
+                noteColor = {
+                  r: Math.round(laneColor.r * 0.25),
+                  g: Math.round(laneColor.g * 0.25),
+                  b: Math.round(laneColor.b * 0.25)
+                };
+              }
+
+              // Make notes 3 pixels wide (center + neighbors)
+              for (let offset = -1; offset <= 1; offset++) {
+                const ledIndex = centerLedIndex + offset;
+                if (ledIndex >= 0 && ledIndex < safeLedCount) {
+                  ledArray[ledIndex] = noteColor;
+                }
               }
             }
           }
@@ -219,7 +251,7 @@ export const VirtualLEDStrip: React.FC<VirtualLEDStripProps> = ({
       ctx.fillRect(x, y, width, canvasHeight);
     }
 
-  }, [config, pattern, currentStep, isPlaying, boomwhackerColors, showTestPattern, animationFrame, safeLedCount, ledSize, canvasWidth, canvasHeight, visualizer]);
+  }, [config, pattern, currentStep, isPlaying, boomwhackerColors, showTestPattern, animationFrame, safeLedCount, ledSize, canvasWidth, canvasHeight, visualizer, fullPattern]);
 
   // Convert HSV to RGB for rainbow test pattern
   const hsvToRgb = (h: number, s: number, v: number): LEDColor => {
