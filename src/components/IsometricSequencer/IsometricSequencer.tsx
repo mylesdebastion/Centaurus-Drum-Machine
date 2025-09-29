@@ -806,9 +806,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     // Draw strike zone perfectly aligned with current beat grid line
     const hitZoneZ = -currentBeat * worldStepDepth; // Align exactly with current beat grid line
 
-    ctx.strokeStyle = '#FFFFFF';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
     ctx.lineWidth = 8;
-    ctx.shadowColor = '#FFFFFF';
+    ctx.shadowColor = 'rgba(255, 255, 255, 0.6)';
     ctx.shadowBlur = 20;
 
     // Draw a more visible strike zone that extends across all 12 lanes
@@ -824,7 +824,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       ctx.stroke();
 
       // Draw additional glow effect
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
       ctx.lineWidth = 16;
       ctx.stroke();
 
