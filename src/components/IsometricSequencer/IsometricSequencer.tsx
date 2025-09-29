@@ -925,7 +925,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   const updateLEDs = useCallback(async () => {
     if (!ledEnabled || ledVisualizers.length === 0) return;
 
-    const activeLanes = getActiveLanes();
+    // Get active lanes for potential future use
+    // const activeLanes = getActiveLanes();
 
     // Calculate beat progress for smooth animation (same as 3D visualization)
     const beatDuration = (60 / bpm) * 1000;
@@ -935,17 +936,23 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     for (const visualizer of ledVisualizers) {
       const config = visualizer.getConfig();
 
-      // Check if this visualizer's lane is currently active
-      const isLaneActive = showAllNotes || activeLanes.includes(config.laneIndex);
-      if (!isLaneActive) continue;
-
-      // Get the pattern for this specific lane
-      const lanePattern = pattern[config.laneIndex] || [];
-      const laneColor = boomwhackerColors[config.laneIndex];
-
+      // LED strips should always work regardless of 3D visualization mode
       try {
+        let patternData: boolean[] | boolean[][];
+        let laneColor: string;
+
+        if (config.multiNotesMode && config.assignedLanes.length > 0) {
+          // Multi-notes mode: gather patterns from all assigned lanes
+          patternData = config.assignedLanes.map(laneIndex => pattern[laneIndex] || []);
+          laneColor = boomwhackerColors[config.assignedLanes[0]]; // Use first lane color as fallback
+        } else {
+          // Single lane mode
+          patternData = pattern[config.laneIndex] || [];
+          laneColor = boomwhackerColors[config.laneIndex];
+        }
+
         await visualizer.updateStrip(
-          lanePattern,
+          patternData,
           currentBeat,
           isPlaying,
           laneColor,

@@ -22,7 +22,9 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
       studentName: 'WLEDTUBE2',
       enabled: true,
       status: 'disconnected',
-      ledCount: 90
+      ledCount: 90,
+      multiNotesMode: false,
+      assignedLanes: [0]
     }
   ]);
   const [visualizers, setVisualizers] = useState<SingleLaneVisualizer[]>([]);
@@ -48,6 +50,7 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
   });
   const [showSettings, setShowSettings] = useState(false);
   const [isTestingAll, setIsTestingAll] = useState(false);
+  const [colorAnimationFrame, setColorAnimationFrame] = useState(0);
   const [bridgeStatus, setBridgeStatus] = useState<'disconnected' | 'connected' | 'connecting'>('disconnected');
 
   // Generate unique ID for new strips
@@ -64,7 +67,9 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
       studentName: '',
       enabled: true,
       status: 'disconnected',
-      ledCount: 90 // Default LED count for new strips
+      ledCount: 90, // Default LED count for new strips
+      multiNotesMode: false,
+      assignedLanes: [0]
     };
 
     setStripConfigs(prev => [...prev, newConfig]);
@@ -223,6 +228,14 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
     return () => clearInterval(interval);
   }, [checkBridgeStatus]);
 
+  // Animate color indicators for multi-notes strips
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setColorAnimationFrame(prev => prev + 1);
+    }, 100); // Update every 100ms for smooth but relaxed color cycling animation
+    return () => clearInterval(interval);
+  }, []);
+
   const getStatusIcon = (status: LEDStripConfig['status']) => {
     switch (status) {
       case 'connected':
@@ -233,6 +246,63 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
         return <WifiOff className="w-4 h-4 text-red-500" />;
     }
   };
+
+  // Get the current display color for a strip configuration
+  // Using colorAnimationFrame to trigger re-renders for color cycling
+  const getCurrentStripColor = useCallback((config: LEDStripConfig) => {
+    if (!config.multiNotesMode || config.assignedLanes.length === 0) {
+      // Single lane mode
+      return boomwhackerColors[config.laneIndex];
+    } else if (config.assignedLanes.length === 1) {
+      // Multi-notes mode with single lane
+      return boomwhackerColors[config.assignedLanes[0]];
+    } else {
+      // Multi-notes mode with multiple lanes - calculate cycling color
+      const totalCycleTime = 2000; // Same as in SingleLaneVisualizer
+      const holdTime = 0.85;
+      const fadeTime = 0.15;
+
+      const cycleTime = (Date.now() / totalCycleTime) % 1.0;
+      const stepsPerColor = 1.0 / config.assignedLanes.length;
+      const activeColorIndex = Math.floor(cycleTime / stepsPerColor) % config.assignedLanes.length;
+
+      const stepProgress = (cycleTime % stepsPerColor) / stepsPerColor;
+      let blendFactor: number;
+
+      if (stepProgress < holdTime) {
+        blendFactor = 0;
+      } else {
+        blendFactor = (stepProgress - holdTime) / fadeTime;
+        blendFactor = Math.min(blendFactor, 1.0);
+      }
+
+      // Get primary and secondary colors in hex format
+      const primaryColor = boomwhackerColors[config.assignedLanes[activeColorIndex]];
+      const nextColorIndex = (activeColorIndex + 1) % config.assignedLanes.length;
+      const secondaryColor = boomwhackerColors[config.assignedLanes[nextColorIndex]];
+
+      // Convert hex to RGB for blending
+      const hexToRgb = (hex: string) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+          r: parseInt(result[1], 16),
+          g: parseInt(result[2], 16),
+          b: parseInt(result[3], 16)
+        } : { r: 0, g: 0, b: 0 };
+      };
+
+      const primaryRgb = hexToRgb(primaryColor);
+      const secondaryRgb = hexToRgb(secondaryColor);
+
+      // Blend colors
+      const r = Math.round(primaryRgb.r * (1 - blendFactor) + secondaryRgb.r * blendFactor);
+      const g = Math.round(primaryRgb.g * (1 - blendFactor) + secondaryRgb.g * blendFactor);
+      const b = Math.round(primaryRgb.b * (1 - blendFactor) + secondaryRgb.b * blendFactor);
+
+      // Convert back to hex
+      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    }
+  }, [boomwhackerColors, colorAnimationFrame]);
 
   return (
     <div className="space-y-6 p-4 bg-gray-900 text-white rounded-lg">
@@ -440,23 +510,81 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
               </button>
             </div>
 
-            {/* Lane Color */}
+            {/* Lane Color - Dynamic for multi-notes mode */}
             <div
-              className="w-6 h-6 rounded border-2 border-gray-600"
-              style={{ backgroundColor: boomwhackerColors[config.laneIndex] }}
-              title={noteNames[config.laneIndex]}
+              className="w-6 h-6 rounded border-2 border-gray-600 transition-colors duration-300"
+              style={{ backgroundColor: getCurrentStripColor(config) }}
+              title={
+                config.multiNotesMode && config.assignedLanes.length > 1
+                  ? `Multi-notes: ${config.assignedLanes.map(i => noteNames[i]).join(', ')}`
+                  : config.multiNotesMode && config.assignedLanes.length === 1
+                  ? `Multi-notes: ${noteNames[config.assignedLanes[0]]}`
+                  : noteNames[config.laneIndex]
+              }
             />
 
-            {/* Lane Selection */}
-            <select
-              value={config.laneIndex}
-              onChange={(e) => updateStripConfig(config.id, 'laneIndex', parseInt(e.target.value))}
-              className="bg-gray-700 text-white rounded px-2 py-1 min-w-[80px]"
-            >
-              {noteNames.map((note, i) => (
-                <option key={i} value={i}>{note}</option>
-              ))}
-            </select>
+            {/* Lane Selection or Multi-Notes Mode */}
+            <div className="flex flex-col gap-1">
+              {/* Multi-notes mode toggle */}
+              <label className="flex items-center gap-1 text-xs">
+                <input
+                  type="checkbox"
+                  checked={config.multiNotesMode}
+                  onChange={(e) => {
+                    updateStripConfig(config.id, 'multiNotesMode', e.target.checked);
+                    if (!e.target.checked) {
+                      // Reset to single lane when disabling multi-notes mode
+                      updateStripConfig(config.id, 'assignedLanes', [config.laneIndex]);
+                    }
+                  }}
+                  className="rounded w-3 h-3"
+                />
+                Multi-notes
+              </label>
+
+              {config.multiNotesMode ? (
+                /* Multi-notes lane assignment */
+                <div className="flex flex-wrap gap-1">
+                  {noteNames.map((note, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        const currentLanes = config.assignedLanes || [];
+                        const isAssigned = currentLanes.includes(i);
+                        const newLanes = isAssigned
+                          ? currentLanes.filter(lane => lane !== i)
+                          : [...currentLanes, i].sort((a, b) => a - b);
+                        updateStripConfig(config.id, 'assignedLanes', newLanes.length > 0 ? newLanes : [0]);
+                      }}
+                      className={`text-xs px-1 py-0.5 rounded transition-colors ${
+                        (config.assignedLanes || []).includes(i)
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                      }`}
+                      style={{
+                        borderColor: boomwhackerColors[i],
+                        borderWidth: '1px',
+                        borderStyle: 'solid'
+                      }}
+                      title={`${note} - ${(config.assignedLanes || []).includes(i) ? 'Remove' : 'Add'}`}
+                    >
+                      {note}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                /* Single lane selection */
+                <select
+                  value={config.laneIndex}
+                  onChange={(e) => updateStripConfig(config.id, 'laneIndex', parseInt(e.target.value))}
+                  className="bg-gray-700 text-white rounded px-2 py-1 min-w-[80px] text-sm"
+                >
+                  {noteNames.map((note, i) => (
+                    <option key={i} value={i}>{note}</option>
+                  ))}
+                </select>
+              )}
+            </div>
 
             {/* IP Address */}
             <input

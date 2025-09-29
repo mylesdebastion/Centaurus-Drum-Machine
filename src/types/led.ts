@@ -15,6 +15,8 @@ export interface LEDStripConfig {
   lastSeen?: Date;        // Last successful communication
   status: 'connected' | 'disconnected' | 'error';
   ledCount: number;        // Number of LEDs in this specific strip
+  multiNotesMode: boolean; // Enable multi-color visualization for multiple lanes
+  assignedLanes: number[]; // Array of lane indices when in multi-notes mode
 }
 
 export interface WLEDMessage {
