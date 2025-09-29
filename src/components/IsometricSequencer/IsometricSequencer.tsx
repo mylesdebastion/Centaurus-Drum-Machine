@@ -913,6 +913,44 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     showAllNotes
   ]);
 
+  // LED update function (called from animation loop)
+  const updateLEDs = useCallback(async () => {
+    if (!ledEnabled || ledVisualizers.length === 0) return;
+
+    const activeLanes = getActiveLanes();
+
+    // Calculate beat progress for smooth animation (same as 3D visualization)
+    const beatDuration = (60 / bpm) * 1000;
+    const timeSinceLastBeat = performance.now() - lastBeatTime.current;
+    const beatProgress = Math.min(timeSinceLastBeat / beatDuration, 1);
+
+    for (const visualizer of ledVisualizers) {
+      const config = visualizer.getConfig();
+
+      // Check if this visualizer's lane is currently active
+      const isLaneActive = showAllNotes || activeLanes.includes(config.laneIndex);
+      if (!isLaneActive) continue;
+
+      // Get the pattern for this specific lane
+      const lanePattern = pattern[config.laneIndex] || [];
+      const laneColor = boomwhackerColors[config.laneIndex];
+
+      try {
+        await visualizer.updateStrip(
+          lanePattern,
+          currentBeat,
+          isPlaying,
+          laneColor,
+          false, // TODO: implement solo logic if needed
+          false, // TODO: implement mute logic if needed
+          beatProgress // Pass beat progress for smooth animation
+        );
+      } catch (error) {
+        console.warn(`Failed to update LED strip for lane ${config.laneIndex}:`, error);
+      }
+    }
+  }, [ledEnabled, ledVisualizers, pattern, currentBeat, isPlaying, boomwhackerColors, showAllNotes, getActiveLanes, bpm]);
+
   // Main render loop
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -934,6 +972,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     // Draw 3D world
     draw3DWorld(ctx, width, height);
 
+    // Update LED strips every frame for smooth animation
+    updateLEDs();
+
     // Update beat timing
     if (isPlaying) {
       const now = performance.now();
@@ -954,7 +995,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     }
 
     animationRef.current = requestAnimationFrame(render);
-  }, [isPlaying, bpm, currentBeat, pattern, lanes, steps, playNote, drawStarfield, draw3DWorld]);
+  }, [isPlaying, bpm, currentBeat, pattern, lanes, steps, playNote, drawStarfield, draw3DWorld, updateLEDs]);
 
   // Start/stop animation loop
   useEffect(() => {
@@ -965,48 +1006,6 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       }
     };
   }, [render]);
-
-  // Update LED strips
-  useEffect(() => {
-    if (!ledEnabled || ledVisualizers.length === 0) return;
-
-    const updateLEDs = async () => {
-      const activeLanes = getActiveLanes();
-
-      // Calculate beat progress for smooth animation (same as 3D visualization)
-      const beatDuration = (60 / bpm) * 1000;
-      const timeSinceLastBeat = performance.now() - lastBeatTime.current;
-      const beatProgress = Math.min(timeSinceLastBeat / beatDuration, 1);
-
-      for (const visualizer of ledVisualizers) {
-        const config = visualizer.getConfig();
-
-        // Check if this visualizer's lane is currently active
-        const isLaneActive = showAllNotes || activeLanes.includes(config.laneIndex);
-        if (!isLaneActive) continue;
-
-        // Get the pattern for this specific lane
-        const lanePattern = pattern[config.laneIndex] || [];
-        const laneColor = boomwhackerColors[config.laneIndex];
-
-        try {
-          await visualizer.updateStrip(
-            lanePattern,
-            currentBeat,
-            isPlaying,
-            laneColor,
-            false, // TODO: implement solo logic if needed
-            false, // TODO: implement mute logic if needed
-            beatProgress // Pass beat progress for smooth animation
-          );
-        } catch (error) {
-          console.warn(`Failed to update LED strip for lane ${config.laneIndex}:`, error);
-        }
-      }
-    };
-
-    updateLEDs();
-  }, [ledEnabled, ledVisualizers, pattern, currentBeat, isPlaying, boomwhackerColors, showAllNotes, getActiveLanes, bpm]);
 
   // Handle LED visualizers change
   const handleLEDVisualizersChange = useCallback((newVisualizers: SingleLaneVisualizer[]) => {
