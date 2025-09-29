@@ -147,9 +147,43 @@ export class SingleLaneVisualizer {
       }
     }
 
-    // Strike zone at the very beginning (bottom) of the strip
+    // Strike zone at the very beginning (bottom) of the strip - static reference
     if (this.config.ledCount > 0) {
       ledArray[0] = { ...strikeZoneColor };
+    }
+
+    // Animated strike bar that moves with beat timing (matching 3D visualization)
+    // This creates a moving indicator that sweeps across the strip like the 3D strike zone
+    if (isPlaying) {
+      // Calculate strike bar position using same timing as 3D visualization
+      // The bar moves smoothly across each beat section
+      const strikeBarColor = { r: 255, g: 0, b: 128 }; // Same pink/magenta as 3D (#FF0080)
+
+      // Position the strike bar within the current beat section
+      const beatWithinSection = currentStep % 4; // Position within that quarter (0-3)
+
+      // Calculate smooth position within the current beat section
+      const sectionSize = Math.floor(this.config.ledCount / beatsToShow);
+      const baseBeatPosition = beatWithinSection * (sectionSize / 4);
+      const progressWithinBeat = easedProgress * (sectionSize / 4);
+      const strikeBarPosition = Math.round(baseBeatPosition + progressWithinBeat);
+
+      // Draw strike bar with center point and glow effect (3-5 LEDs wide)
+      const barWidth = Math.max(3, Math.floor(sectionSize / 16)); // Proportional to strip size
+      const barStart = Math.max(0, strikeBarPosition - Math.floor(barWidth / 2));
+      const barEnd = Math.min(this.config.ledCount - 1, strikeBarPosition + Math.floor(barWidth / 2));
+
+      for (let i = barStart; i <= barEnd; i++) {
+        // Center of bar is brightest, edges are dimmer for glow effect
+        const distanceFromCenter = Math.abs(i - strikeBarPosition);
+        const intensity = Math.max(0.3, 1.0 - (distanceFromCenter / Math.floor(barWidth / 2) * 0.7));
+
+        ledArray[i] = {
+          r: Math.round(strikeBarColor.r * intensity),
+          g: Math.round(strikeBarColor.g * intensity),
+          b: Math.round(strikeBarColor.b * intensity)
+        };
+      }
     }
 
     // Draw notes moving toward strike zone with smooth animation
