@@ -118,7 +118,7 @@ export class SingleLaneVisualizer {
       ? 2 * beatProgress * beatProgress
       : -1 + (4 - 2 * beatProgress) * beatProgress;
 
-    // Draw moving grid dividers (smoothly animated)
+    // Draw moving grid dividers with progressive brightness
     for (let beat = 1; beat < beatsToShow; beat++) {
       // Base position for this grid line
       const baseBeatPosition = beat * ledsPerBeat;
@@ -128,7 +128,22 @@ export class SingleLaneVisualizer {
       const gridPosition = Math.round(baseBeatPosition - progressOffset);
 
       if (gridPosition >= 0 && gridPosition < this.config.ledCount) {
-        ledArray[gridPosition] = { ...gridColor };
+        // Calculate brightness based on distance from strike zone (LED 0)
+        // Grid lines get brighter as they approach the strike zone
+        const distanceFromStrikeZone = gridPosition / this.config.ledCount;
+
+        // Progressive brightness: 0.2 (dim) when far, 1.0 (bright) when close
+        const brightness = Math.max(0.2, 1.0 - (distanceFromStrikeZone * 0.8));
+
+        // Special case: extra bright when very close to strike zone
+        const isNearStrikeZone = gridPosition <= ledsPerBeat * 0.25; // Within 1/4 beat of strike zone
+        const finalBrightness = isNearStrikeZone ? 1.0 : brightness;
+
+        ledArray[gridPosition] = {
+          r: Math.round(gridColor.r * finalBrightness),
+          g: Math.round(gridColor.g * finalBrightness),
+          b: Math.round(gridColor.b * finalBrightness)
+        };
       }
     }
 
@@ -149,7 +164,7 @@ export class SingleLaneVisualizer {
 
         const notePixels = Math.max(1, Math.floor(ledsPerBeat / 8)); // Each note takes 1/8 of a beat space
 
-        // Place note pixels
+        // Place note pixels with progressive brightness
         for (let pixel = 0; pixel < notePixels; pixel++) {
           const ledIndex = notePosition + pixel;
 
@@ -158,8 +173,21 @@ export class SingleLaneVisualizer {
               // Active note being triggered - bright white flash near end of beat
               ledArray[ledIndex] = { ...strikeZoneColor };
             } else {
-              // Future note - show in lane color
-              ledArray[ledIndex] = { ...noteColor };
+              // Future note - show in lane color with progressive brightness
+              const distanceFromStrikeZone = ledIndex / this.config.ledCount;
+
+              // Notes get brighter as they approach: 0.3 (dim) when far, 1.0 (bright) when close
+              const brightness = Math.max(0.3, 1.0 - (distanceFromStrikeZone * 0.7));
+
+              // Extra bright when very close to strike zone
+              const isNearStrikeZone = ledIndex <= ledsPerBeat * 0.25;
+              const finalBrightness = isNearStrikeZone ? 1.0 : brightness;
+
+              ledArray[ledIndex] = {
+                r: Math.round(noteColor.r * finalBrightness),
+                g: Math.round(noteColor.g * finalBrightness),
+                b: Math.round(noteColor.b * finalBrightness)
+              };
             }
           }
         }
