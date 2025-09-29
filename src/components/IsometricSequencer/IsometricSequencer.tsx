@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap, Lightbulb } from 'lucide-react';
+import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap, Lightbulb, Gamepad2 } from 'lucide-react';
 import { SingleLaneVisualizer } from '../../utils/SingleLaneVisualizer';
 import { LEDStripManager } from '../LEDStripManager/LEDStripManager';
+import { APC40Controller, APC40ButtonEvent } from '../../utils/APC40Controller';
 
 interface IsometricSequencerProps {
   onBack: () => void;
@@ -124,6 +125,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   const [ledEnabled, setLEDEnabled] = useState(false);
   // Animation mode toggle (default to smooth scrolling for better musical flow)
   const [smoothScrolling, setSmoothScrolling] = useState(true);
+
+  // APC40 hardware control state
+  const [apc40Controller] = useState(() => new APC40Controller());
+  const [apc40Connected, setAPC40Connected] = useState(false);
+  const [apc40ColorMode, setAPC40ColorMode] = useState<'spectrum' | 'chromatic' | 'harmonic'>('spectrum');
 
   // Constants
   const lanes = 12;
@@ -973,6 +979,78 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     }
   }, [ledEnabled, ledVisualizers, pattern, currentBeat, isPlaying, boomwhackerColors, showAllNotes, getActiveLanes, bpm]);
 
+  // APC40 hardware integration
+  useEffect(() => {
+    // Set up APC40 event handlers
+    apc40Controller.setButtonPressHandler(handleAPC40ButtonPress);
+    apc40Controller.setConnectionChangeHandler(setAPC40Connected);
+    apc40Controller.setColorMode(apc40ColorMode);
+
+    // Cleanup on unmount
+    return () => {
+      apc40Controller.disconnect();
+    };
+  }, [apc40Controller, apc40ColorMode]);
+
+  // Handle APC40 button press
+  const handleAPC40ButtonPress = useCallback((event: APC40ButtonEvent) => {
+    console.log('🎛️ APC40 button press:', event);
+
+    // Map APC40 5x8 grid to IsometricSequencer pattern
+    // APC40 lanes 0-4 → chromatic lanes 0-4 (can map to current scale if needed)
+    // APC40 steps 0-7 → sequencer steps 0-7 (first half of 16-step pattern)
+
+    const chromaticLane = event.lane; // Direct mapping for now
+    const step = event.step;
+
+    // Toggle the pattern state
+    setPattern(prev => {
+      const newPattern = [...prev];
+      newPattern[chromaticLane] = [...newPattern[chromaticLane]];
+      newPattern[chromaticLane][step] = !newPattern[chromaticLane][step];
+      return newPattern;
+    });
+
+    // Play note for feedback
+    playNote(chromaticLane);
+  }, [playNote]);
+
+  // Update APC40 LEDs when pattern or playback state changes
+  const updateAPC40LEDs = useCallback(() => {
+    if (!apc40Connected) return;
+
+    // Map the full 12-lane pattern to APC40's 5-lane display
+    // For now, use first 5 chromatic lanes directly
+    const apc40Pattern: boolean[][] = Array(5).fill(null).map((_, lane) =>
+      pattern[lane] || Array(16).fill(false)
+    );
+
+    // Update APC40 with current pattern and playback state
+    apc40Controller.updateSequencerLEDs(
+      apc40Pattern,
+      currentBeat,
+      isPlaying,
+      boomwhackerColors,
+      getActiveLanes().slice(0, 5) // Only first 5 active lanes
+    );
+  }, [apc40Connected, pattern, currentBeat, isPlaying, boomwhackerColors, getActiveLanes, apc40Controller]);
+
+  // Connect APC40
+  const connectAPC40 = useCallback(async () => {
+    try {
+      await apc40Controller.connect();
+      console.log('🎛️ APC40 connected successfully');
+    } catch (error) {
+      console.error('🚫 Failed to connect APC40:', error);
+      alert('Failed to connect APC40: ' + (error as Error).message);
+    }
+  }, [apc40Controller]);
+
+  // Disconnect APC40
+  const disconnectAPC40 = useCallback(() => {
+    apc40Controller.disconnect();
+  }, [apc40Controller]);
+
   // Main render loop
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -997,6 +1075,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     // Update LED strips every frame for smooth animation
     updateLEDs();
 
+    // Update APC40 LEDs when pattern or beat changes
+    updateAPC40LEDs();
+
     // Update beat timing
     if (isPlaying) {
       const now = performance.now();
@@ -1020,7 +1101,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     }
 
     animationRef.current = requestAnimationFrame(render);
-  }, [isPlaying, bpm, currentBeat, pattern, lanes, steps, playNote, drawStarfield, draw3DWorld, updateLEDs]);
+  }, [isPlaying, bpm, currentBeat, pattern, lanes, steps, playNote, drawStarfield, draw3DWorld, updateLEDs, updateAPC40LEDs]);
 
   // Start/stop animation loop
   useEffect(() => {
@@ -1394,6 +1475,39 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
               Smooth
             </label>
           </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={apc40Connected ? disconnectAPC40 : connectAPC40}
+              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${
+                apc40Connected
+                  ? 'bg-green-600 hover:bg-green-500'
+                  : 'bg-gray-700 hover:bg-gray-600'
+              }`}
+            >
+              <Gamepad2 className="w-4 h-4" />
+              APC40
+            </button>
+
+            {apc40Connected && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-300">Mode:</span>
+                <select
+                  value={apc40ColorMode}
+                  onChange={(e) => {
+                    const mode = e.target.value as 'spectrum' | 'chromatic' | 'harmonic';
+                    setAPC40ColorMode(mode);
+                    apc40Controller.setColorMode(mode);
+                  }}
+                  className="bg-gray-700 text-white px-2 py-1 rounded text-sm"
+                >
+                  <option value="spectrum">Spectrum</option>
+                  <option value="chromatic">Chromatic</option>
+                  <option value="harmonic">Harmonic</option>
+                </select>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1464,7 +1578,14 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
 
       {/* Instructions */}
       <div className="text-center p-4 bg-gray-900 text-gray-400 text-sm">
-        Click anywhere on the 3D view to add/remove notes • Use Melody for musical patterns • Random for noise • Clear to reset
+        <div className="mb-2">
+          Click anywhere on the 3D view to add/remove notes • Use Melody for musical patterns • Random for noise • Clear to reset
+        </div>
+        {apc40Connected && (
+          <div className="text-green-400 text-xs">
+            🎛️ APC40 Connected: Use hardware buttons to control first 5 lanes (8 steps) • LEDs show pattern and playhead
+          </div>
+        )}
       </div>
     </div>
   );
