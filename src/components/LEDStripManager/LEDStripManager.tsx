@@ -16,16 +16,100 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
 }) => {
   const [stripConfigs, setStripConfigs] = useState<LEDStripConfig[]>([
     {
-      id: 'default_wledtube2',
-      laneIndex: 0,
-      ipAddress: '192.168.8.158',
-      studentName: 'WLEDTUBE2',
+      id: 'default_wledtube1',
+      laneIndex: 0, // C note
+      ipAddress: '192.168.8.151',
+      studentName: 'WLEDTUBE1',
       enabled: true,
       status: 'disconnected',
       ledCount: 90,
       multiNotesMode: false,
       assignedLanes: [0],
-      reverseDirection: false // Default: start at end of strip (standard behavior)
+      reverseDirection: true
+    },
+    {
+      id: 'default_wledtube2',
+      laneIndex: 1, // D note
+      ipAddress: '192.168.8.152',
+      studentName: 'WLEDTUBE2',
+      enabled: true,
+      status: 'disconnected',
+      ledCount: 90,
+      multiNotesMode: false,
+      assignedLanes: [1],
+      reverseDirection: true
+    },
+    {
+      id: 'default_wledtube3',
+      laneIndex: 2, // E note
+      ipAddress: '192.168.8.153',
+      studentName: 'WLEDTUBE3',
+      enabled: true,
+      status: 'disconnected',
+      ledCount: 90,
+      multiNotesMode: false,
+      assignedLanes: [2],
+      reverseDirection: true
+    },
+    {
+      id: 'default_wledtube4',
+      laneIndex: 3, // F note
+      ipAddress: '192.168.8.154',
+      studentName: 'WLEDTUBE4',
+      enabled: true,
+      status: 'disconnected',
+      ledCount: 90,
+      multiNotesMode: false,
+      assignedLanes: [3],
+      reverseDirection: true
+    },
+    {
+      id: 'default_wledtube5',
+      laneIndex: 4, // G note
+      ipAddress: '192.168.8.155',
+      studentName: 'WLEDTUBE5',
+      enabled: true,
+      status: 'disconnected',
+      ledCount: 90,
+      multiNotesMode: false,
+      assignedLanes: [4],
+      reverseDirection: true
+    },
+    {
+      id: 'default_wledtube6',
+      laneIndex: 5, // A note
+      ipAddress: '192.168.8.156',
+      studentName: 'WLEDTUBE6',
+      enabled: true,
+      status: 'disconnected',
+      ledCount: 90,
+      multiNotesMode: false,
+      assignedLanes: [5],
+      reverseDirection: true
+    },
+    {
+      id: 'default_wledtube7',
+      laneIndex: 6, // B note
+      ipAddress: '192.168.8.157',
+      studentName: 'WLEDTUBE7',
+      enabled: true,
+      status: 'disconnected',
+      ledCount: 90,
+      multiNotesMode: false,
+      assignedLanes: [6],
+      reverseDirection: true
+    },
+    {
+      id: 'default_wledtube8',
+      laneIndex: 0, // Default lane, but will use multi-notes mode
+      ipAddress: '192.168.8.158',
+      studentName: 'WLEDTUBE8',
+      enabled: true,
+      status: 'disconnected',
+      ledCount: 90,
+      multiNotesMode: true, // Enable multi-notes mode for all C major scale notes
+      assignedLanes: [0, 1, 2, 3, 4, 5, 6], // C, D, E, F, G, A, B (C major scale)
+      reverseDirection: true
     }
   ]);
   const [visualizers, setVisualizers] = useState<SingleLaneVisualizer[]>([]);
@@ -73,7 +157,7 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
       ledCount: 90, // Default LED count for new strips
       multiNotesMode: false,
       assignedLanes: [0],
-      reverseDirection: false // Default: start at end of strip (standard behavior)
+      reverseDirection: true // Default: start at beginning (opposite direction)
     };
 
     setStripConfigs(prev => [...prev, newConfig]);
@@ -527,12 +611,6 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
             {/* Status Icon */}
             <div className="flex items-center gap-2">
               {getStatusIcon(config.status)}
-              <button
-                onClick={() => testConnection(config.id)}
-                className="text-xs text-gray-400 hover:text-white transition-colors"
-              >
-                Test
-              </button>
             </div>
 
             {/* Lane Color - Dynamic for multi-notes mode */}
@@ -642,12 +720,8 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
             {/* Direction Toggle */}
             <button
               onClick={() => updateStripConfig(config.id, 'reverseDirection', !config.reverseDirection)}
-              className={`px-2 py-1 rounded text-xs transition-colors ${
-                config.reverseDirection
-                  ? 'bg-green-600 hover:bg-green-500'
-                  : 'bg-gray-600 hover:bg-gray-500'
-              }`}
-              title={`LED Direction: ${config.reverseDirection ? 'Start at beginning' : 'Start at end (default)'}`}
+              className="px-2 py-1 rounded text-xs transition-colors bg-gray-600 hover:bg-gray-500"
+              title={`LED Direction: ${config.reverseDirection ? 'Start at beginning' : 'Start at end'}`}
             >
               {config.reverseDirection ? '↑' : '↓'}
             </button>
