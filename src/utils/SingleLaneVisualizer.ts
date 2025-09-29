@@ -111,7 +111,13 @@ export class SingleLaneVisualizer {
 
     // Show 4 beats ahead (like 3D view showing 4 beats in depth)
     const beatsToShow = 4;
-    const ledsPerBeat = Math.floor(this.config.ledCount / beatsToShow);
+    // Use the entire strip length by distributing LEDs evenly across beats
+    const ledsPerBeat = this.config.ledCount / beatsToShow; // Use floating point for more precise distribution
+
+    // Debug logging to verify full strip utilization
+    if (isPlaying && currentStep === 0 && beatProgress < 0.1) {
+      console.log(`🔍 LED Strip Utilization: ${this.config.ledCount} LEDs, ${ledsPerBeat.toFixed(2)} per beat, showing ${beatsToShow} beats`);
+    }
 
     // Apply the same easing function as the 3D visualization
     const easedProgress = beatProgress < 0.5
@@ -120,7 +126,7 @@ export class SingleLaneVisualizer {
 
     // Draw moving grid dividers with progressive brightness
     for (let beat = 1; beat < beatsToShow; beat++) {
-      // Base position for this grid line
+      // Base position for this grid line (use floating point for precise positioning)
       const baseBeatPosition = beat * ledsPerBeat;
 
       // Calculate smooth movement - grid lines move toward strike zone
@@ -136,7 +142,7 @@ export class SingleLaneVisualizer {
         const brightness = Math.max(0.2, 1.0 - (distanceFromStrikeZone * 0.8));
 
         // Special case: extra bright when very close to strike zone
-        const isNearStrikeZone = gridPosition <= ledsPerBeat * 0.25; // Within 1/4 beat of strike zone
+        const isNearStrikeZone = gridPosition <= Math.round(ledsPerBeat * 0.25); // Within 1/4 beat of strike zone
         const finalBrightness = isNearStrikeZone ? 1.0 : brightness;
 
         ledArray[gridPosition] = {
@@ -159,7 +165,7 @@ export class SingleLaneVisualizer {
 
       // Calculate strike bar position using exact same logic as grid lines
       // Start at the beginning of each beat section and slide toward strike zone (position 0)
-      const sectionSize = Math.floor(this.config.ledCount / beatsToShow);
+      const sectionSize = ledsPerBeat; // Use same precise calculation as other elements
 
       // Strike bar starts at the front of the current beat section
       const currentBeatStart = sectionSize; // Always start one beat section ahead
@@ -171,7 +177,7 @@ export class SingleLaneVisualizer {
       // Only draw if within valid range
       if (strikeBarPosition >= 0 && strikeBarPosition < this.config.ledCount) {
         // Draw strike bar with center point and glow effect (3-5 LEDs wide)
-        const barWidth = Math.max(3, Math.floor(sectionSize / 16)); // Proportional to strip size
+        const barWidth = Math.max(3, Math.round(sectionSize / 16)); // Proportional to strip size
         const barStart = Math.max(0, strikeBarPosition - Math.floor(barWidth / 2));
         const barEnd = Math.min(this.config.ledCount - 1, strikeBarPosition + Math.floor(barWidth / 2));
 
@@ -199,7 +205,7 @@ export class SingleLaneVisualizer {
         const progressOffset = easedProgress * ledsPerBeat;
         const notePosition = Math.round(baseBeatPosition - progressOffset);
 
-        const notePixels = Math.max(1, Math.floor(ledsPerBeat / 8)); // Each note takes 1/8 of a beat space
+        const notePixels = Math.max(1, Math.round(ledsPerBeat / 8)); // Each note takes 1/8 of a beat space
 
         // Place note pixels with progressive brightness
         for (let pixel = 0; pixel < notePixels; pixel++) {
@@ -217,7 +223,7 @@ export class SingleLaneVisualizer {
               const brightness = Math.max(0.3, 1.0 - (distanceFromStrikeZone * 0.7));
 
               // Extra bright when very close to strike zone
-              const isNearStrikeZone = ledIndex <= ledsPerBeat * 0.25;
+              const isNearStrikeZone = ledIndex <= Math.round(ledsPerBeat * 0.25);
               const finalBrightness = isNearStrikeZone ? 1.0 : brightness;
 
               ledArray[ledIndex] = {
