@@ -84,7 +84,9 @@ export class SingleLaneVisualizer {
   }
 
   /**
-   * Generate LED color array for current state - creates array for full LED strip
+   * Generate LED color array for 3D camera-style visualization
+   * Bottom of strip = strike zone (current beat), top = future beats
+   * Mimics the 3D perspective where notes move toward the camera/strike zone
    */
   private generateLEDArray(
     pattern: boolean[],
@@ -95,58 +97,58 @@ export class SingleLaneVisualizer {
   ): LEDColor[] {
     const ledArray: LEDColor[] = new Array(this.config.ledCount);
 
-    const baseColor = this.hexToRgb(laneColor, this.settings.baseIntensity);
-    const activeColor = this.hexToRgb(laneColor, this.settings.activeIntensity);
+    // Initialize all LEDs to black/off
+    for (let i = 0; i < this.config.ledCount; i++) {
+      ledArray[i] = { r: 0, g: 0, b: 0 };
+    }
 
-    // Calculate how many LEDs per step
-    const ledsPerStep = Math.floor(this.config.ledCount / this.totalSteps);
-    const remainingLEDs = this.config.ledCount % this.totalSteps;
+    const noteColor = this.hexToRgb(laneColor, this.settings.activeIntensity);
+    const strikeZoneColor = { r: 255, g: 255, b: 255 }; // White for strike zone
+    const gridColor = { r: 80, g: 80, b: 80 }; // Dim white for grid lines
 
-    for (let step = 0; step < this.totalSteps; step++) {
-      // Calculate LED indices for this step
-      const startLED = step * ledsPerStep + Math.min(step, remainingLEDs);
-      const endLED = startLED + ledsPerStep + (step < remainingLEDs ? 1 : 0);
+    // Show 4 beats ahead (like 3D view showing 4 beats in depth)
+    const beatsToShow = 4;
+    const ledsPerBeat = Math.floor(this.config.ledCount / beatsToShow);
 
-      let stepColor: LEDColor;
-
-      if (pattern[step]) {
-        // Active note
-        stepColor = { ...activeColor };
-
-        // Extra bright if currently playing this step
-        if (isPlaying && step === currentStep) {
-          // Flash white for active note being played
-          stepColor = this.applyBrightness(this.settings.playheadColor, this.settings.brightness);
-        }
-      } else {
-        // Inactive step - show dim base color
-        stepColor = { ...baseColor };
-
-        // Playhead indicator on inactive steps
-        if (isPlaying && step === currentStep) {
-          // Dim gray playhead for empty steps
-          stepColor = this.applyBrightness(this.settings.playheadColor, 0.3);
-        }
-      }
-
-      // Beat emphasis (every 4th step)
-      if (step % 4 === 0 && this.settings.brightness > 0) {
-        // Slightly brighten downbeats
-        stepColor = this.adjustBrightness(stepColor, 1.2);
-      }
-
-      // Apply global brightness
-      stepColor = this.applyBrightness(stepColor, this.settings.brightness);
-
-      // Fill all LEDs for this step
-      for (let led = startLED; led < endLED; led++) {
-        ledArray[led] = { ...stepColor };
+    // Draw grid dividers (every beat boundary)
+    for (let beat = 1; beat < beatsToShow; beat++) {
+      const gridPosition = beat * ledsPerBeat;
+      if (gridPosition < this.config.ledCount) {
+        ledArray[gridPosition] = { ...gridColor };
       }
     }
 
-    // Fill any remaining LEDs with off
-    for (let led = this.totalSteps * ledsPerStep; led < this.config.ledCount; led++) {
-      ledArray[led] = { r: 0, g: 0, b: 0 };
+    // Strike zone at the very beginning (bottom) of the strip
+    if (this.config.ledCount > 0) {
+      ledArray[0] = { ...strikeZoneColor };
+    }
+
+    // Draw notes moving toward strike zone
+    for (let beatOffset = 0; beatOffset < beatsToShow; beatOffset++) {
+      const futureStep = (currentStep + beatOffset) % this.totalSteps;
+
+      if (pattern[futureStep]) {
+        // Calculate position for this note
+        // beatOffset 0 = at strike zone (LED 0)
+        // beatOffset 1 = 1 beat away (around LED position 1 * ledsPerBeat)
+        // etc.
+
+        const beatStartLED = beatOffset * ledsPerBeat;
+        const notePixels = Math.max(1, Math.floor(ledsPerBeat / 8)); // Each note takes 1/8 of a beat space
+
+        // Place note pixels
+        for (let pixel = 0; pixel < notePixels && (beatStartLED + pixel) < this.config.ledCount; pixel++) {
+          const ledIndex = beatStartLED + pixel;
+
+          if (beatOffset === 0 && isPlaying) {
+            // Active note being triggered - bright white flash
+            ledArray[ledIndex] = { ...strikeZoneColor };
+          } else {
+            // Future note - show in lane color
+            ledArray[ledIndex] = { ...noteColor };
+          }
+        }
+      }
     }
 
     return ledArray;
