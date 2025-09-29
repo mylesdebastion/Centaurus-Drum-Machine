@@ -125,9 +125,25 @@ export class SingleLaneVisualizer {
       ledsPerBeat = this.config.ledCount / beatsToShow;
     }
 
-    // Debug logging to verify full strip utilization
+    // Debug logging to verify full strip utilization and show exact positions
     if (isPlaying && currentStep === 0 && beatProgress < 0.1) {
       console.log(`🔍 LED Strip Utilization: ${this.config.ledCount} LEDs, ${ledsPerBeat.toFixed(2)} per beat, showing ${beatsToShow}/${this.totalSteps} beats`);
+
+      // Show grid line positions
+      const gridPositions = [];
+      for (let beat = 1; beat < beatsToShow; beat++) {
+        const baseBeatPosition = beat * ledsPerBeat;
+        gridPositions.push(Math.round(baseBeatPosition));
+      }
+      console.log(`📍 Grid line base positions: [${gridPositions.join(', ')}]`);
+
+      // Show note spawn range
+      const noteSpawnRange = [];
+      for (let beatOffset = 0; beatOffset < beatsToShow; beatOffset++) {
+        const baseBeatPosition = beatOffset * ledsPerBeat;
+        noteSpawnRange.push(`beat${beatOffset}:${Math.round(baseBeatPosition)}`);
+      }
+      console.log(`🎵 Note spawn positions: [${noteSpawnRange.join(', ')}]`);
     }
 
     // Apply the same easing function as the 3D visualization
@@ -246,6 +262,18 @@ export class SingleLaneVisualizer {
           }
         }
       }
+    }
+
+    // Debug: Track highest LED position used
+    if (isPlaying && currentStep === 0 && beatProgress < 0.1) {
+      let highestUsedLED = -1;
+      for (let i = ledArray.length - 1; i >= 0; i--) {
+        if (ledArray[i].r > 0 || ledArray[i].g > 0 || ledArray[i].b > 0) {
+          highestUsedLED = i;
+          break;
+        }
+      }
+      console.log(`🎯 Highest LED used: ${highestUsedLED}/${this.config.ledCount - 1} (${((highestUsedLED + 1) / this.config.ledCount * 100).toFixed(1)}% of strip)`);
     }
 
     return ledArray;
