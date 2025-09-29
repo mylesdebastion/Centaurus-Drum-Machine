@@ -122,6 +122,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   const [showLEDManager, setShowLEDManager] = useState(false);
   const [ledVisualizers, setLEDVisualizers] = useState<SingleLaneVisualizer[]>([]);
   const [ledEnabled, setLEDEnabled] = useState(false);
+  // Animation mode toggle
+  const [smoothScrolling, setSmoothScrolling] = useState(false);
 
   // Constants
   const lanes = 12;
@@ -437,7 +439,10 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       targetZ = -steps * worldStepDepth;
     }
 
-    const easedProgress = beatProgress < 0.5 ? 2 * beatProgress * beatProgress : -1 + (4 - 2 * beatProgress) * beatProgress;
+    // Choose animation style based on toggle
+    const easedProgress = smoothScrolling
+      ? beatProgress // Linear progression for smooth scrolling
+      : beatProgress < 0.5 ? 2 * beatProgress * beatProgress : -1 + (4 - 2 * beatProgress) * beatProgress; // Eased "jumping" movement
     const interpolatedZ = currentBeatZ + (targetZ - currentBeatZ) * easedProgress;
 
     // Position labels fixed relative to camera position so they stay at bottom
@@ -520,7 +525,10 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       targetZ = -steps * worldStepDepth;
     }
 
-    const easedProgress = beatProgress < 0.5 ? 2 * beatProgress * beatProgress : -1 + (4 - 2 * beatProgress) * beatProgress;
+    // Choose animation style based on toggle
+    const easedProgress = smoothScrolling
+      ? beatProgress // Linear progression for smooth scrolling
+      : beatProgress < 0.5 ? 2 * beatProgress * beatProgress : -1 + (4 - 2 * beatProgress) * beatProgress; // Eased "jumping" movement
     const interpolatedZ = currentBeatZ + (targetZ - currentBeatZ) * easedProgress;
 
     // Optimized camera positioning to show grid alignment clearly
@@ -943,7 +951,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           laneColor,
           false, // TODO: implement solo logic if needed
           false, // TODO: implement mute logic if needed
-          beatProgress // Pass beat progress for smooth animation
+          beatProgress, // Pass beat progress for smooth animation
+          smoothScrolling // Pass animation mode to LED visualizer
         );
       } catch (error) {
         console.warn(`Failed to update LED strip for lane ${config.laneIndex}:`, error);
@@ -1357,6 +1366,16 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
             />
             <label htmlFor="ledEnabled" className="text-sm text-gray-300">
               Enable
+            </label>
+            <input
+              type="checkbox"
+              id="smoothScrolling"
+              checked={smoothScrolling}
+              onChange={(e) => setSmoothScrolling(e.target.checked)}
+              className="w-4 h-4 ml-4"
+            />
+            <label htmlFor="smoothScrolling" className="text-sm text-gray-300">
+              Smooth
             </label>
           </div>
         </div>

@@ -35,7 +35,8 @@ export class SingleLaneVisualizer {
     laneColor: string,
     isSolo: boolean = false,
     isMuted: boolean = false,
-    beatProgress: number = 0
+    beatProgress: number = 0,
+    smoothScrolling: boolean = false
   ): Promise<boolean> {
     // Rate limiting
     const now = Date.now();
@@ -63,7 +64,8 @@ export class SingleLaneVisualizer {
         isPlaying,
         laneColor,
         isSolo,
-        beatProgress
+        beatProgress,
+        smoothScrolling
       );
 
       const success = await this.sendToWLED(ledArray);
@@ -96,7 +98,8 @@ export class SingleLaneVisualizer {
     isPlaying: boolean,
     laneColor: string,
     _isSolo: boolean, // Currently unused, reserved for future solo mode features
-    beatProgress: number = 0
+    beatProgress: number = 0,
+    smoothScrolling: boolean = false
   ): LEDColor[] {
     const ledArray: LEDColor[] = new Array(this.config.ledCount);
 
@@ -146,10 +149,12 @@ export class SingleLaneVisualizer {
       console.log(`🎵 Note spawn positions: [${noteSpawnRange.join(', ')}]`);
     }
 
-    // Apply the same easing function as the 3D visualization
-    const easedProgress = beatProgress < 0.5
-      ? 2 * beatProgress * beatProgress
-      : -1 + (4 - 2 * beatProgress) * beatProgress;
+    // Apply animation style based on mode (matching 3D visualization)
+    const easedProgress = smoothScrolling
+      ? beatProgress // Linear progression for smooth scrolling
+      : beatProgress < 0.5
+        ? 2 * beatProgress * beatProgress
+        : -1 + (4 - 2 * beatProgress) * beatProgress; // Eased "jumping" movement
 
     // Draw moving grid dividers with progressive brightness
     for (let beat = 1; beat < beatsToShow; beat++) {
