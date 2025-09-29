@@ -109,14 +109,25 @@ export class SingleLaneVisualizer {
     const strikeZoneColor = { r: 255, g: 255, b: 255 }; // White for strike zone
     const gridColor = { r: 80, g: 80, b: 80 }; // Dim white for grid lines
 
-    // Show 4 beats ahead (like 3D view showing 4 beats in depth)
-    const beatsToShow = 4;
-    // Use the entire strip length by distributing LEDs evenly across beats
-    const ledsPerBeat = this.config.ledCount / beatsToShow; // Use floating point for more precise distribution
+    // Show enough beats to utilize the full strip effectively
+    // For 16-step patterns, show more beats ahead to fill the strip
+    const minBeatsToShow = 4; // Minimum like 3D view
+    const maxBeatsToShow = Math.min(this.totalSteps, 8); // Don't exceed pattern length or reasonable limit
+
+    // Calculate optimal beats to show based on strip length and pattern
+    // Aim for 8-15 LEDs per beat for good visual resolution
+    let beatsToShow = minBeatsToShow;
+    let ledsPerBeat = this.config.ledCount / beatsToShow;
+
+    // If we have too many LEDs per beat, show more beats
+    while (ledsPerBeat > 15 && beatsToShow < maxBeatsToShow) {
+      beatsToShow++;
+      ledsPerBeat = this.config.ledCount / beatsToShow;
+    }
 
     // Debug logging to verify full strip utilization
     if (isPlaying && currentStep === 0 && beatProgress < 0.1) {
-      console.log(`🔍 LED Strip Utilization: ${this.config.ledCount} LEDs, ${ledsPerBeat.toFixed(2)} per beat, showing ${beatsToShow} beats`);
+      console.log(`🔍 LED Strip Utilization: ${this.config.ledCount} LEDs, ${ledsPerBeat.toFixed(2)} per beat, showing ${beatsToShow}/${this.totalSteps} beats`);
     }
 
     // Apply the same easing function as the 3D visualization
