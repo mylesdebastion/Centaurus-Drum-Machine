@@ -38,7 +38,9 @@ export class SingleLaneVisualizer {
     isSolo: boolean = false,
     isMuted: boolean = false,
     beatProgress: number = 0,
-    smoothScrolling: boolean = false
+    smoothScrolling: boolean = false,
+    globalTimestamp?: number,
+    maxColorCount?: number
   ): Promise<boolean> {
     // Rate limiting
     const now = Date.now();
@@ -68,7 +70,9 @@ export class SingleLaneVisualizer {
         isSolo,
         beatProgress,
         smoothScrolling,
-        this.settings.visualizationMode
+        this.settings.visualizationMode,
+        globalTimestamp,
+        maxColorCount
       );
 
       const success = await this.sendToWLED(ledArray);
@@ -104,7 +108,9 @@ export class SingleLaneVisualizer {
     _isSolo: boolean, // Currently unused, reserved for future solo mode features
     beatProgress: number = 0,
     smoothScrolling: boolean = false,
-    mode: 'static' | 'moving' = 'static'
+    mode: 'static' | 'moving' = 'static',
+    globalTimestamp?: number,
+    maxColorCount?: number
   ): LEDColor[] {
     const ledArray: LEDColor[] = new Array(this.config.ledCount);
 
@@ -122,7 +128,9 @@ export class SingleLaneVisualizer {
         currentStep,
         isPlaying,
         beatProgress,
-        mode
+        mode,
+        globalTimestamp,
+        maxColorCount
       );
     }
 
@@ -464,7 +472,9 @@ export class SingleLaneVisualizer {
     currentStep: number,
     isPlaying: boolean,
     _beatProgress: number,
-    _mode: 'static' | 'moving' = 'static'
+    _mode: 'static' | 'moving' = 'static',
+    globalTimestamp?: number,
+    maxColorCount?: number
   ): LEDColor[] {
     // Use boomwhacker colors for each lane
     const ledBoomwhackerColors: LEDColor[] = [
@@ -522,7 +532,7 @@ export class SingleLaneVisualizer {
           }
         } else {
           // Multiple notes - create fading/cycling effect
-          finalColor = this.blendMultipleColors(activeLanes, ledBoomwhackerColors, isPlaying, timelineIndex, centerLedIndex);
+          finalColor = this.blendMultipleColors(activeLanes, ledBoomwhackerColors, isPlaying, timelineIndex, centerLedIndex, globalTimestamp);
         }
 
         // Place the note (3 pixels wide)
@@ -557,74 +567,95 @@ export class SingleLaneVisualizer {
 
   /**
    * Blend multiple colors with fading/cycling effect for simultaneous notes
+   * ORIGINAL VERSION - Beautiful transitions but not synchronized across different color counts
    */
   private blendMultipleColors(
     activeLanes: number[],
     colorPalette: LEDColor[],
     isPlaying: boolean,
     timelineIndex: number,
-    centerLedIndex: number
+    centerLedIndex: number,
+    globalTimestamp?: number
   ): LEDColor {
     const isTimelineNearNote = isPlaying && timelineIndex >= 0 && Math.abs(timelineIndex - centerLedIndex) <= 2;
 
-    // Create cycling effect based on time - even slower with much longer hold times
+    // Create cycling effect based on time
     const totalCycleTime = 2000; // 2 seconds total cycle time
-    const holdTime = 0.85; // Hold each color for 85% of the time (1.7s out of 2s)
-    const fadeTime = 0.15; // Fade for 15% of the time (0.3s out of 2s)
+    const holdTime = 0.85; // Hold each color for 85% of the time
+    const fadeTime = 0.15; // Fade for 15% of the time
 
-    const cycleTime = (Date.now() / totalCycleTime) % 1.0; // 0-1 cycle
+    // Use synchronized timestamp if provided, fallback to Date.now()
+    const currentTime = globalTimestamp !== undefined ? globalTimestamp : Date.now();
+    const cycleTime = (currentTime / totalCycleTime) % 1.0; // 0-1 cycle
+
+    // Calculate which color should be active based on the number of available colors
+    // Each color gets equal time: 1/colorCount of the total cycle
     const stepsPerColor = 1.0 / activeLanes.length;
-    const activeColorIndex = Math.floor(cycleTime / stepsPerColor) % activeLanes.length;
+    const currentColorIndex = Math.floor(cycleTime / stepsPerColor) % activeLanes.length;
 
     // Calculate blend factor with longer hold times
     const stepProgress = (cycleTime % stepsPerColor) / stepsPerColor; // 0-1 within current color step
     let blendFactor: number;
 
     if (stepProgress < holdTime) {
-      // Hold current color
+      // Hold current color - no blending
       blendFactor = 0;
     } else {
-      // Fade to next color
+      // Fade to next color - smooth transition
       blendFactor = (stepProgress - holdTime) / fadeTime;
       blendFactor = Math.min(blendFactor, 1.0); // Clamp to 1.0
     }
 
-    // Primary color (current in cycle)
-    const primaryLane = activeLanes[activeColorIndex];
+    // Get primary and secondary colors for blending
+    const primaryLane = activeLanes[currentColorIndex];
     const primaryColor = colorPalette[primaryLane % colorPalette.length];
 
-    // Secondary color (next in cycle) for smooth blending
-    const nextColorIndex = (activeColorIndex + 1) % activeLanes.length;
+    const nextColorIndex = (currentColorIndex + 1) % activeLanes.length;
     const secondaryLane = activeLanes[nextColorIndex];
     const secondaryColor = colorPalette[secondaryLane % colorPalette.length];
 
-    // Blend primary and secondary colors
-    const blendedColor: LEDColor = {
-      r: Math.round(primaryColor.r * (1 - blendFactor) + secondaryColor.r * blendFactor),
-      g: Math.round(primaryColor.g * (1 - blendFactor) + secondaryColor.g * blendFactor),
-      b: Math.round(primaryColor.b * (1 - blendFactor) + secondaryColor.b * blendFactor)
-    };
+    // Blend the colors smoothly
+    const r = Math.round(primaryColor.r * (1 - blendFactor) + secondaryColor.r * blendFactor);
+    const g = Math.round(primaryColor.g * (1 - blendFactor) + secondaryColor.g * blendFactor);
+    const b = Math.round(primaryColor.b * (1 - blendFactor) + secondaryColor.b * blendFactor);
 
-    // Apply brightness based on whether timeline is near
+    // Apply timeline highlighting effect
     if (isTimelineNearNote) {
-      return blendedColor; // Full brightness when triggered
-    } else {
+      // Brighten when timeline is near this note
+      const brightnessFactor = 1.3;
       return {
-        r: Math.round(blendedColor.r * 0.25),
-        g: Math.round(blendedColor.g * 0.25),
-        b: Math.round(blendedColor.b * 0.25)
-      }; // 25% brightness when queued
+        r: Math.min(255, Math.round(r * brightnessFactor)),
+        g: Math.min(255, Math.round(g * brightnessFactor)),
+        b: Math.min(255, Math.round(b * brightnessFactor))
+      };
     }
+
+    return { r, g, b };
+  }
+
+  /**
+   * Apply direction reversal to LED array if configured
+   */
+  private applyDirectionReversal(ledArray: LEDColor[]): LEDColor[] {
+    if (this.config.reverseDirection) {
+      // Reverse the array - start at beginning instead of end
+      return [...ledArray].reverse();
+    }
+    // Default behavior: start at end (no reversal)
+    return ledArray;
   }
 
   /**
    * Send LED data to WLED device using UDP WARLS protocol or HTTP JSON
    */
   private async sendToWLED(ledArray: LEDColor[]): Promise<boolean> {
+    // Apply direction reversal if configured
+    const finalLedArray = this.applyDirectionReversal(ledArray);
+
     if (this.settings.protocol === 'udp') {
-      return this.sendUDPData(ledArray);
+      return this.sendUDPData(finalLedArray);
     } else {
-      return this.sendHTTPData(ledArray);
+      return this.sendHTTPData(finalLedArray);
     }
   }
 
@@ -999,7 +1030,7 @@ export class SingleLaneVisualizer {
   /**
    * Get the current display color for the strip (for UI indicators)
    */
-  getCurrentDisplayColor(): string {
+  getCurrentDisplayColor(globalTimestamp?: number, maxColorCount?: number): string {
     // Hardcoded bright boomwhacker colors (same as in visualization)
     const ledBoomwhackerColors: LEDColor[] = [
       { r: 255, g: 0, b: 0 },     // C - Bright Red
@@ -1025,14 +1056,22 @@ export class SingleLaneVisualizer {
       const color = ledBoomwhackerColors[this.config.assignedLanes[0] % ledBoomwhackerColors.length];
       return `rgb(${color.r}, ${color.g}, ${color.b})`;
     } else {
-      // Multi-notes mode with multiple lanes - calculate cycling color
+      // Multi-notes mode with multiple lanes - calculate cycling color with normalized timing
       const totalCycleTime = 2000; // Same as in blendMultipleColors
       const holdTime = 0.85;
       const fadeTime = 0.15;
 
-      const cycleTime = (Date.now() / totalCycleTime) % 1.0;
-      const stepsPerColor = 1.0 / this.config.assignedLanes.length;
-      const activeColorIndex = Math.floor(cycleTime / stepsPerColor) % this.config.assignedLanes.length;
+      // Use synchronized timestamp if provided, fallback to Date.now() for backward compatibility
+      const currentTime = globalTimestamp !== undefined ? globalTimestamp : Date.now();
+      const cycleTime = (currentTime / totalCycleTime) % 1.0;
+
+      // CRITICAL FIX: Use normalized timing like in blendMultipleColors
+      const normalizedColorCount = maxColorCount && maxColorCount > this.config.assignedLanes.length ? maxColorCount : this.config.assignedLanes.length;
+      const stepsPerColor = 1.0 / normalizedColorCount; // Use max color count for timing
+      const globalColorPhase = Math.floor(cycleTime / stepsPerColor) % normalizedColorCount;
+
+      // Map global phase to local color index (hold last color when beyond available colors)
+      const activeColorIndex = Math.min(globalColorPhase, this.config.assignedLanes.length - 1);
 
       const stepProgress = (cycleTime % stepsPerColor) / stepsPerColor;
       let blendFactor: number;
@@ -1044,12 +1083,23 @@ export class SingleLaneVisualizer {
         blendFactor = Math.min(blendFactor, 1.0);
       }
 
-      // Get primary and secondary colors
+      // Get primary and secondary colors using normalized timing
       const primaryLane = this.config.assignedLanes[activeColorIndex];
       const primaryColor = ledBoomwhackerColors[primaryLane % ledBoomwhackerColors.length];
 
-      const nextColorIndex = (activeColorIndex + 1) % this.config.assignedLanes.length;
-      const secondaryLane = this.config.assignedLanes[nextColorIndex];
+      const nextGlobalPhase = (globalColorPhase + 1) % normalizedColorCount;
+
+      // For smooth transitions: if we're beyond our colors, the "next" should be the first color (cycling back)
+      let nextLocalIndex: number;
+      if (globalColorPhase >= this.config.assignedLanes.length - 1) {
+        // We're in hold phase - next transition should be back to first color
+        nextLocalIndex = 0;
+      } else {
+        // Normal progression through our available colors
+        nextLocalIndex = Math.min(nextGlobalPhase, this.config.assignedLanes.length - 1);
+      }
+
+      const secondaryLane = this.config.assignedLanes[nextLocalIndex];
       const secondaryColor = ledBoomwhackerColors[secondaryLane % ledBoomwhackerColors.length];
 
       // Blend colors

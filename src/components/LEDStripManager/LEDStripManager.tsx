@@ -24,7 +24,8 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
       status: 'disconnected',
       ledCount: 90,
       multiNotesMode: false,
-      assignedLanes: [0]
+      assignedLanes: [0],
+      reverseDirection: false // Default: start at end of strip (standard behavior)
     }
   ]);
   const [visualizers, setVisualizers] = useState<SingleLaneVisualizer[]>([]);
@@ -51,6 +52,8 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
   const [showSettings, setShowSettings] = useState(false);
   const [isTestingAll, setIsTestingAll] = useState(false);
   const [colorAnimationFrame, setColorAnimationFrame] = useState(0);
+  const [globalTimestamp, setGlobalTimestamp] = useState(Date.now());
+  const [maxColorCount, setMaxColorCount] = useState(1);
   const [bridgeStatus, setBridgeStatus] = useState<'disconnected' | 'connected' | 'connecting'>('disconnected');
 
   // Generate unique ID for new strips
@@ -69,7 +72,8 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
       status: 'disconnected',
       ledCount: 90, // Default LED count for new strips
       multiNotesMode: false,
-      assignedLanes: [0]
+      assignedLanes: [0],
+      reverseDirection: false // Default: start at end of strip (standard behavior)
     };
 
     setStripConfigs(prev => [...prev, newConfig]);
@@ -231,10 +235,19 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
   // Animate color indicators for multi-notes strips
   useEffect(() => {
     const interval = setInterval(() => {
+      const now = Date.now();
       setColorAnimationFrame(prev => prev + 1);
+      setGlobalTimestamp(now);
+
+      // Calculate max color count across all multi-notes strips for synchronized UI timing
+      const currentMaxColorCount = Math.max(1, ...stripConfigs
+        .filter(config => config.multiNotesMode && config.assignedLanes.length > 0)
+        .map(config => config.assignedLanes.length)
+      );
+      setMaxColorCount(currentMaxColorCount);
     }, 100); // Update every 100ms for smooth but relaxed color cycling animation
     return () => clearInterval(interval);
-  }, []);
+  }, [stripConfigs]);
 
   const getStatusIcon = (status: LEDStripConfig['status']) => {
     switch (status) {
@@ -247,9 +260,21 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
     }
   };
 
+  // Helper to find visualizer for a config
+  const findVisualizerForConfig = useCallback((config: LEDStripConfig) => {
+    return visualizers.find(v => v.getConfig().id === config.id);
+  }, [visualizers]);
+
   // Get the current display color for a strip configuration
   // Using colorAnimationFrame to trigger re-renders for color cycling
   const getCurrentStripColor = useCallback((config: LEDStripConfig) => {
+    // Try to use the visualizer's synchronized color calculation
+    const visualizer = findVisualizerForConfig(config);
+    if (visualizer) {
+      return visualizer.getCurrentDisplayColor(globalTimestamp, maxColorCount);
+    }
+
+    // Fallback to local calculation if visualizer not found
     if (!config.multiNotesMode || config.assignedLanes.length === 0) {
       // Single lane mode
       return boomwhackerColors[config.laneIndex];
@@ -302,7 +327,7 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
       // Convert back to hex
       return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
     }
-  }, [boomwhackerColors, colorAnimationFrame]);
+  }, [boomwhackerColors, colorAnimationFrame, findVisualizerForConfig, globalTimestamp, maxColorCount]);
 
   return (
     <div className="space-y-6 p-4 bg-gray-900 text-white rounded-lg">
@@ -613,6 +638,19 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
               className="bg-gray-700 text-white rounded px-2 py-1 w-20"
               title={`Number of LEDs in this strip (currently ${config.ledCount})`}
             />
+
+            {/* Direction Toggle */}
+            <button
+              onClick={() => updateStripConfig(config.id, 'reverseDirection', !config.reverseDirection)}
+              className={`px-2 py-1 rounded text-xs transition-colors ${
+                config.reverseDirection
+                  ? 'bg-green-600 hover:bg-green-500'
+                  : 'bg-gray-600 hover:bg-gray-500'
+              }`}
+              title={`LED Direction: ${config.reverseDirection ? 'Start at beginning' : 'Start at end (default)'}`}
+            >
+              {config.reverseDirection ? '↑' : '↓'}
+            </button>
 
             {/* Controls */}
             <div className="flex items-center gap-2">

@@ -17,6 +17,7 @@ export interface LEDStripConfig {
   ledCount: number;        // Number of LEDs in this specific strip
   multiNotesMode: boolean; // Enable multi-color visualization for multiple lanes
   assignedLanes: number[]; // Array of lane indices when in multi-notes mode
+  reverseDirection: boolean; // Reverse LED strip direction (default false = start at end)
 }
 
 export interface WLEDMessage {
