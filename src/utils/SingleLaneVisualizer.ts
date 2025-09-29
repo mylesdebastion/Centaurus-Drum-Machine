@@ -34,7 +34,8 @@ export class SingleLaneVisualizer {
     isPlaying: boolean,
     laneColor: string,
     isSolo: boolean = false,
-    isMuted: boolean = false
+    isMuted: boolean = false,
+    beatProgress: number = 0
   ): Promise<boolean> {
     // Rate limiting
     const now = Date.now();
@@ -61,7 +62,8 @@ export class SingleLaneVisualizer {
         currentStep,
         isPlaying,
         laneColor,
-        isSolo
+        isSolo,
+        beatProgress
       );
 
       const success = await this.sendToWLED(ledArray);
@@ -93,7 +95,8 @@ export class SingleLaneVisualizer {
     currentStep: number,
     isPlaying: boolean,
     laneColor: string,
-    _isSolo: boolean // Currently unused, reserved for future solo mode features
+    _isSolo: boolean, // Currently unused, reserved for future solo mode features
+    beatProgress: number = 0
   ): LEDColor[] {
     const ledArray: LEDColor[] = new Array(this.config.ledCount);
 
@@ -110,10 +113,21 @@ export class SingleLaneVisualizer {
     const beatsToShow = 4;
     const ledsPerBeat = Math.floor(this.config.ledCount / beatsToShow);
 
-    // Draw grid dividers (every beat boundary)
+    // Apply the same easing function as the 3D visualization
+    const easedProgress = beatProgress < 0.5
+      ? 2 * beatProgress * beatProgress
+      : -1 + (4 - 2 * beatProgress) * beatProgress;
+
+    // Draw moving grid dividers (smoothly animated)
     for (let beat = 1; beat < beatsToShow; beat++) {
-      const gridPosition = beat * ledsPerBeat;
-      if (gridPosition < this.config.ledCount) {
+      // Base position for this grid line
+      const baseBeatPosition = beat * ledsPerBeat;
+
+      // Calculate smooth movement - grid lines move toward strike zone
+      const progressOffset = easedProgress * ledsPerBeat;
+      const gridPosition = Math.round(baseBeatPosition - progressOffset);
+
+      if (gridPosition >= 0 && gridPosition < this.config.ledCount) {
         ledArray[gridPosition] = { ...gridColor };
       }
     }
@@ -123,29 +137,30 @@ export class SingleLaneVisualizer {
       ledArray[0] = { ...strikeZoneColor };
     }
 
-    // Draw notes moving toward strike zone
+    // Draw notes moving toward strike zone with smooth animation
     for (let beatOffset = 0; beatOffset < beatsToShow; beatOffset++) {
       const futureStep = (currentStep + beatOffset) % this.totalSteps;
 
       if (pattern[futureStep]) {
-        // Calculate position for this note
-        // beatOffset 0 = at strike zone (LED 0)
-        // beatOffset 1 = 1 beat away (around LED position 1 * ledsPerBeat)
-        // etc.
+        // Calculate smooth position for this note
+        const baseBeatPosition = beatOffset * ledsPerBeat;
+        const progressOffset = easedProgress * ledsPerBeat;
+        const notePosition = Math.round(baseBeatPosition - progressOffset);
 
-        const beatStartLED = beatOffset * ledsPerBeat;
         const notePixels = Math.max(1, Math.floor(ledsPerBeat / 8)); // Each note takes 1/8 of a beat space
 
         // Place note pixels
-        for (let pixel = 0; pixel < notePixels && (beatStartLED + pixel) < this.config.ledCount; pixel++) {
-          const ledIndex = beatStartLED + pixel;
+        for (let pixel = 0; pixel < notePixels; pixel++) {
+          const ledIndex = notePosition + pixel;
 
-          if (beatOffset === 0 && isPlaying) {
-            // Active note being triggered - bright white flash
-            ledArray[ledIndex] = { ...strikeZoneColor };
-          } else {
-            // Future note - show in lane color
-            ledArray[ledIndex] = { ...noteColor };
+          if (ledIndex >= 0 && ledIndex < this.config.ledCount) {
+            if (beatOffset === 0 && isPlaying && beatProgress > 0.8) {
+              // Active note being triggered - bright white flash near end of beat
+              ledArray[ledIndex] = { ...strikeZoneColor };
+            } else {
+              // Future note - show in lane color
+              ledArray[ledIndex] = { ...noteColor };
+            }
           }
         }
       }
@@ -550,24 +565,24 @@ export class SingleLaneVisualizer {
   }
 
   /**
-   * Apply brightness multiplier to color
+   * Apply brightness multiplier to color (preserved for future use)
    */
-  private applyBrightness(color: LEDColor, brightness: number): LEDColor {
-    return {
-      r: Math.min(255, Math.round(color.r * brightness)),
-      g: Math.min(255, Math.round(color.g * brightness)),
-      b: Math.min(255, Math.round(color.b * brightness))
-    };
-  }
+  // private applyBrightness(color: LEDColor, brightness: number): LEDColor {
+  //   return {
+  //     r: Math.min(255, Math.round(color.r * brightness)),
+  //     g: Math.min(255, Math.round(color.g * brightness)),
+  //     b: Math.min(255, Math.round(color.b * brightness))
+  //   };
+  // }
 
   /**
-   * Adjust existing color brightness
+   * Adjust existing color brightness (preserved for future use)
    */
-  private adjustBrightness(color: LEDColor, multiplier: number): LEDColor {
-    return {
-      r: Math.min(255, Math.round(color.r * multiplier)),
-      g: Math.min(255, Math.round(color.g * multiplier)),
-      b: Math.min(255, Math.round(color.b * multiplier))
-    };
-  }
+  // private adjustBrightness(color: LEDColor, multiplier: number): LEDColor {
+  //   return {
+  //     r: Math.min(255, Math.round(color.r * multiplier)),
+  //     g: Math.min(255, Math.round(color.g * multiplier)),
+  //     b: Math.min(255, Math.round(color.b * multiplier))
+  //   };
+  // }
 }

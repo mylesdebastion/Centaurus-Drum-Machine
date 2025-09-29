@@ -973,6 +973,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     const updateLEDs = async () => {
       const activeLanes = getActiveLanes();
 
+      // Calculate beat progress for smooth animation (same as 3D visualization)
+      const beatDuration = (60 / bpm) * 1000;
+      const timeSinceLastBeat = performance.now() - lastBeatTime.current;
+      const beatProgress = Math.min(timeSinceLastBeat / beatDuration, 1);
+
       for (const visualizer of ledVisualizers) {
         const config = visualizer.getConfig();
 
@@ -991,7 +996,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
             isPlaying,
             laneColor,
             false, // TODO: implement solo logic if needed
-            false  // TODO: implement mute logic if needed
+            false, // TODO: implement mute logic if needed
+            beatProgress // Pass beat progress for smooth animation
           );
         } catch (error) {
           console.warn(`Failed to update LED strip for lane ${config.laneIndex}:`, error);
@@ -1000,7 +1006,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     };
 
     updateLEDs();
-  }, [ledEnabled, ledVisualizers, pattern, currentBeat, isPlaying, boomwhackerColors, showAllNotes, getActiveLanes]);
+  }, [ledEnabled, ledVisualizers, pattern, currentBeat, isPlaying, boomwhackerColors, showAllNotes, getActiveLanes, bpm]);
 
   // Handle LED visualizers change
   const handleLEDVisualizersChange = useCallback((newVisualizers: SingleLaneVisualizer[]) => {
