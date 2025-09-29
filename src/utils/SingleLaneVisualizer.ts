@@ -91,7 +91,7 @@ export class SingleLaneVisualizer {
     currentStep: number,
     isPlaying: boolean,
     laneColor: string,
-    isSolo: boolean
+    _isSolo: boolean // Currently unused, reserved for future solo mode features
   ): LEDColor[] {
     const ledArray: LEDColor[] = new Array(this.config.ledCount);
 

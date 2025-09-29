@@ -114,7 +114,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   const [pattern, setPattern] = useState<boolean[][]>(
     Array(12).fill(null).map(() => Array(16).fill(false))
   );
-  const [mousePos, setMousePos] = useState<{x: number, y: number} | null>(null);
+  // Mouse position tracking removed - not currently used
+  // const [mousePos, setMousePos] = useState<{x: number, y: number} | null>(null);
   const [hoveredNote, setHoveredNote] = useState<{lane: number, step: number} | null>(null);
 
   // LED visualization state
@@ -194,11 +195,12 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   };
 
   // Legacy majorScales for backward compatibility (now computed dynamically)
-  const majorScales = rootNotes.reduce((acc, root) => {
-    const rootPos = rootPositions[root as keyof typeof rootPositions];
-    acc[root] = scalePatterns.major.map(interval => (rootPos + interval) % 12);
-    return acc;
-  }, {} as Record<string, number[]>);
+  // Preserved for potential future use
+  // const majorScales = rootNotes.reduce((acc, root) => {
+  //   const rootPos = rootPositions[root as keyof typeof rootPositions];
+  //   acc[root] = scalePatterns.major.map(interval => (rootPos + interval) % 12);
+  //   return acc;
+  // }, {} as Record<string, number[]>);
 
   // Get active lanes based on current mode
   const getActiveLanes = () => {
@@ -1014,7 +1016,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    setMousePos({ x: mouseX, y: mouseY });
+    // Mouse position tracking disabled
+    // setMousePos({ x: mouseX, y: mouseY });
 
     const worldPos = getMouseWorldPosition(mouseX, mouseY, rect.width, rect.height);
     if (worldPos) {
@@ -1028,7 +1031,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   }, [getMouseWorldPosition]);
 
   const handleCanvasMouseLeave = useCallback(() => {
-    setMousePos(null);
+    // Mouse position tracking disabled
+    // setMousePos(null);
     setHoveredNote(null);
   }, []);
 
@@ -1306,7 +1310,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
               onChange={(e) => setSelectedScale(e.target.value)}
               className="bg-gray-700 text-white px-2 py-1 rounded text-sm min-w-[5rem]"
             >
-              {Object.entries(scalePatterns).map(([scale, pattern]) => (
+              {Object.entries(scalePatterns).map(([scale]) => (
                 <option key={scale} value={scale}>
                   {scale.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                 </option>
