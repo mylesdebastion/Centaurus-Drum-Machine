@@ -43,7 +43,8 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
     playheadColor: { r: 255, g: 255, b: 255 },
     beatMarkerColor: { r: 255, g: 255, b: 0 },
     protocol: 'udp', // Default to UDP WARLS with integrated bridge
-    udpPort: 21324 // Default WLED UDP port
+    udpPort: 21324, // Default WLED UDP port
+    visualizationMode: 'static' // Default to static step sequencer mode
   });
   const [showSettings, setShowSettings] = useState(false);
   const [isTestingAll, setIsTestingAll] = useState(false);

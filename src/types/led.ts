@@ -59,4 +59,5 @@ export interface LEDVisualizationSettings {
   beatMarkerColor: LEDColor; // Color for beat emphasis
   protocol: 'udp' | 'http'; // Communication protocol
   udpPort: number;          // UDP port for WARLS protocol
+  visualizationMode: 'static' | 'moving'; // LED visualization mode
 }

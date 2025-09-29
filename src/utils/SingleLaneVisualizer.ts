@@ -21,6 +21,7 @@ export class SingleLaneVisualizer {
       beatMarkerColor: { r: 255, g: 255, b: 0 },
       protocol: 'http', // Default to HTTP for browser compatibility
       udpPort: 21324, // Default WLED UDP port (matches Python code)
+      visualizationMode: 'static', // Static step sequencer mode as default
       ...settings
     };
   }
@@ -65,7 +66,8 @@ export class SingleLaneVisualizer {
         laneColor,
         isSolo,
         beatProgress,
-        smoothScrolling
+        smoothScrolling,
+        this.settings.visualizationMode
       );
 
       const success = await this.sendToWLED(ledArray);
@@ -88,9 +90,10 @@ export class SingleLaneVisualizer {
   }
 
   /**
-   * Generate LED color array for 3D camera-style visualization
-   * Bottom of strip = strike zone (current beat), top = future beats
-   * Mimics the 3D perspective where notes move toward the camera/strike zone
+   * Generate LED color array for visualization
+   * Supports both static step sequencer and moving visualization modes
+   * Static mode: Notes at fixed positions with moving timeline bar
+   * Moving mode: Notes move toward strike zone (original 3D camera-style)
    */
   private generateLEDArray(
     pattern: boolean[],
@@ -99,7 +102,8 @@ export class SingleLaneVisualizer {
     laneColor: string,
     _isSolo: boolean, // Currently unused, reserved for future solo mode features
     beatProgress: number = 0,
-    smoothScrolling: boolean = false
+    smoothScrolling: boolean = false,
+    mode: 'static' | 'moving' = 'static'
   ): LEDColor[] {
     const ledArray: LEDColor[] = new Array(this.config.ledCount);
 
@@ -108,6 +112,43 @@ export class SingleLaneVisualizer {
       ledArray[i] = { r: 0, g: 0, b: 0 };
     }
 
+    if (mode === 'moving') {
+      // Original moving visualization (Guitar Hero style)
+      return this.generateMovingVisualization(
+        ledArray,
+        pattern,
+        currentStep,
+        isPlaying,
+        laneColor,
+        beatProgress,
+        smoothScrolling
+      );
+    } else {
+      // Static step sequencer visualization
+      return this.generateStaticVisualization(
+        ledArray,
+        pattern,
+        currentStep,
+        isPlaying,
+        laneColor,
+        beatProgress
+      );
+    }
+  }
+
+  /**
+   * Generate moving visualization (original Guitar Hero style)
+   * Notes move toward strike zone with smooth animation
+   */
+  private generateMovingVisualization(
+    ledArray: LEDColor[],
+    pattern: boolean[],
+    currentStep: number,
+    isPlaying: boolean,
+    laneColor: string,
+    beatProgress: number,
+    smoothScrolling: boolean
+  ): LEDColor[] {
     const noteColor = this.hexToRgb(laneColor, this.settings.activeIntensity);
     const strikeZoneColor = { r: 255, g: 255, b: 255 }; // White for strike zone
     const gridColor = { r: 80, g: 80, b: 80 }; // Dim white for grid lines
@@ -290,6 +331,107 @@ export class SingleLaneVisualizer {
         }
       }
       console.log(`🎯 Highest LED used: ${highestUsedLED}/${this.config.ledCount - 1} (${((highestUsedLED + 1) / this.config.ledCount * 100).toFixed(1)}% of strip)`);
+    }
+
+    return ledArray;
+  }
+
+  /**
+   * Generate static step sequencer visualization
+   * Notes at fixed positions with moving timeline bar
+   */
+  private generateStaticVisualization(
+    ledArray: LEDColor[],
+    pattern: boolean[],
+    currentStep: number,
+    isPlaying: boolean,
+    _laneColor: string, // Unused in static mode, using hardcoded boomwhacker colors
+    _beatProgress: number // Unused in stepping mode, timeline steps discretely
+  ): LEDColor[] {
+    // Hardcoded bright boomwhacker colors for LED visualization
+    const ledBoomwhackerColors: LEDColor[] = [
+      { r: 255, g: 0, b: 0 },     // C - Bright Red
+      { r: 255, g: 100, b: 0 },   // C# - Red-Orange
+      { r: 255, g: 150, b: 0 },   // D - Orange
+      { r: 255, g: 200, b: 0 },   // D# - Yellow-Orange
+      { r: 255, g: 255, b: 0 },   // E - Bright Yellow
+      { r: 150, g: 255, b: 0 },   // F - Yellow-Green
+      { r: 0, g: 255, b: 0 },     // F# - Bright Green
+      { r: 0, g: 255, b: 100 },   // G - Green-Blue
+      { r: 0, g: 255, b: 200 },   // G# - Blue-Green
+      { r: 0, g: 150, b: 255 },   // A - Bright Blue
+      { r: 100, g: 0, b: 255 },   // A# - Blue-Purple
+      { r: 200, g: 0, b: 255 }    // B - Purple
+    ];
+
+    // Calculate step divisions: stepSize = ledCount / 8 for 8 main steps
+    // Support 16th note resolution by mapping 16-step pattern to strip
+    const stepSize = this.config.ledCount / 16; // 16th note resolution
+
+    // Calculate timeline position - steps through beats instead of smooth scroll
+    let timelineIndex = -1;
+    if (isPlaying) {
+      // Timeline steps to the current beat position, not smoothly
+      timelineIndex = Math.round((currentStep / this.totalSteps) * (this.config.ledCount - 1));
+    }
+
+    // Place notes at fixed LED positions based on step timing
+    for (let stepIndex = 0; stepIndex < this.totalSteps; stepIndex++) {
+      if (pattern[stepIndex]) {
+        // Calculate LED position: ledIndex = Math.round(stepIndex * ledCount / 16)
+        const centerLedIndex = Math.round(stepIndex * stepSize);
+
+        if (centerLedIndex >= 1 && centerLedIndex < this.config.ledCount - 1) {
+          // Check if timeline is hitting this note (within 2 pixels)
+          const isTimelineNearNote = isPlaying && timelineIndex >= 0 &&
+            Math.abs(timelineIndex - centerLedIndex) <= 2;
+
+          // Get the lane-specific boomwhacker color
+          const laneColor = ledBoomwhackerColors[this.config.laneIndex % ledBoomwhackerColors.length];
+
+          let noteColorToUse: LEDColor;
+
+          if (isTimelineNearNote) {
+            // Timeline is hitting this note - full brightness lane color
+            noteColorToUse = laneColor;
+          } else {
+            // Queued note - dimmed lane color (25% brightness)
+            noteColorToUse = {
+              r: Math.round(laneColor.r * 0.25),
+              g: Math.round(laneColor.g * 0.25),
+              b: Math.round(laneColor.b * 0.25)
+            };
+          }
+
+          // Make notes 3 pixels long (center pixel + neighbors)
+          for (let offset = -1; offset <= 1; offset++) {
+            const ledIndex = centerLedIndex + offset;
+            if (ledIndex >= 0 && ledIndex < this.config.ledCount) {
+              ledArray[ledIndex] = noteColorToUse;
+            }
+          }
+        }
+      }
+    }
+
+    // Add dim white dividers between steps (24,24,24)
+    for (let stepIndex = 1; stepIndex < this.totalSteps; stepIndex++) {
+      // Calculate divider position between steps
+      const dividerLedIndex = Math.round((stepIndex / this.totalSteps) * this.config.ledCount);
+
+      if (dividerLedIndex >= 0 && dividerLedIndex < this.config.ledCount) {
+        // Only place divider if there's no note at this position
+        const hasNote = ledArray[dividerLedIndex].r > 0 || ledArray[dividerLedIndex].g > 0 || ledArray[dividerLedIndex].b > 0;
+        if (!hasNote) {
+          ledArray[dividerLedIndex] = { r: 24, g: 24, b: 24 }; // Very dim white divider
+        }
+      }
+    }
+
+    // Create moving timeline/strike bar (always on top)
+    if (isPlaying && timelineIndex >= 0 && timelineIndex < this.config.ledCount) {
+      // Single white pixel (1 pixel long) for timeline - always overrides notes and dividers
+      ledArray[timelineIndex] = { r: 255, g: 255, b: 255 };
     }
 
     return ledArray;
