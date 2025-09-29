@@ -39,8 +39,7 @@ export class SingleLaneVisualizer {
     isMuted: boolean = false,
     beatProgress: number = 0,
     smoothScrolling: boolean = false,
-    globalTimestamp?: number,
-    maxColorCount?: number
+    globalTimestamp?: number
   ): Promise<boolean> {
     // Rate limiting
     const now = Date.now();
@@ -71,8 +70,7 @@ export class SingleLaneVisualizer {
         beatProgress,
         smoothScrolling,
         this.settings.visualizationMode,
-        globalTimestamp,
-        maxColorCount
+        globalTimestamp
       );
 
       const success = await this.sendToWLED(ledArray);
@@ -109,8 +107,7 @@ export class SingleLaneVisualizer {
     beatProgress: number = 0,
     smoothScrolling: boolean = false,
     mode: 'static' | 'moving' = 'static',
-    globalTimestamp?: number,
-    maxColorCount?: number
+    globalTimestamp?: number
   ): LEDColor[] {
     const ledArray: LEDColor[] = new Array(this.config.ledCount);
 
@@ -129,8 +126,7 @@ export class SingleLaneVisualizer {
         isPlaying,
         beatProgress,
         mode,
-        globalTimestamp,
-        maxColorCount
+        globalTimestamp
       );
     }
 
@@ -389,10 +385,6 @@ export class SingleLaneVisualizer {
       { r: 200, g: 0, b: 255 }    // B - Purple
     ];
 
-    // Calculate step divisions: stepSize = ledCount / 8 for 8 main steps
-    // Support 16th note resolution by mapping 16-step pattern to strip
-    const stepSize = this.config.ledCount / 16; // 16th note resolution
-
     // Calculate timeline position - steps through beats instead of smooth scroll
     let timelineIndex = -1;
     if (isPlaying) {
@@ -400,11 +392,12 @@ export class SingleLaneVisualizer {
       timelineIndex = Math.round((currentStep / this.totalSteps) * (this.config.ledCount - 1));
     }
 
-    // Place notes at fixed LED positions based on step timing
+    // Place notes at fixed LED positions based on step timing using consistent grid
     for (let stepIndex = 0; stepIndex < this.totalSteps; stepIndex++) {
       if (pattern[stepIndex]) {
-        // Calculate LED position: ledIndex = Math.round(stepIndex * ledCount / 16)
-        const centerLedIndex = Math.round(stepIndex * stepSize);
+        // Calculate LED position using same grid formula as timeline and dividers
+        // This ensures perfect alignment and pushes rounding errors to the end
+        const centerLedIndex = Math.round((stepIndex / this.totalSteps) * (this.config.ledCount - 1));
 
         if (centerLedIndex >= 1 && centerLedIndex < this.config.ledCount - 1) {
           // Check if timeline is hitting this note (within 2 pixels)
@@ -439,10 +432,11 @@ export class SingleLaneVisualizer {
       }
     }
 
-    // Add dim white dividers between steps (24,24,24)
+    // Add dim white dividers between steps with precise grid alignment
+    // Use consistent grid calculation to avoid rounding errors with timeline
     for (let stepIndex = 1; stepIndex < this.totalSteps; stepIndex++) {
-      // Calculate divider position between steps
-      const dividerLedIndex = Math.round((stepIndex / this.totalSteps) * this.config.ledCount);
+      // Calculate divider position using same formula as timeline for consistency
+      const dividerLedIndex = Math.round((stepIndex / this.totalSteps) * (this.config.ledCount - 1));
 
       if (dividerLedIndex >= 0 && dividerLedIndex < this.config.ledCount) {
         // Only place divider if there's no note at this position
@@ -473,8 +467,7 @@ export class SingleLaneVisualizer {
     isPlaying: boolean,
     _beatProgress: number,
     _mode: 'static' | 'moving' = 'static',
-    globalTimestamp?: number,
-    maxColorCount?: number
+    globalTimestamp?: number
   ): LEDColor[] {
     // Use boomwhacker colors for each lane
     const ledBoomwhackerColors: LEDColor[] = [
@@ -492,17 +485,16 @@ export class SingleLaneVisualizer {
       { r: 200, g: 0, b: 255 }    // B - Purple
     ];
 
-    const stepSize = this.config.ledCount / 16; // 16th note resolution
-
     // Timeline position
     let timelineIndex = -1;
     if (isPlaying) {
       timelineIndex = Math.round((currentStep / this.totalSteps) * (this.config.ledCount - 1));
     }
 
-    // Process each step position
+    // Process each step position using consistent grid
     for (let stepIndex = 0; stepIndex < this.totalSteps; stepIndex++) {
-      const centerLedIndex = Math.round(stepIndex * stepSize);
+      // Calculate LED position using same grid formula as timeline and dividers
+      const centerLedIndex = Math.round((stepIndex / this.totalSteps) * (this.config.ledCount - 1));
 
       // Collect all active lanes for this step
       const activeLanes: number[] = [];
@@ -545,9 +537,10 @@ export class SingleLaneVisualizer {
       }
     }
 
-    // Add dim white dividers between steps
+    // Add dim white dividers between steps with precise grid alignment
+    // Use consistent grid calculation to avoid rounding errors with timeline
     for (let stepIndex = 1; stepIndex < this.totalSteps; stepIndex++) {
-      const dividerLedIndex = Math.round((stepIndex / this.totalSteps) * this.config.ledCount);
+      const dividerLedIndex = Math.round((stepIndex / this.totalSteps) * (this.config.ledCount - 1));
 
       if (dividerLedIndex >= 0 && dividerLedIndex < this.config.ledCount) {
         const hasNote = ledArray[dividerLedIndex].r > 0 || ledArray[dividerLedIndex].g > 0 || ledArray[dividerLedIndex].b > 0;
@@ -1030,7 +1023,7 @@ export class SingleLaneVisualizer {
   /**
    * Get the current display color for the strip (for UI indicators)
    */
-  getCurrentDisplayColor(globalTimestamp?: number, maxColorCount?: number): string {
+  getCurrentDisplayColor(globalTimestamp?: number): string {
     // Hardcoded bright boomwhacker colors (same as in visualization)
     const ledBoomwhackerColors: LEDColor[] = [
       { r: 255, g: 0, b: 0 },     // C - Bright Red
@@ -1065,13 +1058,9 @@ export class SingleLaneVisualizer {
       const currentTime = globalTimestamp !== undefined ? globalTimestamp : Date.now();
       const cycleTime = (currentTime / totalCycleTime) % 1.0;
 
-      // CRITICAL FIX: Use normalized timing like in blendMultipleColors
-      const normalizedColorCount = maxColorCount && maxColorCount > this.config.assignedLanes.length ? maxColorCount : this.config.assignedLanes.length;
-      const stepsPerColor = 1.0 / normalizedColorCount; // Use max color count for timing
-      const globalColorPhase = Math.floor(cycleTime / stepsPerColor) % normalizedColorCount;
-
-      // Map global phase to local color index (hold last color when beyond available colors)
-      const activeColorIndex = Math.min(globalColorPhase, this.config.assignedLanes.length - 1);
+      // Original beautiful color cycling - each strip cycles based on its own color count
+      const stepsPerColor = 1.0 / this.config.assignedLanes.length;
+      const currentColorIndex = Math.floor(cycleTime / stepsPerColor) % this.config.assignedLanes.length;
 
       const stepProgress = (cycleTime % stepsPerColor) / stepsPerColor;
       let blendFactor: number;
@@ -1083,23 +1072,12 @@ export class SingleLaneVisualizer {
         blendFactor = Math.min(blendFactor, 1.0);
       }
 
-      // Get primary and secondary colors using normalized timing
-      const primaryLane = this.config.assignedLanes[activeColorIndex];
+      // Get primary and secondary colors for smooth blending
+      const primaryLane = this.config.assignedLanes[currentColorIndex];
       const primaryColor = ledBoomwhackerColors[primaryLane % ledBoomwhackerColors.length];
 
-      const nextGlobalPhase = (globalColorPhase + 1) % normalizedColorCount;
-
-      // For smooth transitions: if we're beyond our colors, the "next" should be the first color (cycling back)
-      let nextLocalIndex: number;
-      if (globalColorPhase >= this.config.assignedLanes.length - 1) {
-        // We're in hold phase - next transition should be back to first color
-        nextLocalIndex = 0;
-      } else {
-        // Normal progression through our available colors
-        nextLocalIndex = Math.min(nextGlobalPhase, this.config.assignedLanes.length - 1);
-      }
-
-      const secondaryLane = this.config.assignedLanes[nextLocalIndex];
+      const nextColorIndex = (currentColorIndex + 1) % this.config.assignedLanes.length;
+      const secondaryLane = this.config.assignedLanes[nextColorIndex];
       const secondaryColor = ledBoomwhackerColors[secondaryLane % ledBoomwhackerColors.length];
 
       // Blend colors

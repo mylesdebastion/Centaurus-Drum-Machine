@@ -271,7 +271,7 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
     // Try to use the visualizer's synchronized color calculation
     const visualizer = findVisualizerForConfig(config);
     if (visualizer) {
-      return visualizer.getCurrentDisplayColor(globalTimestamp, maxColorCount);
+      return visualizer.getCurrentDisplayColor(globalTimestamp);
     }
 
     // Fallback to local calculation if visualizer not found

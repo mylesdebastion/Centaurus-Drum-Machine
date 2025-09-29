@@ -936,15 +936,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     // Create synchronized timestamp for all LED strips to ensure multi-notes strips show same colors
     const globalTimestamp = Date.now();
 
-    // Calculate maximum color count across all multi-notes strips for synchronized timing
-    const maxColorCount = Math.max(1, ...ledVisualizers
-      .map(visualizer => {
-        const config = visualizer.getConfig();
-        return config.multiNotesMode && config.assignedLanes.length > 0
-          ? config.assignedLanes.length
-          : 1;
-      })
-    );
+    // Note: Removed maxColorCount calculation since we restored original color blending
 
     for (const visualizer of ledVisualizers) {
       const config = visualizer.getConfig();
@@ -973,8 +965,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           false, // TODO: implement mute logic if needed
           beatProgress, // Pass beat progress for smooth animation
           smoothScrolling, // Pass animation mode to LED visualizer
-          globalTimestamp, // Pass synchronized timestamp for multi-notes color coordination
-          maxColorCount // Pass max color count for normalized timing across all strips
+          globalTimestamp // Pass synchronized timestamp for multi-notes color coordination
         );
       } catch (error) {
         console.warn(`Failed to update LED strip for lane ${config.laneIndex}:`, error);
