@@ -186,12 +186,14 @@ export class APC40Controller {
     const row = Math.floor(note / 8);    // 0-4 (top to bottom on hardware)
     const column = note % 8;             // 0-7 (left to right on hardware)
 
-    // Map to IsometricSequencer coordinates:
-    // - lane: row index (0-4) maps to chromatic lanes
-    // - step: column index (0-7) maps to first 8 steps of 16-step pattern
+    // Map to IsometricSequencer coordinates with FLIPPED MAPPING:
+    // - Hardware row 0 (top) → lane 4 (rightmost/highest frequency in 3D)
+    // - Hardware row 4 (bottom) → lane 0 (leftmost/lowest frequency in 3D, RED)
+    // - This ensures red (lowest freq) is on bottom APC40 row, matching 3D viz leftmost lane
+    const flippedLane = 4 - row; // Flip the row mapping
 
     return {
-      lane: row,
+      lane: flippedLane,
       step: column,
       velocity
     };
@@ -205,7 +207,9 @@ export class APC40Controller {
       return null;
     }
 
-    return lane * 8 + step;
+    // Apply the same flipped mapping: lane 0 (red, leftmost in 3D) → row 4 (bottom on APC40)
+    const flippedRow = 4 - lane;
+    return flippedRow * 8 + step;
   }
 
   /**
@@ -265,13 +269,14 @@ export class APC40Controller {
   ): number {
     switch (mode) {
       case 'spectrum':
-        // Frequency-based spectrum: 0=high freq (violet), 4=low freq (red)
+        // Frequency-based spectrum: 0=low freq (red), 4=high freq (violet)
+        // This matches 3D viz where leftmost lane (0) is red, rightmost lane (4) is violet
         const spectrumColors = [
-          this.LED_COLORS.RAINBOW.VIOLET,   // Lane 0: highest frequency
-          this.LED_COLORS.RAINBOW.BLUE,     // Lane 1
+          this.LED_COLORS.RAINBOW.RED,      // Lane 0: lowest frequency (red, bottom APC40 row)
+          this.LED_COLORS.RAINBOW.ORANGE,   // Lane 1
           this.LED_COLORS.RAINBOW.GREEN,    // Lane 2: mid frequency
-          this.LED_COLORS.RAINBOW.ORANGE,   // Lane 3
-          this.LED_COLORS.RAINBOW.RED,      // Lane 4: lowest frequency
+          this.LED_COLORS.RAINBOW.BLUE,     // Lane 3
+          this.LED_COLORS.RAINBOW.VIOLET,   // Lane 4: highest frequency (violet, top APC40 row)
         ];
         return spectrumColors[lane] || this.LED_COLORS.GREEN;
 
