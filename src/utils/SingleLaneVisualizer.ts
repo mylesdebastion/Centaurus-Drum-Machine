@@ -153,36 +153,39 @@ export class SingleLaneVisualizer {
     }
 
     // Animated strike bar that moves with beat timing (matching 3D visualization)
-    // This creates a moving indicator that sweeps across the strip like the 3D strike zone
+    // Like the 3D strike zone, it resets to the front of each beat and slides back toward position 0
     if (isPlaying) {
-      // Calculate strike bar position using same timing as 3D visualization
-      // The bar moves smoothly across each beat section
       const strikeBarColor = { r: 255, g: 0, b: 128 }; // Same pink/magenta as 3D (#FF0080)
 
-      // Position the strike bar within the current beat section
-      const beatWithinSection = currentStep % 4; // Position within that quarter (0-3)
-
-      // Calculate smooth position within the current beat section
+      // Calculate strike bar position using exact same logic as grid lines
+      // Start at the beginning of each beat section and slide toward strike zone (position 0)
       const sectionSize = Math.floor(this.config.ledCount / beatsToShow);
-      const baseBeatPosition = beatWithinSection * (sectionSize / 4);
-      const progressWithinBeat = easedProgress * (sectionSize / 4);
-      const strikeBarPosition = Math.round(baseBeatPosition + progressWithinBeat);
 
-      // Draw strike bar with center point and glow effect (3-5 LEDs wide)
-      const barWidth = Math.max(3, Math.floor(sectionSize / 16)); // Proportional to strip size
-      const barStart = Math.max(0, strikeBarPosition - Math.floor(barWidth / 2));
-      const barEnd = Math.min(this.config.ledCount - 1, strikeBarPosition + Math.floor(barWidth / 2));
+      // Strike bar starts at the front of the current beat section
+      const currentBeatStart = sectionSize; // Always start one beat section ahead
 
-      for (let i = barStart; i <= barEnd; i++) {
-        // Center of bar is brightest, edges are dimmer for glow effect
-        const distanceFromCenter = Math.abs(i - strikeBarPosition);
-        const intensity = Math.max(0.3, 1.0 - (distanceFromCenter / Math.floor(barWidth / 2) * 0.7));
+      // Move toward strike zone with same eased progress as grid lines
+      const progressOffset = easedProgress * sectionSize;
+      const strikeBarPosition = Math.round(currentBeatStart - progressOffset);
 
-        ledArray[i] = {
-          r: Math.round(strikeBarColor.r * intensity),
-          g: Math.round(strikeBarColor.g * intensity),
-          b: Math.round(strikeBarColor.b * intensity)
-        };
+      // Only draw if within valid range
+      if (strikeBarPosition >= 0 && strikeBarPosition < this.config.ledCount) {
+        // Draw strike bar with center point and glow effect (3-5 LEDs wide)
+        const barWidth = Math.max(3, Math.floor(sectionSize / 16)); // Proportional to strip size
+        const barStart = Math.max(0, strikeBarPosition - Math.floor(barWidth / 2));
+        const barEnd = Math.min(this.config.ledCount - 1, strikeBarPosition + Math.floor(barWidth / 2));
+
+        for (let i = barStart; i <= barEnd; i++) {
+          // Center of bar is brightest, edges are dimmer for glow effect
+          const distanceFromCenter = Math.abs(i - strikeBarPosition);
+          const intensity = Math.max(0.3, 1.0 - (distanceFromCenter / Math.floor(barWidth / 2) * 0.7));
+
+          ledArray[i] = {
+            r: Math.round(strikeBarColor.r * intensity),
+            g: Math.round(strikeBarColor.g * intensity),
+            b: Math.round(strikeBarColor.b * intensity)
+          };
+        }
       }
     }
 
