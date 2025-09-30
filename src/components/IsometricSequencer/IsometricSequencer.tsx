@@ -112,6 +112,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   const [selectedRoot, setSelectedRoot] = useState('C'); // Root note (C, D, E, etc.)
   const [selectedScale, setSelectedScale] = useState('major'); // Scale type (major, minor, etc.)
   const [showAllNotes, setShowAllNotes] = useState(false); // Toggle between scale and chromatic
+  const [useHarmonicColors, setUseHarmonicColors] = useState(false); // Toggle Circle of Fifths harmonic color arrangement
   const [pattern, setPattern] = useState<boolean[][]>(
     Array(12).fill(null).map(() => Array(16).fill(false))
   );
@@ -174,6 +175,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
 
   // Root note positions (0 = C, 1 = C#, 2 = D, etc.)
   const rootNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+  // Circle of Fifths root note sequence (C-G-D-A-E-B-F#-C#-G#-D#-A#-F)
+  // const circleOfFifthsRoots = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'G#', 'D#', 'A#', 'F']; // Unused - kept for reference
   const rootPositions = {
     'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
     'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11
@@ -192,7 +196,68 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     'melodic_minor': [0, 2, 3, 5, 7, 9, 11],  // Melodic minor
     'pentatonic_major': [0, 2, 4, 7, 9],      // Major pentatonic
     'pentatonic_minor': [0, 3, 5, 7, 10],     // Minor pentatonic
-    'blues': [0, 3, 5, 6, 7, 10]              // Blues scale
+    'blues': [0, 3, 5, 6, 7, 10],             // Blues scale
+    'circle_of_fifths': [0, 7, 2, 9, 4, 11]   // Circle of Fifths pattern (C-G-D-A-E-B)
+  };
+
+  // Function to generate harmonic color mapping based on Circle of Fifths
+  const getHarmonicColorMapping = () => {
+    const rootPos = rootPositions[selectedRoot as keyof typeof rootPositions];
+
+    // Circle of Fifths starting from current root (perfect fifth intervals)
+    const circleOrder = [];
+    let currentNote = rootPos;
+
+    for (let i = 0; i < 12; i++) {
+      circleOrder.push(currentNote);
+      currentNote = (currentNote + 7) % 12; // Move up by perfect fifth (7 semitones)
+    }
+
+    return circleOrder;
+  };
+
+  // Function to get effective lane order (either chromatic or Circle of Fifths)
+  const getEffectiveLaneOrder = () => {
+    if (!useHarmonicColors) {
+      // Standard chromatic order: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 (C, C#, D, D#, E, F, F#, G, G#, A, A#, B)
+      return Array.from({ length: 12 }, (_, i) => i);
+    }
+
+    // Circle of Fifths order starting from current root
+    return getHarmonicColorMapping();
+  };
+
+  // Function to get effective colors (using Circle of Fifths progression colors)
+  const getEffectiveColors = () => {
+    if (!useHarmonicColors) {
+      return boomwhackerColors;
+    }
+
+    // Create harmonic color array where each lane position gets progressive colors
+    const harmonicColors = new Array(12);
+
+    // Use smooth color transitions for Circle of Fifths progression
+    const progressiveHues = [
+      '#ff4444', // 1st in progression - Strong Red
+      '#ff8844', // 2nd in progression - Warm Orange
+      '#ffaa44', // 3rd in progression - Orange
+      '#ffcc44', // 4th in progression - Yellow-Orange
+      '#ffff44', // 5th in progression - Yellow
+      '#aaff44', // 6th in progression - Yellow-Green
+      '#66ff44', // 7th in progression - Green
+      '#44ff44', // 8th in progression - Bright Green
+      '#44ffaa', // 9th in progression - Blue-Green
+      '#44aaff', // 10th in progression - Blue
+      '#4466ff', // 11th in progression - Blue-Purple
+      '#6644ff'  // 12th in progression - Purple
+    ];
+
+    // Assign colors to physical lane positions
+    for (let i = 0; i < 12; i++) {
+      harmonicColors[i] = progressiveHues[i];
+    }
+
+    return harmonicColors;
   };
 
   // Function to get current scale notes
@@ -213,9 +278,21 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   // Get active lanes based on current mode
   const getActiveLanes = () => {
     if (showAllNotes) {
-      return Array.from({ length: 12 }, (_, i) => i);
+      // All 12 chromatic notes - use effective lane order for Circle of Fifths
+      return getEffectiveLaneOrder();
     }
-    return getCurrentScale();
+
+    // Scale mode - need to get scale notes in effective order
+    const scaleNotes = getCurrentScale();
+
+    if (!useHarmonicColors) {
+      // Normal chromatic order
+      return scaleNotes;
+    }
+
+    // Circle of Fifths mode: filter the Circle of Fifths order to only include scale notes
+    const circleOrder = getEffectiveLaneOrder();
+    return circleOrder.filter(chromaticLane => scaleNotes.includes(chromaticLane));
   };
 
   const activeLanes = getActiveLanes();
@@ -476,10 +553,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
         ctx.save();
 
         // Apply dimming to the color
-        const color = boomwhackerColors[chromaticLane];
+        const effectiveColors = getEffectiveColors();
+        const color = effectiveColors[chromaticLane];
         const rgb = color.match(/\w\w/g);
         if (rgb) {
-          const [r, g, b] = rgb.map(x => parseInt(x, 16));
+          const [r, g, b] = rgb.map((x: string) => parseInt(x, 16));
           ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${labelOpacity})`;
         } else {
           ctx.fillStyle = color;
@@ -492,10 +570,10 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
         // Add glow effect, dimmed for out-of-key notes
         const shadowOpacity = isInKey ? 1.0 : 0.3;
         if (rgb) {
-          const [r, g, b] = rgb.map(x => parseInt(x, 16));
+          const [r, g, b] = rgb.map((x: string) => parseInt(x, 16));
           ctx.shadowColor = `rgba(${r}, ${g}, ${b}, ${shadowOpacity})`;
         } else {
-          ctx.shadowColor = boomwhackerColors[chromaticLane];
+          ctx.shadowColor = effectiveColors[chromaticLane];
         }
         ctx.shadowBlur = 20;
 
@@ -515,7 +593,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
         ctx.restore();
       }
     }
-  }, [effectiveLanes, activeLanes, worldLaneWidth, noteNames, boomwhackerColors, currentBeat, bpm, steps, worldStepDepth, selectedRoot, selectedScale, getCurrentScale]);
+  }, [effectiveLanes, activeLanes, worldLaneWidth, noteNames, getEffectiveColors(), currentBeat, bpm, steps, worldStepDepth, selectedRoot, selectedScale, getCurrentScale, useHarmonicColors]);
 
   // Setup camera for 3D view
   const setupCamera = useCallback(() => {
@@ -577,10 +655,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       // When showing all notes, draw all 12 lane lines with dimming for out-of-key notes
       const currentScale = getCurrentScale();
 
-      for (let laneIndex = 0; laneIndex < 12; laneIndex++) {
+      for (let laneIndex = 0; laneIndex < effectiveLanes; laneIndex++) {
         const x = startX + laneIndex * worldLaneWidth;
-        const chromaticLane = laneIndex;
-        const laneColor = boomwhackerColors[chromaticLane];
+        const chromaticLane = activeLanes[laneIndex]; // Use effective lane order
+        const effectiveColors = getEffectiveColors();
+        const laneColor = effectiveColors[chromaticLane];
 
         // Check if this lane is in the current key
         const isInKey = currentScale.includes(chromaticLane);
@@ -635,7 +714,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
 
         // Use the color of this active lane
         const activeLaneIndex = activeLanes[laneIndex];
-        const laneColor = boomwhackerColors[activeLaneIndex];
+        const effectiveColors = getEffectiveColors();
+        const laneColor = effectiveColors[activeLaneIndex];
 
         // Convert hex to rgba for transparency
         const r = parseInt(laneColor.substr(1, 2), 16);
@@ -779,7 +859,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
               // Use correct color mapping:
               // - In "all notes" mode: use chromatic lane color (chromaticLane)
               // - In scale mode: use the color of the active lane at this visual position (activeLanes[laneIndex])
-              const cubeColor = showAllNotes ? boomwhackerColors[chromaticLane] : boomwhackerColors[activeLanes[laneIndex]];
+              const effectiveColors = getEffectiveColors();
+              const cubeColor = showAllNotes ? effectiveColors[chromaticLane] : effectiveColors[activeLanes[laneIndex]];
 
               drawIsometricBlock(
                 ctx,
@@ -833,15 +914,6 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
       ctx.lineWidth = 16;
       ctx.stroke();
-
-      // Draw center indicator
-      const centerX = (leftPoint.x + rightPoint.x) / 2;
-      const centerY = (leftPoint.y + rightPoint.y) / 2;
-      ctx.fillStyle = '#FF0080';
-      ctx.shadowBlur = 30;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
-      ctx.fill();
     }
 
     ctx.shadowBlur = 0;
@@ -918,7 +990,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     isPlaying,
     setupCamera,
     drawIsometricBlock,
-    boomwhackerColors,
+    getEffectiveColors(),
     draw3DLaneLabels,
     hoveredNote,
     selectedRoot,
@@ -997,10 +1069,16 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     console.log('🎛️ APC40 button press:', event);
 
     // Map APC40 5x8 grid to IsometricSequencer pattern
-    // APC40 lanes 0-4 → chromatic lanes 0-4 (can map to current scale if needed)
+    // APC40 lanes 0-4 → first 5 active lanes (respects Circle of Fifths ordering)
     // APC40 steps 0-7 → sequencer steps 0-7 (first half of 16-step pattern)
 
-    const chromaticLane = event.lane; // Direct mapping for now
+    // Use effective lane ordering - map APC40 lane to chromatic lane
+    const activeLanesArray = getActiveLanes();
+    if (event.lane >= activeLanesArray.length) {
+      console.warn(`APC40 lane ${event.lane} is beyond active lanes (${activeLanesArray.length})`);
+      return;
+    }
+    const chromaticLane = activeLanesArray[event.lane];
     const step = event.step;
 
     // Toggle the pattern state
@@ -1020,17 +1098,19 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     if (!apc40Connected) return;
 
     // Map the full 12-lane pattern to APC40's 5-lane display
-    // For now, use first 5 chromatic lanes directly
-    const apc40Pattern: boolean[][] = Array(5).fill(null).map((_, lane) =>
-      pattern[lane] || Array(16).fill(false)
-    );
+    // Use effective lane ordering (respects Circle of Fifths when enabled)
+    const activeLanesArray = getActiveLanes();
+    const apc40Pattern: boolean[][] = Array(5).fill(null).map((_, apc40Lane) => {
+      const chromaticLane = activeLanesArray[apc40Lane];
+      return chromaticLane !== undefined ? (pattern[chromaticLane] || Array(16).fill(false)) : Array(16).fill(false);
+    });
 
     // Update APC40 with current pattern and playback state
     apc40Controller.updateSequencerLEDs(
       apc40Pattern,
       currentBeat,
       isPlaying,
-      boomwhackerColors,
+      getEffectiveColors(),
       getActiveLanes().slice(0, 5) // Only first 5 active lanes
     );
   }, [apc40Connected, pattern, currentBeat, isPlaying, boomwhackerColors, getActiveLanes, apc40Controller]);
@@ -1430,6 +1510,18 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           </div>
 
           <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useHarmonicColors}
+                onChange={(e) => setUseHarmonicColors(e.target.checked)}
+                className="w-4 h-4 text-cyan-400 bg-gray-700 border-gray-600 rounded focus:ring-cyan-400 focus:ring-2"
+              />
+              <span className="text-sm text-gray-300">Circle of 5ths</span>
+            </label>
+          </div>
+
+          <div className="flex items-center gap-2">
             <input
               type="checkbox"
               id="showAllNotes"
@@ -1515,7 +1607,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       {showLEDManager && (
         <div className="border-b border-gray-700">
           <LEDStripManager
-            boomwhackerColors={boomwhackerColors}
+            boomwhackerColors={getEffectiveColors()}
             noteNames={noteNames}
             onStripsChange={handleLEDVisualizersChange}
             pattern={pattern}
