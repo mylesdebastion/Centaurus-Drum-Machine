@@ -25,9 +25,9 @@ export interface APC40ButtonEvent {
 export type APC40ButtonHandler = (event: APC40ButtonEvent) => void;
 
 export class APC40Controller {
-  private input: WebMIDI.MIDIInput | null = null;
-  private output: WebMIDI.MIDIOutput | null = null;
-  private midiAccess: WebMIDI.MIDIAccess | null = null;
+  private input: MIDIInput | null = null;
+  private output: MIDIOutput | null = null;
+  private midiAccess: MIDIAccess | null = null;
   private connected = false;
 
   // State management for LED optimization
@@ -40,6 +40,10 @@ export class APC40Controller {
     colorMode: 'spectrum',
     connected: false
   };
+
+  // Pagination state for 16-step sequencer (8 steps per page)
+  private currentPage = 0; // 0 = steps 0-7, 1 = steps 8-15
+  private autoPageSwitch = true; // Automatically switch pages during playback
 
   // Event handlers
   private onButtonPress?: APC40ButtonHandler;
@@ -87,6 +91,7 @@ export class APC40Controller {
           this.input = input;
           input.onmidimessage = this.handleMIDIMessage.bind(this);
           console.log('🎛️ Found APC40 input:', input.name);
+          console.log('🎛️ MIDI message handler attached successfully');
           break;
         }
       }
@@ -152,20 +157,98 @@ export class APC40Controller {
   /**
    * Handle incoming MIDI messages from APC40
    */
-  private handleMIDIMessage = (event: WebMIDI.MIDIMessageEvent): void => {
-    const [command, note, velocity] = event.data;
+  private handleMIDIMessage = (event: MIDIMessageEvent): void => {
+    // First - log that we received ANY MIDI message at all
+    console.log('🎛️ RAW MIDI received:', Array.from(event.data));
 
-    if (command === 0x90 && velocity > 0) {
+    const [command, data1, data2] = event.data;
+    const channel = command & 0x0F;
+    const messageType = command & 0xF0;
+
+    // Debug: log ALL incoming MIDI messages with detailed breakdown
+    const messageTypeName = {
+      0x80: 'Note Off',
+      0x90: 'Note On',
+      0xB0: 'Control Change',
+      0xC0: 'Program Change',
+      0xD0: 'Channel Pressure',
+      0xE0: 'Pitch Bend'
+    }[messageType] || 'Unknown';
+
+    console.log(`🎛️ APC40 MIDI: ${messageTypeName} Ch${channel} Command=0x${command.toString(16)} Data1=${data1} (0x${data1.toString(16)}) Data2=${data2}`);
+
+    // Handle Note On/Off messages (main grid pads)
+    if (messageType === 0x90 && data2 > 0) {
       // Button press
-      const buttonEvent = this.noteToButtonEvent(note, velocity);
+
+      // Check for Bank Select button presses (page switching)
+      // Based on official APC40 MIDI specification
+      if (data1 === 0x34 && data2 > 0) {
+        // Bank Left (note 52/0x34) - previous page
+        console.log(`🎛️ Bank Left pressed (note ${data1}) - switching to previous page`);
+        const newPage = Math.max(0, this.currentPage - 1);
+        this.setPage(newPage);
+        this.autoPageSwitch = false;
+        return;
+      } else if (data1 === 0x35 && data2 > 0) {
+        // Bank Right (note 53/0x35) - next page
+        console.log(`🎛️ Bank Right pressed (note ${data1}) - switching to next page`);
+        const newPage = Math.min(1, this.currentPage + 1);
+        this.setPage(newPage);
+        this.autoPageSwitch = false;
+        return;
+      } else if (data1 === 0x32 && data2 > 0) {
+        // Bank Up (note 50/0x32) - could be used for other functions
+        console.log(`🎛️ Bank Up pressed (note ${data1})`);
+        return;
+      } else if (data1 === 0x33 && data2 > 0) {
+        // Bank Down (note 51/0x33) - could be used for other functions
+        console.log(`🎛️ Bank Down pressed (note ${data1})`);
+        return;
+      }
+
+      // Check for scene button presses (alternative page switching)
+      if (data1 === 0x52 && data2 > 0) {
+        // Scene button 1 - switch to page 0 (steps 0-7)
+        console.log('🎛️ Scene button 1 pressed - switching to page 0');
+        this.setPage(0);
+        this.autoPageSwitch = false;
+        return;
+      } else if (data1 === 0x53 && data2 > 0) {
+        // Scene button 2 - switch to page 1 (steps 8-15)
+        console.log('🎛️ Scene button 2 pressed - switching to page 1');
+        this.setPage(1);
+        this.autoPageSwitch = false;
+        return;
+      }
+
+      const buttonEvent = this.noteToButtonEvent(data1, data2);
       if (buttonEvent && this.onButtonPress) {
         this.onButtonPress(buttonEvent);
       }
-    } else if (command === 0x80 || (command === 0x90 && velocity === 0)) {
+    } else if (messageType === 0x80 || (messageType === 0x90 && data2 === 0)) {
       // Button release
-      const buttonEvent = this.noteToButtonEvent(note, 0);
+      const buttonEvent = this.noteToButtonEvent(data1, 0);
       if (buttonEvent && this.onButtonRelease) {
         this.onButtonRelease(buttonEvent);
+      }
+    } else if (messageType === 0xB0) {
+      // Control Change messages (knobs, faders, other controls)
+      console.log(`🎛️ Control Change: CC${data1} = ${data2} (channel ${channel})`);
+
+      // Check if CC messages are used for bank select
+      if (data1 === 47 && data2 > 63) {
+        // CC 47 high value might be bank select right
+        console.log('🎛️ Possible Bank Select Right via CC47');
+        const newPage = Math.min(1, this.currentPage + 1);
+        this.setPage(newPage);
+        this.autoPageSwitch = false;
+      } else if (data1 === 47 && data2 < 64) {
+        // CC 47 low value might be bank select left
+        console.log('🎛️ Possible Bank Select Left via CC47');
+        const newPage = Math.max(0, this.currentPage - 1);
+        this.setPage(newPage);
+        this.autoPageSwitch = false;
       }
     }
   };
@@ -183,18 +266,18 @@ export class APC40Controller {
     }
 
     // Calculate row and column from MIDI note
-    const row = Math.floor(note / 8);    // 0-4 (top to bottom on hardware)
+    const row = Math.floor(note / 8);    // 0-4 (BOTTOM to TOP on hardware - row 0 is BOTTOM!)
     const column = note % 8;             // 0-7 (left to right on hardware)
 
-    // Map to IsometricSequencer coordinates with FLIPPED MAPPING:
-    // - Hardware row 0 (top) → lane 4 (rightmost/highest frequency in 3D)
-    // - Hardware row 4 (bottom) → lane 0 (leftmost/lowest frequency in 3D, RED)
-    // - This ensures red (lowest freq) is on bottom APC40 row, matching 3D viz leftmost lane
-    const flippedLane = 4 - row; // Flip the row mapping
+    // Map to IsometricSequencer coordinates:
+    // - Hardware row 0 (BOTTOM) → lane 0 (leftmost/lowest frequency in 3D, RED)
+    // - Hardware row 4 (TOP) → lane 4 (rightmost/highest frequency in 3D, VIOLET)
+    // - This ensures red (lowest freq) is on BOTTOM APC40 row (row 0), matching 3D viz leftmost lane
+    const lane = row; // Direct mapping - no flip needed since row 0 is already bottom
 
     return {
-      lane: flippedLane,
-      step: column,
+      lane: lane,
+      step: column + (this.currentPage * 8), // Add page offset to step
       velocity
     };
   }
@@ -203,13 +286,22 @@ export class APC40Controller {
    * Convert lane/step to APC40 MIDI note
    */
   private buttonEventToNote(lane: number, step: number): number | null {
-    if (lane < 0 || lane > 4 || step < 0 || step > 7) {
+    if (lane < 0 || lane > 4 || step < 0 || step > 15) {
       return null;
     }
 
-    // Apply the same flipped mapping: lane 0 (red, leftmost in 3D) → row 4 (bottom on APC40)
-    const flippedRow = 4 - lane;
-    return flippedRow * 8 + step;
+    // Convert step to current page display (only show 8 steps at a time)
+    const pageStep = step % 8;
+    const stepPage = Math.floor(step / 8);
+
+    // Only show steps that are on the current page
+    if (stepPage !== this.currentPage) {
+      return null;
+    }
+
+    // Direct mapping: lane 0 (red, leftmost in 3D) → row 0 (bottom on APC40)
+    const row = lane;
+    return row * 8 + pageStep;
   }
 
   /**
@@ -226,25 +318,35 @@ export class APC40Controller {
     currentStep: number,
     isPlaying: boolean,
     boomwhackerColors: string[],
-    activeLanes?: number[]
+    _activeLanes?: number[]
   ): void {
     if (!this.connected || !this.output) return;
 
-    // Only show first 8 steps on APC40 (8 columns)
+    // Auto-switch pages based on current step during playback
+    if (this.autoPageSwitch && isPlaying) {
+      const requiredPage = Math.floor(currentStep / 8);
+      if (requiredPage !== this.currentPage) {
+        this.currentPage = requiredPage;
+      }
+    }
+
+    // Calculate the step offset for the current page
+    const pageOffset = this.currentPage * 8;
     const visibleSteps = 8;
 
     // Update each position in the 5x8 grid
     for (let lane = 0; lane < 5; lane++) {
       for (let step = 0; step < visibleSteps; step++) {
-        const note = this.buttonEventToNote(lane, step);
+        const actualStep = step + pageOffset; // Convert to actual step in pattern
+        const note = this.buttonEventToNote(lane, actualStep);
         if (note === null) continue;
 
         let color: number;
 
-        if (step === currentStep && isPlaying) {
+        if (actualStep === currentStep && isPlaying) {
           // Timeline indicator - bright white
           color = this.LED_COLORS.YELLOW; // Use YELLOW for timeline (shows as bright white)
-        } else if (pattern[lane] && pattern[lane][step]) {
+        } else if (pattern[lane] && pattern[lane][actualStep]) {
           // Active note - use color mode
           color = this.getAPC40Color(lane, 100, this.config.colorMode, boomwhackerColors);
         } else {
@@ -255,6 +357,58 @@ export class APC40Controller {
         this.setLED(note, color);
       }
     }
+
+    // Add page indicators using the top row of scene launch buttons
+    this.updatePageIndicators();
+  }
+
+  /**
+   * Update page indicators using scene launch buttons and bank select buttons
+   */
+  private updatePageIndicators(): void {
+    if (!this.connected || !this.output) return;
+
+    // Scene launch buttons are notes 0x52-0x56 (82-86)
+    // Use first two scene buttons for page indicators
+    const sceneButton1 = 0x52; // Page 1 indicator (steps 0-7)
+    const sceneButton2 = 0x53; // Page 2 indicator (steps 8-15)
+
+    // Bank Select buttons based on official APC40 MIDI specification
+    const bankLeft = 0x34;  // Bank Left (note 52)
+    const bankRight = 0x35; // Bank Right (note 53)
+
+    // Set page indicators on scene buttons
+    this.setLED(sceneButton1, this.currentPage === 0 ? this.LED_COLORS.GREEN : this.LED_COLORS.OFF);
+    this.setLED(sceneButton2, this.currentPage === 1 ? this.LED_COLORS.GREEN : this.LED_COLORS.OFF);
+
+    // Set bank select button indicators (dim when at boundaries)
+    this.setLED(bankLeft, this.currentPage > 0 ? this.LED_COLORS.ORANGE : this.LED_COLORS.OFF);
+    this.setLED(bankRight, this.currentPage < 1 ? this.LED_COLORS.ORANGE : this.LED_COLORS.OFF);
+  }
+
+  /**
+   * Manually switch to a specific page
+   */
+  setPage(page: number): void {
+    if (page >= 0 && page <= 1) {
+      const oldPage = this.currentPage;
+      this.currentPage = page;
+      console.log(`🎛️ APC40 page switched from ${oldPage} to ${this.currentPage} (steps ${this.currentPage * 8}-${this.currentPage * 8 + 7})`);
+    }
+  }
+
+  /**
+   * Get current page
+   */
+  getCurrentPage(): number {
+    return this.currentPage;
+  }
+
+  /**
+   * Toggle auto page switching
+   */
+  setAutoPageSwitch(enabled: boolean): void {
+    this.autoPageSwitch = enabled;
   }
 
   /**
@@ -265,7 +419,7 @@ export class APC40Controller {
     lane: number,
     velocity: number,
     mode: 'spectrum' | 'chromatic' | 'harmonic',
-    boomwhackerColors?: string[]
+    _boomwhackerColors?: string[]
   ): number {
     switch (mode) {
       case 'spectrum':
@@ -345,7 +499,7 @@ export class APC40Controller {
       const batch = this.updateQueue.splice(0, 8);
 
       batch.forEach(({ note, color, animationType }) => {
-        const channel = animationType;
+        const channel = animationType ?? 0;
         try {
           this.output?.send([0x90 | channel, note, color]);
         } catch (e) {
@@ -469,9 +623,4 @@ export class APC40Controller {
   } as const;
 }
 
-// Extend global Window interface for WebSocket bridge
-declare global {
-  interface Window {
-    wledBridge?: WebSocket | null;
-  }
-}
+// wledBridge property is declared in src/types/window.d.ts
