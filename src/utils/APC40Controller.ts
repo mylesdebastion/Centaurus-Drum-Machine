@@ -77,7 +77,7 @@ export class APC40Controller {
 
       // Find APC40 output
       for (const output of this.midiAccess.outputs.values()) {
-        if (this.isAPC40Port(output.name)) {
+        if (output.name && this.isAPC40Port(output.name)) {
           this.output = output;
           this.config.deviceName = output.name;
           console.log('🎛️ Found APC40 output:', output.name);
@@ -87,7 +87,7 @@ export class APC40Controller {
 
       // Find APC40 input
       for (const input of this.midiAccess.inputs.values()) {
-        if (this.isAPC40Port(input.name)) {
+        if (input.name && this.isAPC40Port(input.name)) {
           this.input = input;
           input.onmidimessage = this.handleMIDIMessage.bind(this);
           console.log('🎛️ Found APC40 input:', input.name);
@@ -159,6 +159,7 @@ export class APC40Controller {
    */
   private handleMIDIMessage = (event: MIDIMessageEvent): void => {
     // First - log that we received ANY MIDI message at all
+    if (!event.data) return;
     console.log('🎛️ RAW MIDI received:', Array.from(event.data));
 
     const [command, data1, data2] = event.data;
