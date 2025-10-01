@@ -1067,11 +1067,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   // Auto-switch APC40 color mode based on Circle of Fifths setting
   useEffect(() => {
     const newColorMode = useHarmonicColors ? 'harmonic' : 'chromatic';
-    if (apc40ColorMode !== newColorMode) {
-      setAPC40ColorMode(newColorMode);
-      apc40Controller.setColorMode(newColorMode);
-    }
-  }, [useHarmonicColors, apc40ColorMode, apc40Controller]);
+    setAPC40ColorMode(newColorMode);
+    apc40Controller.setColorMode(newColorMode);
+  }, [useHarmonicColors, apc40Controller]);
 
   // Handle APC40 button press
   const handleAPC40ButtonPress = useCallback((event: APC40ButtonEvent) => {
