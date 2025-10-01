@@ -319,7 +319,7 @@ export class APC40Controller {
     currentStep: number,
     isPlaying: boolean,
     boomwhackerColors: string[],
-    _activeLanes?: number[]
+    activeLanes?: number[]
   ): void {
     if (!this.connected || !this.output) return;
 
@@ -349,7 +349,9 @@ export class APC40Controller {
           color = this.LED_COLORS.YELLOW; // Use YELLOW for timeline (shows as bright white)
         } else if (pattern[lane] && pattern[lane][actualStep]) {
           // Active note - use color mode
-          color = this.getAPC40Color(lane, 100, this.config.colorMode, boomwhackerColors);
+          // Map APC40 lane to actual chromatic lane for correct color
+          const chromaticLane = activeLanes ? activeLanes[lane] : lane;
+          color = this.getAPC40Color(chromaticLane, 100, this.config.colorMode, boomwhackerColors);
         } else {
           // Inactive - off
           color = this.LED_COLORS.OFF;
