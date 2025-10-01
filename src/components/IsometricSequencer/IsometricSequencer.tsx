@@ -1051,17 +1051,21 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     }
   }, [ledEnabled, ledVisualizers, pattern, currentBeat, isPlaying, boomwhackerColors, showAllNotes, getActiveLanes, bpm]);
 
-  // APC40 hardware integration
+  // APC40 hardware integration - setup/teardown
   useEffect(() => {
     // Set up APC40 event handlers
     apc40Controller.setButtonPressHandler(handleAPC40ButtonPress);
     apc40Controller.setConnectionChangeHandler(setAPC40Connected);
-    apc40Controller.setColorMode(apc40ColorMode);
 
     // Cleanup on unmount
     return () => {
       apc40Controller.disconnect();
     };
+  }, [apc40Controller]);
+
+  // APC40 color mode updates - separate from setup/teardown
+  useEffect(() => {
+    apc40Controller.setColorMode(apc40ColorMode);
   }, [apc40Controller, apc40ColorMode]);
 
   // Auto-switch APC40 color mode based on Circle of Fifths setting
