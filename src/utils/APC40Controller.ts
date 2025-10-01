@@ -438,15 +438,22 @@ export class APC40Controller {
         return spectrumColors[lane] || this.LED_COLORS.GREEN;
 
       case 'chromatic':
-        // Map to chromatic scale colors
+        // Map to full chromatic scale colors (12 semitones)
         const chromaticColors = [
-          this.LED_COLORS.RAINBOW.RED,         // C
-          this.LED_COLORS.RAINBOW.RED_ORANGE,  // C#
-          this.LED_COLORS.RAINBOW.ORANGE,      // D
-          this.LED_COLORS.RAINBOW.YELLOW,      // D#
-          this.LED_COLORS.RAINBOW.GREEN,       // E
+          this.LED_COLORS.RAINBOW.RED,         // C (0)
+          this.LED_COLORS.RAINBOW.RED_ORANGE,  // C# (1)
+          this.LED_COLORS.RAINBOW.ORANGE,      // D (2)
+          this.LED_COLORS.RAINBOW.YELLOW,      // D# (3)
+          this.LED_COLORS.RAINBOW.YELLOW,      // E (4) - should be yellow, not green
+          this.LED_COLORS.RAINBOW.GREEN,       // F (5) - lime green
+          this.LED_COLORS.RAINBOW.GREEN,       // F# (6)
+          this.LED_COLORS.RAINBOW.CYAN,        // G (7) - deep green/cyan
+          this.LED_COLORS.RAINBOW.CYAN,        // G# (8)
+          this.LED_COLORS.RAINBOW.BLUE,        // A (9)
+          this.LED_COLORS.RAINBOW.BLUE,        // A# (10)
+          this.LED_COLORS.RAINBOW.VIOLET,      // B (11)
         ];
-        return chromaticColors[lane] || this.LED_COLORS.GREEN;
+        return chromaticColors[lane % 12] || this.LED_COLORS.GREEN;
 
       case 'harmonic':
         // Circle of fifths progression
