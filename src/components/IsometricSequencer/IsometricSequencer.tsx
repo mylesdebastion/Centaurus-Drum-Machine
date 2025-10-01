@@ -1068,8 +1068,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   useEffect(() => {
     const newColorMode = useHarmonicColors ? 'harmonic' : 'chromatic';
     setAPC40ColorMode(newColorMode);
-    apc40Controller.setColorMode(newColorMode);
-  }, [useHarmonicColors, apc40Controller]);
+    // Note: Don't call apc40Controller.setColorMode here - let the existing useEffect handle it
+  }, [useHarmonicColors]);
 
   // Handle APC40 button press
   const handleAPC40ButtonPress = useCallback((event: APC40ButtonEvent) => {
