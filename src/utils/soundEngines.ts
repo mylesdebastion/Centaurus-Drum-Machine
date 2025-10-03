@@ -226,25 +226,26 @@ class PluckSoundEngine implements SoundEngine {
 
 /**
  * Pad/ambient sound engine using Tone.js Synth with soft envelope
+ * Smooth, rounded tone with extended release for ambient atmosphere
  */
 class PadSoundEngine implements SoundEngine {
   private synth: Tone.PolySynth;
 
   constructor() {
     this.synth = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: 'triangle' },
+      oscillator: { type: 'sine' },  // Changed from triangle to sine for rounder sound
       envelope: {
-        attack: 0.1,
-        decay: 0.3,
-        sustain: 0.5,
-        release: 1.0
+        attack: 0.2,          // Slightly longer attack for smoother onset
+        decay: 0.4,           // Slightly longer decay
+        sustain: 0.6,         // Higher sustain for fuller body
+        release: 1.5          // Extended release from 1.0 to 1.5 for longer tail
       }
     }).toDestination();
 
     this.synth.volume.value = -8; // Normalize volume (pads can be loud)
   }
 
-  playNote(frequency: number, velocity: number = 0.6, duration: number = 0.8): void {
+  playNote(frequency: number, velocity: number = 0.6, duration: number = 1.0): void {
     const note = Tone.Frequency(frequency, 'hz').toNote();
     this.synth.triggerAttackRelease(note, duration, undefined, velocity);
   }
