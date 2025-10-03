@@ -46,38 +46,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </p>
         </div>
 
-        {/* Feature Cards */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
-          <div className="bg-gray-800 p-4 sm:p-6 rounded-xl border border-gray-700 hover:border-primary-500 transition-colors">
-            <Users className="w-10 h-10 sm:w-12 sm:h-12 text-primary-500 mb-3 sm:mb-4" />
-            <h3 className="text-base sm:text-lg font-semibold mb-2">Multi-User Jamming</h3>
-            <p className="text-gray-400 text-xs sm:text-sm">
-              Sync with friends worldwide. Low-latency networking keeps everyone in perfect time.
-            </p>
-          </div>
-          
-          <div className="bg-gray-800 p-4 sm:p-6 rounded-xl border border-gray-700 hover:border-accent-500 transition-colors">
-            <Sparkles className="w-10 h-10 sm:w-12 sm:h-12 text-accent-500 mb-3 sm:mb-4" />
-            <h3 className="text-base sm:text-lg font-semibold mb-2">Music Visualization</h3>
-            <p className="text-gray-400 text-xs sm:text-sm">
-              Watch your music come alive with colors. Connect LED matrices for physical light shows.
-            </p>
-          </div>
-          
-          <div className="bg-gray-800 p-4 sm:p-6 rounded-xl border border-gray-700 hover:border-green-500 transition-colors sm:col-span-2 lg:col-span-1">
-            <BookOpen className="w-10 h-10 sm:w-12 sm:h-12 text-green-500 mb-3 sm:mb-4" />
-            <h3 className="text-base sm:text-lg font-semibold mb-2">Educational Mode</h3>
-            <p className="text-gray-400 text-xs sm:text-sm">
-              Learn rhythm and melody through interactive lessons designed for K-12 students.
-            </p>
-          </div>
-        </div>
-
-        {/* Main Features Section */}
-        <div className="mb-8 sm:mb-10">
-          <h2 className="text-xl sm:text-2xl font-bold text-center mb-6 text-gray-200">
-            Main Features
-          </h2>
+        {/* Action Buttons Section */}
+        <div className="mb-12 sm:mb-16">
           <div className="grid sm:grid-cols-3 gap-4">
             {/* 3D Sequencer - Primary */}
             <button
@@ -132,6 +102,42 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 </div>
               </div>
             </button>
+          </div>
+        </div>
+
+        {/* Why This Platform Section */}
+        <div className="mb-12 sm:mb-16">
+          <h2 className="text-xl sm:text-2xl font-bold text-center mb-2 text-gray-200">
+            Why Audiolux?
+          </h2>
+          <p className="text-center text-sm text-gray-400 mb-8">
+            Innovative features that make music creation accessible and visual
+          </p>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-700/50">
+              <Users className="w-10 h-10 sm:w-12 sm:h-12 text-primary-500 mb-3 sm:mb-4" />
+              <h3 className="text-base sm:text-lg font-semibold mb-2">Multi-User Jamming</h3>
+              <p className="text-gray-400 text-xs sm:text-sm">
+                Sync with friends worldwide. Low-latency networking keeps everyone in perfect time.
+              </p>
+            </div>
+
+            <div className="bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-700/50">
+              <Sparkles className="w-10 h-10 sm:w-12 sm:h-12 text-accent-500 mb-3 sm:mb-4" />
+              <h3 className="text-base sm:text-lg font-semibold mb-2">Music Visualization</h3>
+              <p className="text-gray-400 text-xs sm:text-sm">
+                Watch your music come alive with colors. Connect LED matrices for physical light shows.
+              </p>
+            </div>
+
+            <div className="bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-700/50 sm:col-span-2 lg:col-span-1">
+              <BookOpen className="w-10 h-10 sm:w-12 sm:h-12 text-green-500 mb-3 sm:mb-4" />
+              <h3 className="text-base sm:text-lg font-semibold mb-2">Educational Focus</h3>
+              <p className="text-gray-400 text-xs sm:text-sm">
+                Learn rhythm and melody through interactive lessons designed for K-12 students.
+              </p>
+            </div>
           </div>
         </div>
 
