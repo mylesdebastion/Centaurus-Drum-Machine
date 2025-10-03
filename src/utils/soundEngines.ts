@@ -3,7 +3,7 @@ import * as Tone from 'tone';
 /**
  * Sound engine types available for the IsometricSequencer
  */
-export type SoundEngineType = 'sine' | 'drums' | 'pluck' | 'pad' | 'fm-bell' | 'bass';
+export type SoundEngineType = 'keys' | 'sine' | 'drums' | 'pluck' | 'pad' | 'fm-bell' | 'bass';
 
 /**
  * Interface for sound engine implementations
@@ -72,6 +72,14 @@ class DrumSoundEngine implements SoundEngine {
         envelope: { attack: 0.005, decay: 0.1, sustain: 0.0 }
       }).connect(this.masterVolume),
 
+      'rimshot': new Tone.MetalSynth({
+        envelope: { attack: 0.001, decay: 0.05, release: 0.01 },
+        harmonicity: 8,
+        modulationIndex: 10,
+        resonance: 3000,
+        octaves: 0.5
+      }).connect(this.masterVolume),
+
       'hihat': new Tone.MetalSynth({
         envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
         harmonicity: 5.1,
@@ -109,11 +117,18 @@ class DrumSoundEngine implements SoundEngine {
         octaves: 1.5
       }).connect(this.masterVolume),
 
-      'tom': new Tone.MembraneSynth({
+      'lowtom': new Tone.MembraneSynth({
         pitchDecay: 0.008,
         octaves: 2,
         oscillator: { type: 'sine' },
         envelope: { attack: 0.006, decay: 0.5, sustain: 0.0 }
+      }).connect(this.masterVolume),
+
+      'hightom': new Tone.MembraneSynth({
+        pitchDecay: 0.006,
+        octaves: 1.5,
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.004, decay: 0.4, sustain: 0.0 }
       }).connect(this.masterVolume)
     };
   }
@@ -127,41 +142,49 @@ class DrumSoundEngine implements SoundEngine {
   }
 
   playNote(frequency: number, velocity: number = 0.8): void {
-    // Map frequency ranges to different drum sounds
-    // Lower frequencies = kick/bass sounds, higher = cymbals/hats
+    // Map frequency ranges to different drum sounds based on boomwhacker colors:
+    // Red=C, Orange=D, Yellow=E, Yellow-Green=F, Green=G, Blue-Green=G#, Blue=A, Purple=B
     let sample: Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth;
     let drumType: string;
 
-    if (frequency < 150) {
-      // Very low = kick drum
+    if (frequency < 270) {
+      // C-C# (Red-Orange-Red): Kick drum
       sample = this.drumSamples['kick'] as Tone.MembraneSynth;
       drumType = 'kick';
-    } else if (frequency < 200) {
-      // Low-mid = tom
-      sample = this.drumSamples['tom'] as Tone.MembraneSynth;
-      drumType = 'tom';
-    } else if (frequency < 300) {
-      // Mid = snare
+    } else if (frequency < 305) {
+      // D (Orange): Low tom
+      sample = this.drumSamples['lowtom'] as Tone.MembraneSynth;
+      drumType = 'lowtom';
+    } else if (frequency < 340) {
+      // D#-E (Yellow-Orange to Yellow): High tom
+      sample = this.drumSamples['hightom'] as Tone.MembraneSynth;
+      drumType = 'hightom';
+    } else if (frequency < 370) {
+      // F (Yellow-Green): Snare
       sample = this.drumSamples['snare'] as Tone.NoiseSynth;
       drumType = 'snare';
-    } else if (frequency < 400) {
-      // Mid-high = clap
+    } else if (frequency < 405) {
+      // F#-G (Green-Yellow to Green): Rimshot / side stick
+      sample = this.drumSamples['rimshot'] as Tone.MetalSynth;
+      drumType = 'rimshot';
+    } else if (frequency < 430) {
+      // G# (Blue-Green): Clap
       sample = this.drumSamples['clap'] as Tone.NoiseSynth;
       drumType = 'clap';
-    } else if (frequency < 500) {
-      // High = closed hi-hat
+    } else if (frequency < 455) {
+      // A (Blue): Closed hi-hat
       sample = this.drumSamples['hihat'] as Tone.MetalSynth;
       drumType = 'hihat';
-    } else if (frequency < 600) {
-      // Higher = open hi-hat
+    } else if (frequency < 480) {
+      // A# (Blue-Purple): Open hi-hat
       sample = this.drumSamples['openhat'] as Tone.MetalSynth;
       drumType = 'openhat';
-    } else if (frequency < 800) {
-      // Very high = ride
+    } else if (frequency < 520) {
+      // B (Purple): Ride
       sample = this.drumSamples['ride'] as Tone.MetalSynth;
       drumType = 'ride';
     } else {
-      // Highest = crash
+      // Higher: Crash
       sample = this.drumSamples['crash'] as Tone.MetalSynth;
       drumType = 'crash';
     }
@@ -172,7 +195,16 @@ class DrumSoundEngine implements SoundEngine {
 
       if (sample instanceof Tone.MembraneSynth) {
         // For kick and tom drums - use pitch variation
-        const note = drumType === 'kick' ? 'C1' : 'C3';
+        let note: string;
+        if (drumType === 'kick') {
+          note = 'C1';
+        } else if (drumType === 'lowtom') {
+          note = 'F2';  // Lower tom pitch
+        } else if (drumType === 'hightom') {
+          note = 'A2';  // Higher tom pitch
+        } else {
+          note = 'C3';
+        }
         sample.volume.value = volumeDb;
         sample.triggerAttackRelease(note, '8n', now);
       } else if (sample instanceof Tone.NoiseSynth) {
@@ -180,7 +212,7 @@ class DrumSoundEngine implements SoundEngine {
         sample.volume.value = volumeDb;
         sample.triggerAttackRelease('8n', now);
       } else if (sample instanceof Tone.MetalSynth) {
-        // For hi-hats, crash, ride
+        // For hi-hats, crash, ride, rimshot
         sample.volume.value = volumeDb;
         sample.triggerAttackRelease('8n', now);
       }
@@ -296,6 +328,55 @@ class FMBellSoundEngine implements SoundEngine {
 }
 
 /**
+ * Fender Rhodes electric piano sound engine
+ * Warm, bell-like tone with characteristic FM texture
+ */
+class RhodesSoundEngine implements SoundEngine {
+  private synth: Tone.PolySynth;
+
+  constructor() {
+    this.synth = new Tone.PolySynth(Tone.FMSynth, {
+      harmonicity: 3.01,     // Slightly detuned for classic Rhodes character
+      modulationIndex: 14,   // Moderate modulation for warm, bell-like tone
+      oscillator: { type: 'sine' },
+      envelope: {
+        attack: 0.005,       // Quick attack like struck tine
+        decay: 0.8,          // Medium decay
+        sustain: 0.15,       // Low sustain for realistic piano decay
+        release: 1.2         // Natural release
+      },
+      modulation: { type: 'sine' },
+      modulationEnvelope: {
+        attack: 0.002,
+        decay: 0.4,
+        sustain: 0.2,
+        release: 0.8
+      }
+    }).toDestination();
+
+    // Add subtle chorus effect for authentic Rhodes sound
+    const chorus = new Tone.Chorus({
+      frequency: 1.5,
+      delayTime: 3.5,
+      depth: 0.4,
+      spread: 180
+    }).toDestination();
+
+    this.synth.connect(chorus);
+    this.synth.volume.value = -8; // Normalize volume
+  }
+
+  playNote(frequency: number, velocity: number = 0.7, duration: number = 1.2): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.synth.triggerAttackRelease(note, duration, undefined, velocity);
+  }
+
+  dispose(): void {
+    this.synth.dispose();
+  }
+}
+
+/**
  * Bass sound engine using Tone.js MonoSynth
  * Deep, warm bass sound pitched two octaves lower
  */
@@ -352,6 +433,8 @@ export function createSoundEngine(
   masterGain: GainNode
 ): SoundEngine {
   switch (type) {
+    case 'keys':
+      return new RhodesSoundEngine();
     case 'sine':
       return new OscillatorSoundEngine(audioContext, masterGain);
     case 'drums':
@@ -365,7 +448,7 @@ export function createSoundEngine(
     case 'bass':
       return new BassSoundEngine();
     default:
-      return new OscillatorSoundEngine(audioContext, masterGain);
+      return new RhodesSoundEngine();
   }
 }
 
@@ -373,6 +456,7 @@ export function createSoundEngine(
  * Display names for sound engine types
  */
 export const soundEngineNames: Record<SoundEngineType, string> = {
+  'keys': 'Keys',
   'sine': 'Sine Wave',
   'drums': 'Drums',
   'pluck': 'Pluck',

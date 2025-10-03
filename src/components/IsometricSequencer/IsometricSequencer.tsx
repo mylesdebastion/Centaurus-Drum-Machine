@@ -134,19 +134,24 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   const [apc40ColorMode, setAPC40ColorMode] = useState<'spectrum' | 'chromatic' | 'harmonic'>('spectrum');
 
   // Sound engine state
-  const [selectedSoundEngine, setSelectedSoundEngine] = useState<SoundEngineType>('sine');
+  const [selectedSoundEngine, setSelectedSoundEngine] = useState<SoundEngineType>('keys');
   const [showSoundMenu, setShowSoundMenu] = useState(false);
   const soundEngineRef = useRef<SoundEngine | null>(null);
 
   // Melody generation mode state
-  type MelodyMode = 'melody' | 'random' | 'chords';
+  type MelodyMode = 'melody' | 'random' | 'chords' | 'beats';
   const [selectedMelodyMode, setSelectedMelodyMode] = useState<MelodyMode>('melody');
   const [showMelodyMenu, setShowMelodyMenu] = useState(false);
   const melodyModeNames: Record<MelodyMode, string> = {
     melody: 'Melody',
     random: 'Random',
-    chords: 'Chords'
+    chords: 'Chords',
+    beats: 'Beats'
   };
+
+  // Key/Scale menu state
+  const [showKeyMenu, setShowKeyMenu] = useState(false);
+  const [showScaleMenu, setShowScaleMenu] = useState(false);
 
   // Constants
   const lanes = 12;
@@ -1328,6 +1333,173 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     ));
   };
 
+  // Generate drum beats with typical drum patterns
+  const generateBeats = () => {
+    // Clear current pattern
+    const newPattern: boolean[][] = Array(12).fill(null).map(() => Array(16).fill(false));
+
+    // Map chromatic notes to drum sounds (using lower notes for kick, mid for snare, high for hats/cymbals)
+    const drumMap = {
+      kick: 0,      // C - lowest note
+      snare: 2,     // D
+      clap: 4,      // E
+      hihat: 7,     // G
+      openhat: 9,   // A
+      crash: 11,    // B - highest
+    };
+
+    // Snare variations for variety
+    const snareVariations = [
+      // Standard backbeat (2 and 4)
+      () => {
+        newPattern[drumMap.snare][4] = true;
+        newPattern[drumMap.snare][12] = true;
+      },
+      // With ghost note
+      () => {
+        newPattern[drumMap.snare][3] = true;  // Ghost note before
+        newPattern[drumMap.snare][4] = true;
+        newPattern[drumMap.snare][12] = true;
+      },
+      // Syncopated
+      () => {
+        newPattern[drumMap.snare][4] = true;
+        newPattern[drumMap.snare][10] = true; // Earlier hit
+        newPattern[drumMap.snare][12] = true;
+      },
+      // With flam
+      () => {
+        newPattern[drumMap.snare][4] = true;
+        newPattern[drumMap.snare][11] = true; // Lead-in
+        newPattern[drumMap.snare][12] = true;
+      },
+      // Double hit
+      () => {
+        newPattern[drumMap.snare][4] = true;
+        newPattern[drumMap.snare][5] = true;  // Quick double
+        newPattern[drumMap.snare][12] = true;
+      },
+      // Shuffle feel
+      () => {
+        newPattern[drumMap.snare][4] = true;
+        newPattern[drumMap.snare][6] = true;  // Shuffle offset
+        newPattern[drumMap.snare][12] = true;
+        newPattern[drumMap.snare][14] = true; // Shuffle offset
+      },
+      // With rim shots
+      () => {
+        newPattern[drumMap.snare][4] = true;
+        newPattern[drumMap.rimshot][7] = true; // Rim accent
+        newPattern[drumMap.snare][12] = true;
+      },
+      // Complex pattern
+      () => {
+        newPattern[drumMap.snare][3] = true;  // Ghost
+        newPattern[drumMap.snare][4] = true;
+        newPattern[drumMap.snare][10] = true; // Syncopation
+        newPattern[drumMap.snare][12] = true;
+        newPattern[drumMap.snare][14] = true; // Fill
+      }
+    ];
+
+    // Common drum patterns
+    const patterns = [
+      // Four-on-the-floor (house/disco)
+      () => {
+        // Kick on every beat
+        for (let i = 0; i < steps; i += 4) {
+          newPattern[drumMap.kick][i] = true;
+        }
+        // Random snare variation
+        const snareVar = snareVariations[Math.floor(Math.random() * snareVariations.length)];
+        snareVar();
+        // Hi-hats on every other step
+        for (let i = 0; i < steps; i += 2) {
+          newPattern[drumMap.hihat][i] = true;
+        }
+        // Open hat on 8th
+        newPattern[drumMap.openhat][7] = true;
+      },
+
+      // Standard rock beat
+      () => {
+        // Kick on 1 and 3
+        newPattern[drumMap.kick][0] = true;
+        newPattern[drumMap.kick][8] = true;
+        // Random snare variation
+        const snareVar = snareVariations[Math.floor(Math.random() * snareVariations.length)];
+        snareVar();
+        // Hi-hats on every beat
+        for (let i = 0; i < steps; i += 2) {
+          newPattern[drumMap.hihat][i] = true;
+        }
+      },
+
+      // Hip-hop boom bap
+      () => {
+        // Kick on 1 and syncopated
+        newPattern[drumMap.kick][0] = true;
+        newPattern[drumMap.kick][6] = true;
+        newPattern[drumMap.kick][10] = true;
+        // Random snare variation
+        const snareVar = snareVariations[Math.floor(Math.random() * snareVariations.length)];
+        snareVar();
+        // Hi-hats steady
+        for (let i = 0; i < steps; i += 2) {
+          newPattern[drumMap.hihat][i] = true;
+        }
+        // Open hat accents
+        newPattern[drumMap.openhat][7] = true;
+        newPattern[drumMap.openhat][15] = true;
+      },
+
+      // Breakbeat
+      () => {
+        // Syncopated kicks
+        newPattern[drumMap.kick][0] = true;
+        newPattern[drumMap.kick][3] = true;
+        newPattern[drumMap.kick][10] = true;
+        // Random snare variation (breakbeat style)
+        const snareVar = snareVariations[Math.floor(Math.random() * snareVariations.length)];
+        snareVar();
+        // Complex hi-hat pattern
+        for (let i = 0; i < steps; i += 2) {
+          newPattern[drumMap.hihat][i] = true;
+        }
+        newPattern[drumMap.openhat][6] = true;
+      },
+
+      // Dance/EDM
+      () => {
+        // Four-on-the-floor kick
+        for (let i = 0; i < steps; i += 4) {
+          newPattern[drumMap.kick][i] = true;
+        }
+        // Clap on 2 and 4 (instead of snare for EDM)
+        newPattern[drumMap.clap][4] = true;
+        newPattern[drumMap.clap][12] = true;
+        // But also add some snare variety
+        const snareVar = snareVariations[Math.floor(Math.random() * Math.min(3, snareVariations.length))];
+        snareVar();
+        // Hi-hat eighth notes
+        for (let i = 0; i < steps; i += 2) {
+          newPattern[drumMap.hihat][i] = true;
+        }
+        // Open hat accents
+        newPattern[drumMap.openhat][7] = true;
+        newPattern[drumMap.openhat][15] = true;
+        // Crash on 1
+        newPattern[drumMap.crash][0] = true;
+      }
+    ];
+
+    // Choose random pattern
+    const pattern = patterns[Math.floor(Math.random() * patterns.length)];
+    pattern();
+
+    setPattern(newPattern);
+  };
+
   // Generate chord progressions following selected key
   const generateChords = () => {
     // Clear current pattern
@@ -1554,6 +1726,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       case 'chords':
         generateChords();
         break;
+      case 'beats':
+        generateBeats();
+        break;
     }
   };
 
@@ -1586,34 +1761,6 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
               className="w-20"
             />
             <span className="text-sm text-cyan-400 w-8">{bpm}</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-300">Root:</span>
-            <select
-              value={selectedRoot}
-              onChange={(e) => setSelectedRoot(e.target.value)}
-              className="bg-gray-700 text-white px-2 py-1 rounded text-sm min-w-[3rem]"
-            >
-              {rootNotes.map(root => (
-                <option key={root} value={root}>{root}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-300">Scale:</span>
-            <select
-              value={selectedScale}
-              onChange={(e) => setSelectedScale(e.target.value)}
-              className="bg-gray-700 text-white px-2 py-1 rounded text-sm min-w-[5rem]"
-            >
-              {Object.entries(scalePatterns).map(([scale]) => (
-                <option key={scale} value={scale}>
-                  {scale.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                </option>
-              ))}
-            </select>
           </div>
 
           <div className="flex items-center gap-2">
@@ -1758,6 +1905,80 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           Clear
         </button>
 
+        {/* Key selector */}
+        <div className="relative flex">
+          <button
+            onClick={() => setShowKeyMenu(!showKeyMenu)}
+            className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 rounded-l-lg transition-all transform hover:scale-105 font-semibold"
+          >
+            <Music className="w-5 h-5" />
+            {selectedRoot}
+          </button>
+
+          <button
+            onClick={() => setShowKeyMenu(!showKeyMenu)}
+            className="flex items-center gap-1 px-2 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 rounded-r-lg transition-all transform hover:scale-105 font-semibold border-l border-blue-700"
+          >
+            ▼
+          </button>
+
+          {showKeyMenu && (
+            <div className="absolute bottom-full mb-2 left-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-64 overflow-y-auto">
+              {rootNotes.map((root) => (
+                <button
+                  key={root}
+                  onClick={() => {
+                    setSelectedRoot(root);
+                    setShowKeyMenu(false);
+                  }}
+                  className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors ${
+                    selectedRoot === root ? 'bg-blue-900 text-blue-400' : 'text-white'
+                  }`}
+                >
+                  {root}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Scale selector */}
+        <div className="relative flex">
+          <button
+            onClick={() => setShowScaleMenu(!showScaleMenu)}
+            className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 rounded-l-lg transition-all transform hover:scale-105 font-semibold"
+          >
+            <Music className="w-5 h-5" />
+            {selectedScale.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+          </button>
+
+          <button
+            onClick={() => setShowScaleMenu(!showScaleMenu)}
+            className="flex items-center gap-1 px-2 py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 rounded-r-lg transition-all transform hover:scale-105 font-semibold border-l border-indigo-700"
+          >
+            ▼
+          </button>
+
+          {showScaleMenu && (
+            <div className="absolute bottom-full mb-2 left-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-64 overflow-y-auto">
+              {Object.keys(scalePatterns).map((scale) => (
+                <button
+                  key={scale}
+                  onClick={() => {
+                    setSelectedScale(scale);
+                    setShowScaleMenu(false);
+                  }}
+                  className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors ${
+                    selectedScale === scale ? 'bg-indigo-900 text-indigo-400' : 'text-white'
+                  }`}
+                >
+                  {scale.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="relative flex">
           <button
             onClick={generatePattern}
@@ -1793,6 +2014,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
                           break;
                         case 'chords':
                           generateChords();
+                          break;
+                        case 'beats':
+                          generateBeats();
                           break;
                       }
                     }, 0);
