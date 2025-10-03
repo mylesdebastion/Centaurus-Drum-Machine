@@ -118,6 +118,14 @@ class Drum808SoundEngine implements SoundEngine {
     };
   }
 
+  /**
+   * Convert velocity (0-1) to decibels (-40 to 0)
+   * Matches audioEngine.ts velocityToDb() for proper dynamics
+   */
+  private velocityToDb(velocity: number): number {
+    return Math.max(-40, Math.log10(Math.max(0.01, velocity)) * 20);
+  }
+
   playNote(frequency: number, velocity: number = 0.8): void {
     // Map frequency ranges to different drum sounds
     // Lower frequencies = kick/bass sounds, higher = cymbals/hats
@@ -160,16 +168,21 @@ class Drum808SoundEngine implements SoundEngine {
 
     try {
       const now = Tone.now();
+      const volumeDb = this.velocityToDb(velocity);
+
       if (sample instanceof Tone.MembraneSynth) {
         // For kick and tom drums - use pitch variation
         const note = drumType === 'kick' ? 'C1' : 'C3';
-        sample.triggerAttackRelease(note, '8n', now, velocity);
+        sample.volume.value = volumeDb;
+        sample.triggerAttackRelease(note, '8n', now);
       } else if (sample instanceof Tone.NoiseSynth) {
         // For snare and clap
-        sample.triggerAttackRelease('8n', now, velocity);
+        sample.volume.value = volumeDb;
+        sample.triggerAttackRelease('8n', now);
       } else if (sample instanceof Tone.MetalSynth) {
         // For hi-hats, crash, ride
-        sample.triggerAttackRelease('8n', now, velocity);
+        sample.volume.value = volumeDb;
+        sample.triggerAttackRelease('8n', now);
       }
     } catch (error) {
       console.error(`Error playing drum sound:`, error);
