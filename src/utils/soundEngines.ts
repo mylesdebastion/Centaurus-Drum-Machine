@@ -255,34 +255,35 @@ class PadSoundEngine implements SoundEngine {
 
 /**
  * FM Bell sound engine using Tone.js FMSynth
+ * Bright, metallic, crystalline tone with complex harmonics
  */
 class FMBellSoundEngine implements SoundEngine {
   private synth: Tone.PolySynth;
 
   constructor() {
     this.synth = new Tone.PolySynth(Tone.FMSynth, {
-      harmonicity: 3.5,
-      modulationIndex: 15,
+      harmonicity: 8,        // Higher ratio for more metallic, bell-like quality
+      modulationIndex: 25,   // Increased modulation for brighter, more complex harmonics
       oscillator: { type: 'sine' },
       envelope: {
-        attack: 0.001,
-        decay: 0.4,
-        sustain: 0.1,
-        release: 0.8
+        attack: 0.001,       // Very fast attack for bell strike
+        decay: 1.2,          // Longer decay for sustained shimmer
+        sustain: 0.05,       // Low sustain for realistic bell decay
+        release: 1.5         // Extended release for lingering resonance
       },
-      modulation: { type: 'square' },
+      modulation: { type: 'sine' },  // Sine modulation for smoother harmonics
       modulationEnvelope: {
-        attack: 0.002,
-        decay: 0.2,
-        sustain: 0,
-        release: 0.2
+        attack: 0.0005,      // Instant modulation attack
+        decay: 0.6,          // Longer decay for evolving timbre
+        sustain: 0.1,
+        release: 0.8         // Extended release for complex harmonics
       }
     }).toDestination();
 
-    this.synth.volume.value = -6; // Normalize volume
+    this.synth.volume.value = -8; // Slightly quieter due to bright harmonics
   }
 
-  playNote(frequency: number, velocity: number = 0.7, duration: number = 0.5): void {
+  playNote(frequency: number, velocity: number = 0.7, duration: number = 1.0): void {
     const note = Tone.Frequency(frequency, 'hz').toNote();
     this.synth.triggerAttackRelease(note, duration, undefined, velocity);
   }
