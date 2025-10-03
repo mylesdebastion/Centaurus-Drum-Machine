@@ -1,8 +1,9 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap, Lightbulb, Gamepad2 } from 'lucide-react';
+import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap, Lightbulb, Gamepad2, Volume2 } from 'lucide-react';
 import { SingleLaneVisualizer } from '../../utils/SingleLaneVisualizer';
 import { LEDStripManager } from '../LEDStripManager/LEDStripManager';
 import { APC40Controller, APC40ButtonEvent } from '../../utils/APC40Controller';
+import { createSoundEngine, SoundEngine, SoundEngineType, soundEngineNames } from '../../utils/soundEngines';
 
 interface IsometricSequencerProps {
   onBack: () => void;
@@ -131,6 +132,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   const [apc40Controller] = useState(() => new APC40Controller());
   const [apc40Connected, setAPC40Connected] = useState(false);
   const [apc40ColorMode, setAPC40ColorMode] = useState<'spectrum' | 'chromatic' | 'harmonic'>('spectrum');
+
+  // Sound engine state
+  const [selectedSoundEngine, setSelectedSoundEngine] = useState<SoundEngineType>('sine');
+  const [showSoundMenu, setShowSoundMenu] = useState(false);
+  const soundEngineRef = useRef<SoundEngine | null>(null);
 
   // Constants
   const lanes = 12;
@@ -345,38 +351,43 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   const camera = useRef(new Camera3D());
   const lastBeatTime = useRef(0);
 
-  // Initialize audio context
+  // Initialize audio context and sound engine
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     masterGainRef.current = audioContextRef.current.createGain();
     masterGainRef.current.connect(audioContextRef.current.destination);
     masterGainRef.current.gain.value = 0.3;
 
+    // Initialize default sound engine
+    if (audioContextRef.current && masterGainRef.current) {
+      soundEngineRef.current = createSoundEngine(selectedSoundEngine, audioContextRef.current, masterGainRef.current);
+    }
+
     return () => {
+      soundEngineRef.current?.dispose();
       if (audioContextRef.current?.state !== 'closed') {
         audioContextRef.current?.close();
       }
     };
   }, []);
 
-  // Play note function
-  const playNote = useCallback((laneIndex: number) => {
+  // Update sound engine when selection changes
+  useEffect(() => {
     if (!audioContextRef.current || !masterGainRef.current) return;
 
-    const oscillator = audioContextRef.current.createOscillator();
-    const gainNode = audioContextRef.current.createGain();
+    // Dispose old engine
+    soundEngineRef.current?.dispose();
 
-    oscillator.connect(gainNode);
-    gainNode.connect(masterGainRef.current);
+    // Create new engine
+    soundEngineRef.current = createSoundEngine(selectedSoundEngine, audioContextRef.current, masterGainRef.current);
+  }, [selectedSoundEngine]);
 
-    oscillator.frequency.setValueAtTime(noteFrequencies[laneIndex], audioContextRef.current.currentTime);
-    oscillator.type = 'sine';
+  // Play note function
+  const playNote = useCallback((laneIndex: number) => {
+    if (!soundEngineRef.current) return;
 
-    gainNode.gain.setValueAtTime(0.5, audioContextRef.current.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.3);
-
-    oscillator.start(audioContextRef.current.currentTime);
-    oscillator.stop(audioContextRef.current.currentTime + 0.3);
+    const frequency = noteFrequencies[laneIndex];
+    soundEngineRef.current.playNote(frequency, 0.8, 0.3);
   }, []);
 
   // Canvas resize handler
@@ -1677,6 +1688,35 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           <Zap className="w-5 h-5" />
           Melody
         </button>
+
+        <div className="relative">
+          <button
+            onClick={() => setShowSoundMenu(!showSoundMenu)}
+            className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-700 hover:to-cyan-600 rounded-lg transition-all transform hover:scale-105 font-semibold"
+          >
+            <Volume2 className="w-5 h-5" />
+            {soundEngineNames[selectedSoundEngine]}
+          </button>
+
+          {showSoundMenu && (
+            <div className="absolute bottom-full mb-2 left-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50">
+              {(Object.keys(soundEngineNames) as SoundEngineType[]).map((engineType) => (
+                <button
+                  key={engineType}
+                  onClick={() => {
+                    setSelectedSoundEngine(engineType);
+                    setShowSoundMenu(false);
+                  }}
+                  className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors ${
+                    selectedSoundEngine === engineType ? 'bg-cyan-900 text-cyan-400' : 'text-white'
+                  }`}
+                >
+                  {soundEngineNames[engineType]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Instructions */}
