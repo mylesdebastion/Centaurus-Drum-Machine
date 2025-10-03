@@ -131,7 +131,6 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   // APC40 hardware control state
   const [apc40Controller] = useState(() => new APC40Controller());
   const [apc40Connected, setAPC40Connected] = useState(false);
-  const [apc40ColorMode, setAPC40ColorMode] = useState<'spectrum' | 'chromatic' | 'harmonic'>('spectrum');
 
   // Sound engine state
   const [selectedSoundEngine, setSelectedSoundEngine] = useState<SoundEngineType>('keys');
@@ -1089,17 +1088,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     };
   }, [apc40Controller]);
 
-  // APC40 color mode updates - separate from setup/teardown
+  // Auto-sync APC40 color mode with harmonic toggle
   useEffect(() => {
-    apc40Controller.setColorMode(apc40ColorMode);
-  }, [apc40Controller, apc40ColorMode]);
-
-  // Auto-switch APC40 color mode based on harmonic mode setting
-  useEffect(() => {
-    const newColorMode = useHarmonicMode ? 'harmonic' : 'chromatic';
-    setAPC40ColorMode(newColorMode);
-    // Note: Don't call apc40Controller.setColorMode here - let the existing useEffect handle it
-  }, [useHarmonicMode]);
+    const colorMode = useHarmonicMode ? 'harmonic' : 'chromatic';
+    apc40Controller.setColorMode(colorMode);
+  }, [apc40Controller, useHarmonicMode]);
 
   // Handle APC40 button press
   const handleAPC40ButtonPress = useCallback((event: APC40ButtonEvent) => {
@@ -1876,24 +1869,6 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
               APC40
             </button>
 
-            {apc40Connected && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-300">Mode:</span>
-                <select
-                  value={apc40ColorMode}
-                  onChange={(e) => {
-                    const mode = e.target.value as 'spectrum' | 'chromatic' | 'harmonic';
-                    setAPC40ColorMode(mode);
-                    apc40Controller.setColorMode(mode);
-                  }}
-                  className="bg-gray-700 text-white px-2 py-1 rounded text-sm"
-                >
-                  <option value="spectrum">Spectrum</option>
-                  <option value="chromatic">Chromatic</option>
-                  <option value="harmonic">Harmonic</option>
-                </select>
-              </div>
-            )}
           </div>
         </div>
       </div>
