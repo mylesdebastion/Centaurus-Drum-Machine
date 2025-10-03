@@ -161,33 +161,42 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               <p className="text-sm text-gray-400 mb-4">
                 Sync with friends using room codes
               </p>
-              {!showJoinInput ? (
+              <div className="space-y-2">
                 <button
-                  onClick={() => setShowJoinInput(true)}
-                  className="btn-secondary w-full text-sm px-4 py-2 flex items-center justify-center gap-2"
+                  onClick={onStartJam}
+                  className="btn-primary w-full text-sm px-4 py-2 flex items-center justify-center gap-2"
                 >
-                  <Users className="w-4 h-4" />
-                  Join a Room
+                  <Play className="w-4 h-4" />
+                  Create a Jam Room
                 </button>
-              ) : (
-                <form onSubmit={handleJoinSubmit} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={joinCode}
-                    onChange={(e) => setJoinCode(e.target.value)}
-                    placeholder="Room code"
-                    className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm placeholder-gray-400 focus:border-purple-500 focus:outline-none"
-                    autoFocus
-                  />
+                {!showJoinInput ? (
                   <button
-                    type="submit"
-                    className="btn-primary px-4 py-2 text-sm"
-                    disabled={!joinCode.trim()}
+                    onClick={() => setShowJoinInput(true)}
+                    className="btn-secondary w-full text-sm px-4 py-2 flex items-center justify-center gap-2"
                   >
-                    Join
+                    <Users className="w-4 h-4" />
+                    Join a Room
                   </button>
-                </form>
-              )}
+                ) : (
+                  <form onSubmit={handleJoinSubmit} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={joinCode}
+                      onChange={(e) => setJoinCode(e.target.value)}
+                      placeholder="Room code"
+                      className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm placeholder-gray-400 focus:border-purple-500 focus:outline-none"
+                      autoFocus
+                    />
+                    <button
+                      type="submit"
+                      className="btn-primary px-4 py-2 text-sm"
+                      disabled={!joinCode.trim()}
+                    >
+                      Join
+                    </button>
+                  </form>
+                )}
+              </div>
             </div>
 
             {/* APC40 Demo */}
