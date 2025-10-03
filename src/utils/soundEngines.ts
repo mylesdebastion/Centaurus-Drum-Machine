@@ -3,7 +3,7 @@ import * as Tone from 'tone';
 /**
  * Sound engine types available for the IsometricSequencer
  */
-export type SoundEngineType = 'sine' | 'drums' | 'pluck' | 'pad' | 'fm-bell';
+export type SoundEngineType = 'sine' | 'drums' | 'pluck' | 'pad' | 'fm-bell' | 'bass';
 
 /**
  * Interface for sound engine implementations
@@ -199,21 +199,22 @@ class DrumSoundEngine implements SoundEngine {
 
 /**
  * Pluck/mallet sound engine using Tone.js PluckSynth
+ * Softer pluck sound with less percussive attack
  */
 class PluckSoundEngine implements SoundEngine {
   private synth: Tone.PluckSynth;
 
   constructor() {
     this.synth = new Tone.PluckSynth({
-      attackNoise: 1,
-      dampening: 4000,
-      resonance: 0.7
+      attackNoise: 0.5,    // Reduced from 1 for softer attack
+      dampening: 3000,     // Reduced from 4000 for longer sustain
+      resonance: 0.85      // Increased from 0.7 for more resonance
     }).toDestination();
 
     this.synth.volume.value = -3; // Normalize volume
   }
 
-  playNote(frequency: number, velocity: number = 0.8, duration: number = 0.3): void {
+  playNote(frequency: number, velocity: number = 0.8, duration: number = 0.5): void {
     const note = Tone.Frequency(frequency, 'hz').toNote();
     this.synth.triggerAttackRelease(note, duration, undefined, velocity);
   }
@@ -294,6 +295,54 @@ class FMBellSoundEngine implements SoundEngine {
 }
 
 /**
+ * Bass sound engine using Tone.js MonoSynth
+ * Deep, warm bass sound pitched one octave lower
+ */
+class BassSoundEngine implements SoundEngine {
+  private synth: Tone.MonoSynth;
+
+  constructor() {
+    this.synth = new Tone.MonoSynth({
+      oscillator: {
+        type: 'sawtooth'     // Rich harmonics for bass
+      },
+      filter: {
+        Q: 2,
+        type: 'lowpass',
+        frequency: 800       // Low-pass filter for warm bass
+      },
+      envelope: {
+        attack: 0.01,        // Quick attack
+        decay: 0.3,
+        sustain: 0.4,
+        release: 0.8
+      },
+      filterEnvelope: {
+        attack: 0.01,
+        decay: 0.2,
+        sustain: 0.3,
+        release: 0.5,
+        baseFrequency: 200,  // Bass frequency range
+        octaves: 2.5
+      }
+    }).toDestination();
+
+    this.synth.volume.value = -3; // Normalize volume
+  }
+
+  playNote(frequency: number, velocity: number = 0.8, duration: number = 0.4): void {
+    // Pitch down by one octave (divide frequency by 2)
+    const bassFrequency = frequency / 2;
+    const note = Tone.Frequency(bassFrequency, 'hz').toNote();
+    this.synth.triggerAttackRelease(note, duration, undefined, velocity);
+  }
+
+  dispose(): void {
+    this.synth.dispose();
+  }
+}
+
+/**
  * Factory function to create sound engines
  */
 export function createSoundEngine(
@@ -312,6 +361,8 @@ export function createSoundEngine(
       return new PadSoundEngine();
     case 'fm-bell':
       return new FMBellSoundEngine();
+    case 'bass':
+      return new BassSoundEngine();
     default:
       return new OscillatorSoundEngine(audioContext, masterGain);
   }
@@ -325,5 +376,6 @@ export const soundEngineNames: Record<SoundEngineType, string> = {
   'drums': 'Drums',
   'pluck': 'Pluck',
   'pad': 'Pad',
-  'fm-bell': 'FM Bell'
+  'fm-bell': 'FM Bell',
+  'bass': 'Bass'
 };
