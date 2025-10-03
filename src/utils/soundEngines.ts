@@ -296,7 +296,7 @@ class FMBellSoundEngine implements SoundEngine {
 
 /**
  * Bass sound engine using Tone.js MonoSynth
- * Deep, warm bass sound pitched one octave lower
+ * Deep, warm bass sound pitched two octaves lower
  */
 class BassSoundEngine implements SoundEngine {
   private synth: Tone.MonoSynth;
@@ -331,8 +331,8 @@ class BassSoundEngine implements SoundEngine {
   }
 
   playNote(frequency: number, velocity: number = 0.8, duration: number = 0.4): void {
-    // Pitch down by one octave (divide frequency by 2)
-    const bassFrequency = frequency / 2;
+    // Pitch down by two octaves (divide frequency by 4)
+    const bassFrequency = frequency / 4;
     const note = Tone.Frequency(bassFrequency, 'hz').toNote();
     this.synth.triggerAttackRelease(note, duration, undefined, velocity);
   }
