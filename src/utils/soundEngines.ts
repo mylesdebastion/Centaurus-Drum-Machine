@@ -3,7 +3,7 @@ import * as Tone from 'tone';
 /**
  * Sound engine types available for the IsometricSequencer
  */
-export type SoundEngineType = 'sine' | '808' | 'pluck' | 'pad' | 'fm-bell';
+export type SoundEngineType = 'sine' | 'drums' | 'pluck' | 'pad' | 'fm-bell';
 
 /**
  * Interface for sound engine implementations
@@ -48,10 +48,10 @@ class OscillatorSoundEngine implements SoundEngine {
 }
 
 /**
- * 808-style drum machine sound engine matching original jam mode drums
+ * Drum machine sound engine matching original jam mode drums
  * Maps frequencies to different drum sounds from audioEngine.ts
  */
-class Drum808SoundEngine implements SoundEngine {
+class DrumSoundEngine implements SoundEngine {
   private drumSamples: { [key: string]: Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth };
   private masterVolume: Tone.Volume;
 
@@ -303,8 +303,8 @@ export function createSoundEngine(
   switch (type) {
     case 'sine':
       return new OscillatorSoundEngine(audioContext, masterGain);
-    case '808':
-      return new Drum808SoundEngine();
+    case 'drums':
+      return new DrumSoundEngine();
     case 'pluck':
       return new PluckSoundEngine();
     case 'pad':
@@ -321,7 +321,7 @@ export function createSoundEngine(
  */
 export const soundEngineNames: Record<SoundEngineType, string> = {
   'sine': 'Sine Wave',
-  '808': '808 Drums',
+  'drums': 'Drums',
   'pluck': 'Pluck',
   'pad': 'Pad',
   'fm-bell': 'FM Bell'
