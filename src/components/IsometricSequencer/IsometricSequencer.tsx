@@ -138,6 +138,16 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   const [showSoundMenu, setShowSoundMenu] = useState(false);
   const soundEngineRef = useRef<SoundEngine | null>(null);
 
+  // Melody generation mode state
+  type MelodyMode = 'melody' | 'random' | 'chords';
+  const [selectedMelodyMode, setSelectedMelodyMode] = useState<MelodyMode>('melody');
+  const [showMelodyMenu, setShowMelodyMenu] = useState(false);
+  const melodyModeNames: Record<MelodyMode, string> = {
+    melody: 'Melody',
+    random: 'Random',
+    chords: 'Chords'
+  };
+
   // Constants
   const lanes = 12;
   const steps = 16;
@@ -1318,6 +1328,66 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     ));
   };
 
+  // Generate chord progressions following selected key
+  const generateChords = () => {
+    // Clear current pattern
+    const newPattern: boolean[][] = Array(12).fill(null).map(() => Array(16).fill(false));
+
+    // Use the current root and scale
+    const currentScale = getCurrentScale();
+
+    // Build chords for the selected key
+    const keyChords = {
+      I: [currentScale[0], currentScale[2], currentScale[4]],    // I major (1, 3, 5)
+      ii: [currentScale[1], currentScale[3], currentScale[5]],   // ii minor (2, 4, 6)
+      iii: [currentScale[2], currentScale[4], currentScale[6]], // iii minor (3, 5, 7)
+      IV: [currentScale[3], currentScale[5], currentScale[0]],   // IV major (4, 6, 1)
+      V: [currentScale[4], currentScale[6], currentScale[1]],    // V major (5, 7, 2)
+      vi: [currentScale[5], currentScale[0], currentScale[2]],   // vi minor (6, 1, 3)
+      vii: [currentScale[6], currentScale[1], currentScale[3]]   // vii diminished (7, 2, 4)
+    };
+
+    // Popular chord progressions
+    const progressions = [
+      ['I', 'V', 'vi', 'IV'],     // Pop progression (C-G-Am-F)
+      ['vi', 'IV', 'I', 'V'],     // Pop progression variation (Am-F-C-G)
+      ['I', 'vi', 'ii', 'V'],     // Classic jazz turnaround
+      ['I', 'IV', 'V', 'I'],      // Basic major progression
+      ['vi', 'ii', 'V', 'I'],     // Minor to major resolution
+      ['I', 'iii', 'vi', 'IV']    // Circle progression
+    ];
+
+    // Choose random progression
+    const progression = progressions[Math.floor(Math.random() * progressions.length)];
+
+    progression.forEach((chordName, beatIndex) => {
+      const chord = keyChords[chordName as keyof typeof keyChords];
+      const startBeat = beatIndex * 4; // Each chord lasts 4 beats
+
+      // Add all chord tones at the same time (vertical chord)
+      chord.forEach((note) => {
+        if (startBeat < steps) {
+          newPattern[note][startBeat] = true;
+        }
+      });
+
+      // Add chord repetition on beat 2 of the measure
+      if (Math.random() < 0.7 && startBeat + 2 < steps) {
+        chord.forEach((note) => {
+          newPattern[note][startBeat + 2] = true;
+        });
+      }
+
+      // Optional: add bass note on off-beats for rhythm
+      if (Math.random() < 0.5 && startBeat + 1 < steps) {
+        const rootNote = chord[0];
+        newPattern[rootNote][startBeat + 1] = true;
+      }
+    });
+
+    setPattern(newPattern);
+  };
+
   // Musical patterns and chord progressions
   const generateMelody = () => {
     // Clear current pattern
@@ -1470,6 +1540,21 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     }
 
     setPattern(newPattern);
+  };
+
+  // Unified pattern generator based on selected mode
+  const generatePattern = () => {
+    switch (selectedMelodyMode) {
+      case 'melody':
+        generateMelody();
+        break;
+      case 'random':
+        randomizePattern();
+        break;
+      case 'chords':
+        generateChords();
+        break;
+    }
   };
 
   return (
@@ -1673,29 +1758,70 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           Clear
         </button>
 
-        <button
-          onClick={randomizePattern}
-          className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 rounded-lg transition-all transform hover:scale-105 font-semibold"
-        >
-          <Shuffle className="w-5 h-5" />
-          Random
-        </button>
+        <div className="relative flex">
+          <button
+            onClick={generatePattern}
+            className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 rounded-l-lg transition-all transform hover:scale-105 font-semibold"
+          >
+            <Zap className="w-5 h-5" />
+            {melodyModeNames[selectedMelodyMode]}
+          </button>
 
-        <button
-          onClick={generateMelody}
-          className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 rounded-lg transition-all transform hover:scale-105 font-semibold"
-        >
-          <Zap className="w-5 h-5" />
-          Melody
-        </button>
+          <button
+            onClick={() => setShowMelodyMenu(!showMelodyMenu)}
+            className="flex items-center gap-1 px-2 py-3 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 rounded-r-lg transition-all transform hover:scale-105 font-semibold border-l border-orange-700"
+          >
+            ▼
+          </button>
 
-        <div className="relative">
+          {showMelodyMenu && (
+            <div className="absolute bottom-full mb-2 left-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50">
+              {(Object.keys(melodyModeNames) as MelodyMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => {
+                    setSelectedMelodyMode(mode);
+                    setShowMelodyMenu(false);
+                    // Generate immediately after selecting
+                    setTimeout(() => {
+                      switch (mode) {
+                        case 'melody':
+                          generateMelody();
+                          break;
+                        case 'random':
+                          randomizePattern();
+                          break;
+                        case 'chords':
+                          generateChords();
+                          break;
+                      }
+                    }, 0);
+                  }}
+                  className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors ${
+                    selectedMelodyMode === mode ? 'bg-orange-900 text-orange-400' : 'text-white'
+                  }`}
+                >
+                  {melodyModeNames[mode]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="relative flex">
           <button
             onClick={() => setShowSoundMenu(!showSoundMenu)}
-            className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-700 hover:to-cyan-600 rounded-lg transition-all transform hover:scale-105 font-semibold"
+            className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-700 hover:to-cyan-600 rounded-l-lg transition-all transform hover:scale-105 font-semibold"
           >
             <Volume2 className="w-5 h-5" />
             {soundEngineNames[selectedSoundEngine]}
+          </button>
+
+          <button
+            onClick={() => setShowSoundMenu(!showSoundMenu)}
+            className="flex items-center gap-1 px-2 py-3 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-700 hover:to-cyan-600 rounded-r-lg transition-all transform hover:scale-105 font-semibold border-l border-cyan-700"
+          >
+            ▼
           </button>
 
           {showSoundMenu && (
