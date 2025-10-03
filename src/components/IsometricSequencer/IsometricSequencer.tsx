@@ -113,7 +113,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   const [selectedRoot, setSelectedRoot] = useState('C'); // Root note (C, D, E, etc.)
   const [selectedScale, setSelectedScale] = useState('major'); // Scale type (major, minor, etc.)
   const [showAllNotes, setShowAllNotes] = useState(false); // Toggle between scale and chromatic
-  const [useHarmonicColors, setUseHarmonicColors] = useState(false); // Toggle Circle of Fifths harmonic color arrangement
+  const [useHarmonicMode, setUseHarmonicMode] = useState(false); // Toggle harmonic mode (Circle of Fifths note arrangement)
   const [pattern, setPattern] = useState<boolean[][]>(
     Array(12).fill(null).map(() => Array(16).fill(false))
   );
@@ -239,7 +239,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
 
   // Function to get effective lane order (either chromatic or Circle of Fifths)
   const getEffectiveLaneOrder = () => {
-    if (!useHarmonicColors) {
+    if (!useHarmonicMode) {
       // Standard chromatic order: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 (C, C#, D, D#, E, F, F#, G, G#, A, A#, B)
       return Array.from({ length: 12 }, (_, i) => i);
     }
@@ -248,34 +248,34 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     return getHarmonicColorMapping();
   };
 
-  // Function to get effective colors (using Circle of Fifths progression colors)
+  // Function to get effective colors
   const getEffectiveColors = () => {
-    if (!useHarmonicColors) {
+    if (!useHarmonicMode) {
+      // Chromatic mode: colors indexed by chromatic note (C=red, D=orange, etc.)
       return boomwhackerColors;
     }
 
-    // Create harmonic color array where each lane position gets progressive colors
+    // Harmonic mode: colors assigned by Circle of Fifths position
+    // Notes that are close in the Circle of Fifths get similar colors
+    // Circle of Fifths from C: C, G, D, A, E, B, F#, C#, G#, D#, A#, F
     const harmonicColors = new Array(12);
 
-    // Use smooth color transitions for Circle of Fifths progression
-    const progressiveHues = [
-      '#ff4444', // 1st in progression - Strong Red
-      '#ff8844', // 2nd in progression - Warm Orange
-      '#ffaa44', // 3rd in progression - Orange
-      '#ffcc44', // 4th in progression - Yellow-Orange
-      '#ffff44', // 5th in progression - Yellow
-      '#aaff44', // 6th in progression - Yellow-Green
-      '#66ff44', // 7th in progression - Green
-      '#44ff44', // 8th in progression - Bright Green
-      '#44ffaa', // 9th in progression - Blue-Green
-      '#44aaff', // 10th in progression - Blue
-      '#4466ff', // 11th in progression - Blue-Purple
-      '#6644ff'  // 12th in progression - Purple
-    ];
+    // For each chromatic note, find its position in Circle of Fifths
+    // and assign it the corresponding boomwhacker color
+    for (let chromaticNote = 0; chromaticNote < 12; chromaticNote++) {
+      // Find position in Circle of Fifths (how many fifths from C)
+      let circlePosition = 0;
+      let currentNote = 0; // Start at C
+      for (let i = 0; i < 12; i++) {
+        if (currentNote === chromaticNote) {
+          circlePosition = i;
+          break;
+        }
+        currentNote = (currentNote + 7) % 12; // Move by perfect fifth
+      }
 
-    // Assign colors to physical lane positions
-    for (let i = 0; i < 12; i++) {
-      harmonicColors[i] = progressiveHues[i];
+      // Assign color based on Circle of Fifths position
+      harmonicColors[chromaticNote] = boomwhackerColors[circlePosition];
     }
 
     return harmonicColors;
@@ -306,12 +306,12 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     // Scale mode - need to get scale notes in effective order
     const scaleNotes = getCurrentScale();
 
-    if (!useHarmonicColors) {
+    if (!useHarmonicMode) {
       // Normal chromatic order
       return scaleNotes;
     }
 
-    // Circle of Fifths mode: filter the Circle of Fifths order to only include scale notes
+    // Harmonic mode: filter the Circle of Fifths order to only include scale notes
     const circleOrder = getEffectiveLaneOrder();
     return circleOrder.filter(chromaticLane => scaleNotes.includes(chromaticLane));
   };
@@ -619,7 +619,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
         ctx.restore();
       }
     }
-  }, [effectiveLanes, activeLanes, worldLaneWidth, noteNames, getEffectiveColors(), currentBeat, bpm, steps, worldStepDepth, selectedRoot, selectedScale, getCurrentScale, useHarmonicColors]);
+  }, [effectiveLanes, activeLanes, worldLaneWidth, noteNames, getEffectiveColors(), currentBeat, bpm, steps, worldStepDepth, selectedRoot, selectedScale, getCurrentScale, useHarmonicMode]);
 
   // Setup camera for 3D view
   const setupCamera = useCallback(() => {
@@ -1094,12 +1094,12 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     apc40Controller.setColorMode(apc40ColorMode);
   }, [apc40Controller, apc40ColorMode]);
 
-  // Auto-switch APC40 color mode based on Circle of Fifths setting
+  // Auto-switch APC40 color mode based on harmonic mode setting
   useEffect(() => {
-    const newColorMode = useHarmonicColors ? 'harmonic' : 'chromatic';
+    const newColorMode = useHarmonicMode ? 'harmonic' : 'chromatic';
     setAPC40ColorMode(newColorMode);
     // Note: Don't call apc40Controller.setColorMode here - let the existing useEffect handle it
-  }, [useHarmonicColors]);
+  }, [useHarmonicMode]);
 
   // Handle APC40 button press
   const handleAPC40ButtonPress = useCallback((event: APC40ButtonEvent) => {
@@ -1343,6 +1343,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       kick: 0,      // C - lowest note
       snare: 2,     // D
       clap: 4,      // E
+      rimshot: 5,   // F - rimshot/side stick
       hihat: 7,     // G
       openhat: 9,   // A
       crash: 11,    // B - highest
@@ -1732,6 +1733,46 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     }
   };
 
+  // Randomize all settings: key, scale, melody mode, and sound engine
+  const randomizeAll = () => {
+    // Randomly select root note
+    const randomRoot = rootNotes[Math.floor(Math.random() * rootNotes.length)];
+    setSelectedRoot(randomRoot);
+
+    // Randomly select scale
+    const scaleKeys = Object.keys(scalePatterns);
+    const randomScale = scaleKeys[Math.floor(Math.random() * scaleKeys.length)];
+    setSelectedScale(randomScale);
+
+    // Randomly select melody mode
+    const melodyModes: MelodyMode[] = ['melody', 'random', 'chords', 'beats'];
+    const randomMelodyMode = melodyModes[Math.floor(Math.random() * melodyModes.length)];
+    setSelectedMelodyMode(randomMelodyMode);
+
+    // Randomly select sound engine
+    const engineTypes = Object.keys(soundEngineNames) as SoundEngineType[];
+    const randomEngine = engineTypes[Math.floor(Math.random() * engineTypes.length)];
+    setSelectedSoundEngine(randomEngine);
+
+    // Generate pattern based on selected mode after a short delay to ensure state updates
+    setTimeout(() => {
+      switch (randomMelodyMode) {
+        case 'melody':
+          generateMelody();
+          break;
+        case 'random':
+          randomizePattern();
+          break;
+        case 'chords':
+          generateChords();
+          break;
+        case 'beats':
+          generateBeats();
+          break;
+      }
+    }, 50);
+  };
+
   return (
     <div className="min-h-screen bg-black flex flex-col">
       {/* Header */}
@@ -1767,11 +1808,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={useHarmonicColors}
-                onChange={(e) => setUseHarmonicColors(e.target.checked)}
+                checked={useHarmonicMode}
+                onChange={(e) => setUseHarmonicMode(e.target.checked)}
                 className="w-4 h-4 text-cyan-400 bg-gray-700 border-gray-600 rounded focus:ring-cyan-400 focus:ring-2"
               />
-              <span className="text-sm text-gray-300">Circle of 5ths</span>
+              <span className="text-sm text-gray-300">Harmonic</span>
             </label>
           </div>
 
@@ -2067,6 +2108,15 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
             </div>
           )}
         </div>
+
+        <button
+          onClick={randomizeAll}
+          className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 rounded-lg transition-all transform hover:scale-105 font-semibold"
+          title="Randomize all settings"
+        >
+          <Shuffle className="w-5 h-5" />
+          Random
+        </button>
       </div>
 
       {/* Instructions */}
