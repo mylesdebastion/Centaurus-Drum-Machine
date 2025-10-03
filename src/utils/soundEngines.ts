@@ -48,36 +48,139 @@ class OscillatorSoundEngine implements SoundEngine {
 }
 
 /**
- * 808-style drum machine sound engine using Tone.js MembraneSynth
+ * 808-style drum machine sound engine matching original jam mode drums
+ * Maps frequencies to different drum sounds from audioEngine.ts
  */
 class Drum808SoundEngine implements SoundEngine {
-  private synth: Tone.MembraneSynth;
+  private drumSamples: { [key: string]: Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth };
+  private masterVolume: Tone.Volume;
 
   constructor() {
-    this.synth = new Tone.MembraneSynth({
-      pitchDecay: 0.05,
-      octaves: 10,
-      oscillator: { type: 'sine' },
-      envelope: {
-        attack: 0.001,
-        decay: 0.4,
-        sustain: 0.01,
-        release: 1.4,
-        attackCurve: 'exponential'
-      }
-    }).toDestination();
+    this.masterVolume = new Tone.Volume(-6).toDestination();
 
-    this.synth.volume.value = -6; // Normalize volume
+    // Create drum samples matching original audioEngine.ts configuration
+    this.drumSamples = {
+      'kick': new Tone.MembraneSynth({
+        pitchDecay: 0.05,
+        octaves: 10,
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4 }
+      }).connect(this.masterVolume),
+
+      'snare': new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.005, decay: 0.1, sustain: 0.0 }
+      }).connect(this.masterVolume),
+
+      'hihat': new Tone.MetalSynth({
+        envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 4000,
+        octaves: 1.5
+      }).connect(this.masterVolume),
+
+      'openhat': new Tone.MetalSynth({
+        envelope: { attack: 0.001, decay: 0.3, release: 0.1 },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 4000,
+        octaves: 1.5
+      }).connect(this.masterVolume),
+
+      'clap': new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.005, decay: 0.1, sustain: 0.0 }
+      }).connect(this.masterVolume),
+
+      'crash': new Tone.MetalSynth({
+        envelope: { attack: 0.001, decay: 1.4, release: 0.2 },
+        harmonicity: 5.1,
+        modulationIndex: 64,
+        resonance: 4000,
+        octaves: 1.5
+      }).connect(this.masterVolume),
+
+      'ride': new Tone.MetalSynth({
+        envelope: { attack: 0.001, decay: 0.4, release: 0.1 },
+        harmonicity: 5.1,
+        modulationIndex: 16,
+        resonance: 4000,
+        octaves: 1.5
+      }).connect(this.masterVolume),
+
+      'tom': new Tone.MembraneSynth({
+        pitchDecay: 0.008,
+        octaves: 2,
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.006, decay: 0.5, sustain: 0.0 }
+      }).connect(this.masterVolume)
+    };
   }
 
-  playNote(frequency: number, velocity: number = 0.8, duration: number = 0.3): void {
-    // Convert frequency to note name for Tone.js
-    const note = Tone.Frequency(frequency, 'hz').toNote();
-    this.synth.triggerAttackRelease(note, duration, undefined, velocity);
+  playNote(frequency: number, velocity: number = 0.8): void {
+    // Map frequency ranges to different drum sounds
+    // Lower frequencies = kick/bass sounds, higher = cymbals/hats
+    let sample: Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth;
+    let drumType: string;
+
+    if (frequency < 150) {
+      // Very low = kick drum
+      sample = this.drumSamples['kick'] as Tone.MembraneSynth;
+      drumType = 'kick';
+    } else if (frequency < 200) {
+      // Low-mid = tom
+      sample = this.drumSamples['tom'] as Tone.MembraneSynth;
+      drumType = 'tom';
+    } else if (frequency < 300) {
+      // Mid = snare
+      sample = this.drumSamples['snare'] as Tone.NoiseSynth;
+      drumType = 'snare';
+    } else if (frequency < 400) {
+      // Mid-high = clap
+      sample = this.drumSamples['clap'] as Tone.NoiseSynth;
+      drumType = 'clap';
+    } else if (frequency < 500) {
+      // High = closed hi-hat
+      sample = this.drumSamples['hihat'] as Tone.MetalSynth;
+      drumType = 'hihat';
+    } else if (frequency < 600) {
+      // Higher = open hi-hat
+      sample = this.drumSamples['openhat'] as Tone.MetalSynth;
+      drumType = 'openhat';
+    } else if (frequency < 800) {
+      // Very high = ride
+      sample = this.drumSamples['ride'] as Tone.MetalSynth;
+      drumType = 'ride';
+    } else {
+      // Highest = crash
+      sample = this.drumSamples['crash'] as Tone.MetalSynth;
+      drumType = 'crash';
+    }
+
+    try {
+      const now = Tone.now();
+      if (sample instanceof Tone.MembraneSynth) {
+        // For kick and tom drums - use pitch variation
+        const note = drumType === 'kick' ? 'C1' : 'C3';
+        sample.triggerAttackRelease(note, '8n', now, velocity);
+      } else if (sample instanceof Tone.NoiseSynth) {
+        // For snare and clap
+        sample.triggerAttackRelease('8n', now, velocity);
+      } else if (sample instanceof Tone.MetalSynth) {
+        // For hi-hats, crash, ride
+        sample.triggerAttackRelease('8n', now, velocity);
+      }
+    } catch (error) {
+      console.error(`Error playing drum sound:`, error);
+    }
   }
 
   dispose(): void {
-    this.synth.dispose();
+    Object.values(this.drumSamples).forEach(sample => {
+      sample.dispose();
+    });
+    this.masterVolume.dispose();
   }
 }
 
