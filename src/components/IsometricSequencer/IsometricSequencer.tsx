@@ -1098,7 +1098,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   // Auto-sync APC40 rotation setting
   useEffect(() => {
     apc40Controller.setRotation(apc40Rotated);
-  }, [apc40Controller, apc40Rotated]);
+    // Clear LEDs when rotation changes to refresh the display
+    if (apc40Connected) {
+      apc40Controller.clearAllLEDs();
+    }
+  }, [apc40Controller, apc40Rotated, apc40Connected]);
 
   // Handle APC40 button press
   const handleAPC40ButtonPress = useCallback((event: APC40ButtonEvent) => {
