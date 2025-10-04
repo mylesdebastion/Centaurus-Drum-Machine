@@ -274,14 +274,13 @@ export class APC40Controller {
 
     if (this.config.rotated) {
       // Rotated 90° mode: rows become steps, columns become lanes
-      // - Hardware columns (0-7 left to right) → steps (0-7)
-      // - Hardware rows (0-4 bottom to top) → lanes (0-4)
-      // Only use first 5 columns for lanes
-      if (column >= 5) return null; // Ignore columns 5-7 in rotated mode
+      // - Hardware columns (0-7 left to right) → lanes (0-7)
+      // - Hardware rows (0-4 bottom to top) → steps (0-4)
+      // Now using all 8 columns for 8 lanes (was limited to 5)
 
       return {
-        lane: column, // Columns become lanes
-        step: row + (this.currentPage * 8), // Rows become steps
+        lane: column, // Columns become lanes (0-7 for 8 lanes)
+        step: row + (this.currentPage * 8), // Rows become steps (5 rows visible at once)
         velocity
       };
     } else {
@@ -303,7 +302,10 @@ export class APC40Controller {
    * Convert lane/step to APC40 MIDI note
    */
   private buttonEventToNote(lane: number, step: number): number | null {
-    if (lane < 0 || lane > 4 || step < 0 || step > 15) {
+    // In rotated mode, we support 8 lanes (0-7); in normal mode, 5 lanes (0-4)
+    const maxLane = this.config.rotated ? 7 : 4;
+
+    if (lane < 0 || lane > maxLane || step < 0 || step > 15) {
       return null;
     }
 
@@ -359,8 +361,11 @@ export class APC40Controller {
     const pageOffset = this.currentPage * 8;
     const visibleSteps = 8;
 
-    // Update each position in the 5x8 grid
-    for (let lane = 0; lane < 5; lane++) {
+    // In rotated mode, we show 8 lanes; in normal mode, 5 lanes
+    const maxLane = this.config.rotated ? 8 : 5;
+
+    // Update each position in the grid
+    for (let lane = 0; lane < maxLane; lane++) {
       for (let step = 0; step < visibleSteps; step++) {
         const actualStep = step + pageOffset; // Convert to actual step in pattern
         const note = this.buttonEventToNote(lane, actualStep);
@@ -369,8 +374,8 @@ export class APC40Controller {
         let color: number;
 
         if (actualStep === currentStep && isPlaying) {
-          // Timeline indicator - bright white
-          color = this.LED_COLORS.YELLOW; // Use YELLOW for timeline (shows as bright white)
+          // Timeline indicator - white
+          color = this.LED_COLORS.WHITE;
         } else if (pattern[lane] && pattern[lane][actualStep]) {
           // Active note - use color mode
           // Map APC40 lane to actual chromatic lane for correct color

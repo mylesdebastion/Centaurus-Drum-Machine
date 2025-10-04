@@ -1136,7 +1136,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     // Map the full 12-lane pattern to APC40's 5-lane display
     // Use effective lane ordering (respects Circle of Fifths when enabled)
     const activeLanesArray = getActiveLanes();
-    const apc40Pattern: boolean[][] = Array(5).fill(null).map((_, apc40Lane) => {
+
+    // In rotated mode, show 8 lanes; in normal mode, show 5 lanes
+    const numLanes = apc40Rotated ? 8 : 5;
+
+    const apc40Pattern: boolean[][] = Array(numLanes).fill(null).map((_, apc40Lane) => {
       const chromaticLane = activeLanesArray[apc40Lane];
       return chromaticLane !== undefined ? (pattern[chromaticLane] || Array(16).fill(false)) : Array(16).fill(false);
     });
@@ -1147,9 +1151,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       currentBeat,
       isPlaying,
       getEffectiveColors(),
-      getActiveLanes().slice(0, 5) // Only first 5 active lanes
+      getActiveLanes().slice(0, numLanes)
     );
-  }, [apc40Connected, pattern, currentBeat, isPlaying, boomwhackerColors, getActiveLanes, apc40Controller]);
+  }, [apc40Connected, pattern, currentBeat, isPlaying, boomwhackerColors, getActiveLanes, apc40Controller, apc40Rotated]);
 
   // Connect APC40
   const connectAPC40 = useCallback(async () => {
