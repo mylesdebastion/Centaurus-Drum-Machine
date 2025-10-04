@@ -1108,12 +1108,12 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   const handleAPC40ButtonPress = useCallback((event: APC40ButtonEvent) => {
     console.log('🎛️ APC40 button press:', event);
 
-    // Map APC40 5x8 grid to IsometricSequencer pattern
-    // APC40 lanes 0-4 → first 5 active lanes (respects Circle of Fifths ordering)
-    // APC40 steps 0-7 → sequencer steps 0-7 (first half of 16-step pattern)
+    // Map APC40 grid to IsometricSequencer pattern
+    // In rotated mode: 8 lanes × 5 steps (uses all chromatic notes)
+    // In normal mode: 5 lanes × 8 steps (uses active scale/chromatic)
 
-    // Use effective lane ordering - map APC40 lane to chromatic lane
-    const activeLanesArray = getActiveLanes();
+    // Use effective lane ordering - in rotated mode, always use all chromatic lanes
+    const activeLanesArray = apc40Rotated ? getEffectiveLaneOrder() : getActiveLanes();
     if (event.lane >= activeLanesArray.length) {
       console.warn(`APC40 lane ${event.lane} is beyond active lanes (${activeLanesArray.length})`);
       return;
@@ -1131,15 +1131,15 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
 
     // Play note for feedback
     playNote(chromaticLane);
-  }, [playNote]);
+  }, [playNote, getActiveLanes, apc40Rotated, getEffectiveLaneOrder]);
 
   // Update APC40 LEDs when pattern or playback state changes
   const updateAPC40LEDs = useCallback(() => {
     if (!apc40Connected) return;
 
-    // Map the full 12-lane pattern to APC40's 5-lane display
     // Use effective lane ordering (respects Circle of Fifths when enabled)
-    const activeLanesArray = getActiveLanes();
+    // In rotated mode, we need at least 8 lanes, so use all chromatic notes
+    const activeLanesArray = apc40Rotated ? getEffectiveLaneOrder() : getActiveLanes();
 
     // In rotated mode, show 8 lanes; in normal mode, show 5 lanes
     const numLanes = apc40Rotated ? 8 : 5;
