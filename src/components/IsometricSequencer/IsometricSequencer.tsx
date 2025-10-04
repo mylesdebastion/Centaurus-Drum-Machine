@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap, Lightbulb, Gamepad2, Volume2 } from 'lucide-react';
+import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap, Lightbulb, Gamepad2, Volume2, RotateCw } from 'lucide-react';
 import { SingleLaneVisualizer } from '../../utils/SingleLaneVisualizer';
 import { LEDStripManager } from '../LEDStripManager/LEDStripManager';
 import { APC40Controller, APC40ButtonEvent } from '../../utils/APC40Controller';
@@ -131,6 +131,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   // APC40 hardware control state
   const [apc40Controller] = useState(() => new APC40Controller());
   const [apc40Connected, setAPC40Connected] = useState(false);
+  const [apc40Rotated, setAPC40Rotated] = useState(false);
 
   // Sound engine state
   const [selectedSoundEngine, setSelectedSoundEngine] = useState<SoundEngineType>('keys');
@@ -1094,6 +1095,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     apc40Controller.setColorMode(colorMode);
   }, [apc40Controller, useHarmonicMode]);
 
+  // Auto-sync APC40 rotation setting
+  useEffect(() => {
+    apc40Controller.setRotation(apc40Rotated);
+  }, [apc40Controller, apc40Rotated]);
+
   // Handle APC40 button press
   const handleAPC40ButtonPress = useCallback((event: APC40ButtonEvent) => {
     console.log('🎛️ APC40 button press:', event);
@@ -1868,6 +1874,21 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
               <Gamepad2 className="w-4 h-4" />
               APC40
             </button>
+
+            {apc40Connected && (
+              <button
+                onClick={() => setAPC40Rotated(!apc40Rotated)}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                  apc40Rotated
+                    ? 'bg-cyan-600 hover:bg-cyan-500'
+                    : 'bg-gray-600 hover:bg-gray-500'
+                }`}
+                title="Rotate APC40 grid 90° to match 3D visualization"
+              >
+                <RotateCw className="w-3 h-3" />
+                90°
+              </button>
+            )}
 
           </div>
         </div>

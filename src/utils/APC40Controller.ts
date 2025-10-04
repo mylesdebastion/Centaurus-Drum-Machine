@@ -12,6 +12,7 @@
 
 export interface APC40Config {
   colorMode: 'spectrum' | 'chromatic' | 'harmonic';
+  rotated: boolean; // Rotate 90° to match 3D viz orientation
   connected: boolean;
   deviceName?: string;
 }
@@ -38,6 +39,7 @@ export class APC40Controller {
   // Configuration
   private config: APC40Config = {
     colorMode: 'spectrum',
+    rotated: false,
     connected: false
   };
 
@@ -270,17 +272,31 @@ export class APC40Controller {
     const row = Math.floor(note / 8);    // 0-4 (BOTTOM to TOP on hardware - row 0 is BOTTOM!)
     const column = note % 8;             // 0-7 (left to right on hardware)
 
-    // Map to IsometricSequencer coordinates:
-    // - Hardware row 0 (BOTTOM) → lane 0 (leftmost/lowest frequency in 3D, RED)
-    // - Hardware row 4 (TOP) → lane 4 (rightmost/highest frequency in 3D, VIOLET)
-    // - This ensures red (lowest freq) is on BOTTOM APC40 row (row 0), matching 3D viz leftmost lane
-    const lane = row; // Direct mapping - no flip needed since row 0 is already bottom
+    if (this.config.rotated) {
+      // Rotated 90° mode: rows become steps, columns become lanes
+      // - Hardware columns (0-7 left to right) → steps (0-7)
+      // - Hardware rows (0-4 bottom to top) → lanes (0-4)
+      // Only use first 5 columns for lanes
+      if (column >= 5) return null; // Ignore columns 5-7 in rotated mode
 
-    return {
-      lane: lane,
-      step: column + (this.currentPage * 8), // Add page offset to step
-      velocity
-    };
+      return {
+        lane: column, // Columns become lanes
+        step: row + (this.currentPage * 8), // Rows become steps
+        velocity
+      };
+    } else {
+      // Normal mode: Map to IsometricSequencer coordinates
+      // - Hardware row 0 (BOTTOM) → lane 0 (leftmost/lowest frequency in 3D, RED)
+      // - Hardware row 4 (TOP) → lane 4 (rightmost/highest frequency in 3D, VIOLET)
+      // - This ensures red (lowest freq) is on BOTTOM APC40 row (row 0), matching 3D viz leftmost lane
+      const lane = row; // Direct mapping - no flip needed since row 0 is already bottom
+
+      return {
+        lane: lane,
+        step: column + (this.currentPage * 8), // Add page offset to step
+        velocity
+      };
+    }
   }
 
   /**
@@ -300,9 +316,17 @@ export class APC40Controller {
       return null;
     }
 
-    // Direct mapping: lane 0 (red, leftmost in 3D) → row 0 (bottom on APC40)
-    const row = lane;
-    return row * 8 + pageStep;
+    if (this.config.rotated) {
+      // Rotated mode: lanes are columns, steps are rows
+      const column = lane; // Lane becomes column
+      const row = pageStep; // Step becomes row
+      return row * 8 + column;
+    } else {
+      // Normal mode: lanes are rows, steps are columns
+      // Direct mapping: lane 0 (red, leftmost in 3D) → row 0 (bottom on APC40)
+      const row = lane;
+      return row * 8 + pageStep;
+    }
   }
 
   /**
@@ -541,6 +565,13 @@ export class APC40Controller {
    */
   setColorMode(mode: 'spectrum' | 'chromatic' | 'harmonic'): void {
     this.config.colorMode = mode;
+  }
+
+  /**
+   * Set rotation mode (90° to match 3D viz orientation)
+   */
+  setRotation(rotated: boolean): void {
+    this.config.rotated = rotated;
   }
 
   /**
