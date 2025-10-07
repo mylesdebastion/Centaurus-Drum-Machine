@@ -7,7 +7,7 @@
 
 import { hardwareErrorHandler, type HardwareError } from '../utils/errorHandler';
 import { APC40_ERROR_CODES, APC40_TIMING, CONNECTION_HEALTH } from './constants';
-import type { ConnectionStatus } from '../core/types';
+// import type { ConnectionStatus } from '../core/types'; // Unused for now
 
 export interface APC40ErrorContext {
   controllerId: string;
@@ -109,7 +109,7 @@ export class APC40ErrorRecovery {
    */
   private getRecoveryStrategy(
     errorCode: string,
-    context: APC40ErrorContext
+    _context: APC40ErrorContext
   ): RecoveryStrategy | null {
     const strategy = this.recoveryStrategies.get(errorCode);
     if (strategy) {
@@ -429,7 +429,8 @@ export class APC40ErrorRecovery {
    * Setup integration with central error handler
    */
   private setupErrorHandlerIntegration(): void {
-    hardwareErrorHandler.addEventListener('error', (error: HardwareError) => {
+    hardwareErrorHandler.addEventListener('error', (error?: HardwareError) => {
+      if (!error) return;
       // Only handle APC40-related errors
       if (error.code && error.code.startsWith('APC40_')) {
         console.log(`[APC40Recovery] Handling error: ${error.code}`);

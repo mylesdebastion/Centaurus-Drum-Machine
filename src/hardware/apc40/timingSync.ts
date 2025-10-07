@@ -37,7 +37,7 @@ export interface LEDUpdateEvent {
  * Bridges Tone.js Transport timing with APC40 LED updates
  */
 export class LEDTimingSync {
-  private controller: APC40Controller;
+  // private _controller: APC40Controller; // May be used for future features
   private config: TimingSyncConfig;
   private isActive: boolean = false;
   private currentScheduleId: number | null = null;
@@ -69,8 +69,8 @@ export class LEDTimingSync {
   // LED update callbacks
   private updateCallbacks: Set<(event: LEDUpdateEvent) => void> = new Set();
 
-  constructor(controller: APC40Controller, config?: Partial<TimingSyncConfig>) {
-    this.controller = controller;
+  constructor(_controller: APC40Controller, config?: Partial<TimingSyncConfig>) {
+    // this._controller = controller; // May be used for future features
     this.config = {
       lookaheadTime: 25, // 25ms lookahead
       updateInterval: '16n', // 16th note updates

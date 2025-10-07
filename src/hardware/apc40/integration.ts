@@ -281,7 +281,7 @@ export class APC40Integration {
       // Setup step toggle handling
       if (callbacks.onStepToggle) {
         controller.addEventListener('step_toggle', (event) => {
-          callbacks.onStepToggle!(event.data.step, event.data.intensity);
+          callbacks.onStepToggle!(event.data.step as number, event.data.intensity as number || 100);
         });
       }
 
@@ -289,7 +289,7 @@ export class APC40Integration {
       if (callbacks.onTransportControl) {
         controller.addEventListener('hardware_input', (event) => {
           if (event.data.transport && event.data.command) {
-            callbacks.onTransportControl!(event.data.command);
+            callbacks.onTransportControl!(event.data.command as 'stop' | 'play' | 'record');
           }
         });
       }
@@ -298,8 +298,8 @@ export class APC40Integration {
       if (callbacks.onConnectionChange) {
         controller.addEventListener('connection_change', (event) => {
           callbacks.onConnectionChange!(
-            event.data.connected,
-            event.data.deviceName
+            Boolean(event.data.connected),
+            event.data.deviceName as string | undefined
           );
         });
       }

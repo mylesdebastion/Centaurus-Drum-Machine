@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
-import { Music, Users, Play, BookOpen, Sparkles } from 'lucide-react';
+import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3 } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onStartJam: () => void;
   onJoinJam: (code: string) => void;
   onEducationMode: () => void;
+  onIsometricMode: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onStartJam,
   onJoinJam,
-  onEducationMode
+  onEducationMode,
+  onIsometricMode
 }) => {
   const [joinCode, setJoinCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
@@ -44,79 +46,179 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </p>
         </div>
 
-        {/* Feature Cards */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
-          <div className="bg-gray-800 p-4 sm:p-6 rounded-xl border border-gray-700 hover:border-primary-500 transition-colors">
-            <Users className="w-10 h-10 sm:w-12 sm:h-12 text-primary-500 mb-3 sm:mb-4" />
-            <h3 className="text-base sm:text-lg font-semibold mb-2">Multi-User Jamming</h3>
-            <p className="text-gray-400 text-xs sm:text-sm">
-              Sync with friends worldwide. Low-latency networking keeps everyone in perfect time.
-            </p>
-          </div>
-          
-          <div className="bg-gray-800 p-4 sm:p-6 rounded-xl border border-gray-700 hover:border-accent-500 transition-colors">
-            <Sparkles className="w-10 h-10 sm:w-12 sm:h-12 text-accent-500 mb-3 sm:mb-4" />
-            <h3 className="text-base sm:text-lg font-semibold mb-2">Music Visualization</h3>
-            <p className="text-gray-400 text-xs sm:text-sm">
-              Watch your music come alive with colors. Connect LED matrices for physical light shows.
-            </p>
-          </div>
-          
-          <div className="bg-gray-800 p-4 sm:p-6 rounded-xl border border-gray-700 hover:border-green-500 transition-colors sm:col-span-2 lg:col-span-1">
-            <BookOpen className="w-10 h-10 sm:w-12 sm:h-12 text-green-500 mb-3 sm:mb-4" />
-            <h3 className="text-base sm:text-lg font-semibold mb-2">Educational Mode</h3>
-            <p className="text-gray-400 text-xs sm:text-sm">
-              Learn rhythm and melody through interactive lessons designed for K-12 students.
-            </p>
+        {/* Action Buttons Section */}
+        <div className="mb-12 sm:mb-16">
+          <div className="grid sm:grid-cols-3 gap-4">
+            {/* 3D Sequencer - Primary */}
+            <button
+              onClick={onIsometricMode}
+              className="group bg-gradient-to-br from-cyan-900/50 to-purple-900/50 hover:from-cyan-800/60 hover:to-purple-800/60 p-6 rounded-xl border-2 border-cyan-500/30 hover:border-cyan-400 transition-all transform hover:scale-105 shadow-lg hover:shadow-cyan-500/20"
+            >
+              <div className="flex flex-col items-center gap-3 text-center">
+                <Boxes className="w-12 h-12 text-cyan-400 group-hover:text-cyan-300 transition-colors" />
+                <h3 className="text-lg font-bold text-white">3D Sequencer</h3>
+                <p className="text-sm text-gray-300">
+                  Interactive isometric music sequencer with visual feedback
+                </p>
+                <div className="mt-2 flex items-center gap-2 text-xs text-cyan-300">
+                  <Play className="w-4 h-4" />
+                  <span>Start Creating</span>
+                </div>
+              </div>
+            </button>
+
+            {/* Drum Machine */}
+            <button
+              onClick={onStartJam}
+              className="group bg-gradient-to-br from-primary-900/50 to-accent-900/50 hover:from-primary-800/60 hover:to-accent-800/60 p-6 rounded-xl border-2 border-primary-500/30 hover:border-primary-400 transition-all transform hover:scale-105 shadow-lg hover:shadow-primary-500/20"
+            >
+              <div className="flex flex-col items-center gap-3 text-center">
+                <Grid3x3 className="w-12 h-12 text-primary-400 group-hover:text-primary-300 transition-colors" />
+                <h3 className="text-lg font-bold text-white">Drum Machine</h3>
+                <p className="text-sm text-gray-300">
+                  Classic grid-based drum sequencer with sample pads
+                </p>
+                <div className="mt-2 flex items-center gap-2 text-xs text-primary-300">
+                  <Music className="w-4 h-4" />
+                  <span>Beat Maker</span>
+                </div>
+              </div>
+            </button>
+
+            {/* Education Mode */}
+            <button
+              onClick={onEducationMode}
+              className="group bg-gradient-to-br from-green-900/50 to-emerald-900/50 hover:from-green-800/60 hover:to-emerald-800/60 p-6 rounded-xl border-2 border-green-500/30 hover:border-green-400 transition-all transform hover:scale-105 shadow-lg hover:shadow-green-500/20"
+            >
+              <div className="flex flex-col items-center gap-3 text-center">
+                <BookOpen className="w-12 h-12 text-green-400 group-hover:text-green-300 transition-colors" />
+                <h3 className="text-lg font-bold text-white">Education Mode</h3>
+                <p className="text-sm text-gray-300">
+                  Interactive lessons for rhythm and melody (K-12)
+                </p>
+                <div className="mt-2 flex items-center gap-2 text-xs text-green-300">
+                  <BookOpen className="w-4 h-4" />
+                  <span>Learn Music</span>
+                </div>
+              </div>
+            </button>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col gap-4 justify-center items-center">
-          <button
-            onClick={onStartJam}
-            className="btn-primary text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 flex items-center gap-3 w-full sm:w-auto sm:min-w-[200px] justify-center touch-target"
-          >
-            <Play className="w-5 h-5 sm:w-6 sm:h-6" />
-            Start a Jam
-          </button>
+        {/* Why This Platform Section */}
+        <div className="mb-12 sm:mb-16">
+          <h2 className="text-xl sm:text-2xl font-bold text-center mb-2 text-gray-200">
+            Why Audiolux?
+          </h2>
+          <p className="text-center text-sm text-gray-400 mb-8">
+            Innovative features that make music creation accessible and visual
+          </p>
 
-          <div className="flex flex-col gap-4 items-center w-full sm:w-auto">
-            {!showJoinInput ? (
-              <button
-                onClick={() => setShowJoinInput(true)}
-                className="btn-secondary text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 flex items-center gap-3 w-full sm:w-auto sm:min-w-[200px] justify-center touch-target"
-              >
-                <Users className="w-5 h-5 sm:w-6 sm:h-6" />
-                Join a Jam
-              </button>
-            ) : (
-              <form onSubmit={handleJoinSubmit} className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                <input
-                  type="text"
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value)}
-                  placeholder="Enter room code"
-                  className="px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-primary-500 focus:outline-none w-full sm:w-auto touch-target"
-                  autoFocus
-                />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-700/50">
+              <Users className="w-10 h-10 sm:w-12 sm:h-12 text-primary-500 mb-3 sm:mb-4" />
+              <h3 className="text-base sm:text-lg font-semibold mb-2">Multi-User Jamming</h3>
+              <p className="text-gray-400 text-xs sm:text-sm">
+                Sync with friends worldwide. Low-latency networking keeps everyone in perfect time.
+              </p>
+            </div>
+
+            <div className="bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-700/50">
+              <Sparkles className="w-10 h-10 sm:w-12 sm:h-12 text-accent-500 mb-3 sm:mb-4" />
+              <h3 className="text-base sm:text-lg font-semibold mb-2">Music Visualization</h3>
+              <p className="text-gray-400 text-xs sm:text-sm">
+                LED strips represent instruments or notes for participants to follow in sync with the music creation.
+              </p>
+            </div>
+
+            <div className="bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-700/50 sm:col-span-2 lg:col-span-1">
+              <BookOpen className="w-10 h-10 sm:w-12 sm:h-12 text-green-500 mb-3 sm:mb-4" />
+              <h3 className="text-base sm:text-lg font-semibold mb-2">Educational Focus</h3>
+              <p className="text-gray-400 text-xs sm:text-sm">
+                Learn rhythm and melody through interactive lessons designed for K-12 students.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Experiments Section */}
+        <div className="border-t border-gray-700/50 pt-8">
+          <h2 className="text-lg sm:text-xl font-bold text-center mb-4 text-gray-400">
+            Experiments
+          </h2>
+          <p className="text-center text-sm text-gray-500 mb-6">
+            Beta features and experimental tools
+          </p>
+
+          <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+            {/* Multiplayer Jam */}
+            <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
+              <div className="flex items-center gap-3 mb-3">
+                <Users className="w-6 h-6 text-purple-400" />
+                <h3 className="font-semibold text-white">Multiplayer Jam</h3>
+                <span className="text-xs bg-purple-600/30 text-purple-300 px-2 py-1 rounded">Beta</span>
+              </div>
+              <p className="text-sm text-gray-400 mb-4">
+                Sync with friends using room codes
+              </p>
+              <div className="space-y-2">
                 <button
-                  type="submit"
-                  className="btn-primary px-6 py-3 w-full sm:w-auto touch-target"
-                  disabled={!joinCode.trim()}
+                  onClick={onStartJam}
+                  className="btn-primary w-full text-sm px-4 py-2 flex items-center justify-center gap-2"
                 >
-                  Join
+                  <Play className="w-4 h-4" />
+                  Create a Jam Room
                 </button>
-              </form>
-            )}
+                {!showJoinInput ? (
+                  <button
+                    onClick={() => setShowJoinInput(true)}
+                    className="btn-secondary w-full text-sm px-4 py-2 flex items-center justify-center gap-2"
+                  >
+                    <Users className="w-4 h-4" />
+                    Join a Room
+                  </button>
+                ) : (
+                  <form onSubmit={handleJoinSubmit} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={joinCode}
+                      onChange={(e) => setJoinCode(e.target.value)}
+                      placeholder="Room code"
+                      className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm placeholder-gray-400 focus:border-purple-500 focus:outline-none"
+                      autoFocus
+                    />
+                    <button
+                      type="submit"
+                      className="btn-primary px-4 py-2 text-sm"
+                      disabled={!joinCode.trim()}
+                    >
+                      Join
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
 
-            <button
-              onClick={onEducationMode}
-              className="btn-accent text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 flex items-center gap-3 w-full sm:w-auto sm:min-w-[200px] justify-center touch-target"
+            {/* APC40 Demo */}
+            <a
+              href="/apc40-demo.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-pink-500/50 transition-colors"
             >
-              <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" />
-              Education Mode
-            </button>
+              <div className="flex items-center gap-3 mb-3">
+                <Gamepad2 className="w-6 h-6 text-pink-400" />
+                <h3 className="font-semibold text-white">APC40 Demo</h3>
+                <span className="text-xs bg-pink-600/30 text-pink-300 px-2 py-1 rounded">Hardware</span>
+              </div>
+              <p className="text-sm text-gray-400 mb-4">
+                Test MIDI controller integration
+              </p>
+              <div className="flex items-center gap-2 text-sm text-pink-400 group-hover:text-pink-300">
+                <span>Open Demo</span>
+                <Play className="w-4 h-4" />
+              </div>
+            </a>
           </div>
         </div>
 

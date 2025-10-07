@@ -17,9 +17,8 @@ import type {
 
 import { WebMIDIApiWrapper } from '../utils/webMidiApi';
 import {
-  APC40_DEVICE_INFO,
   APC40_TIMING,
-  APC40_ERROR_CODES,
+  // APC40_ERROR_CODES, // Not currently used
   createModeSwitch,
   createLedControl,
   isAPC40Device,
@@ -35,7 +34,6 @@ import {
 } from './errorRecovery';
 import {
   defaultGridMapping,
-  stepStateToLedColor,
   velocityToIntensity,
   APC40_TRANSPORT,
   type GridMapping,
@@ -47,7 +45,6 @@ import {
 } from './ledPatterns';
 import {
   LEDTimingSync,
-  type TimingSyncConfig,
   type SequencerSyncState,
   type LEDUpdateEvent,
 } from './timingSync';
@@ -60,8 +57,8 @@ export class APC40Controller implements HardwareController {
   public readonly capabilities: ControllerCapabilities;
 
   // APC40-specific properties
-  private midiInput: WebMIDI.MIDIInput | null = null;
-  private midiOutput: WebMIDI.MIDIOutput | null = null;
+  private midiInput: MIDIInput | null = null;
+  private midiOutput: MIDIOutput | null = null;
   private webMidiApi: WebMIDIApiWrapper;
   private gridMapping: GridMapping;
   private ledStates: Map<number, number> = new Map();
@@ -183,7 +180,7 @@ export class APC40Controller implements HardwareController {
   /**
    * Find connected APC40 device
    */
-  private async findAPC40Device(): Promise<WebMIDI.MIDIInput | null> {
+  private async findAPC40Device(): Promise<MIDIInput | null> {
     const devices = await this.webMidiApi.enumerateDevices();
     
     for (const device of devices.inputs) {
@@ -198,7 +195,7 @@ export class APC40Controller implements HardwareController {
   /**
    * Connect to specific MIDI device
    */
-  private async connectToDevice(inputDevice: WebMIDI.MIDIInput): Promise<void> {
+  private async connectToDevice(inputDevice: MIDIInput): Promise<void> {
     // Connect to input
     this.midiInput = inputDevice;
     this.midiInput.addEventListener('midimessage', this.handleMIDIMessage.bind(this));
@@ -215,7 +212,7 @@ export class APC40Controller implements HardwareController {
       console.warn('APC40Controller: Output device not found, LED control unavailable');
     }
     
-    this.name = inputDevice.name || 'APC40 Controller';
+    // this.name = inputDevice.name || 'APC40 Controller'; // name is readonly
   }
 
   /**
@@ -348,8 +345,9 @@ export class APC40Controller implements HardwareController {
   /**
    * Handle incoming MIDI messages from APC40
    */
-  private handleMIDIMessage(event: WebMIDI.MIDIMessageEvent): void {
-    const [status, note, velocity] = event.data;
+  private handleMIDIMessage(event: MIDIMessageEvent): void {
+    if (!event.data || event.data.length < 3) return;
+    const [status, note, velocity] = Array.from(event.data);
     this.lastHeartbeat = performance.now();
     
     // Handle Note On/Off messages (button presses)
@@ -384,7 +382,7 @@ export class APC40Controller implements HardwareController {
       }
     }
     // Check if this is a transport control
-    else if (Object.values(APC40_TRANSPORT).includes(note)) {
+    else if (Object.values(APC40_TRANSPORT).includes(note as 100 | 91 | 92 | 93 | 98 | 101)) {
       this.handleTransportControl(note, isNoteOn);
     }
   }
@@ -446,7 +444,7 @@ export class APC40Controller implements HardwareController {
         const syncState: SequencerSyncState = {
           isPlaying: state.isPlaying || false,
           currentStep: state.currentStep || 0,
-          bpm: state.bpm || 120,
+          bpm: (state as any).bpm || 120, // bpm may not exist on SequencerState
           pattern: state.pattern || [],
           totalSteps: 16,
         };
@@ -514,7 +512,7 @@ export class APC40Controller implements HardwareController {
       });
 
       // Log timing sync events in development mode
-      if (process.env.NODE_ENV === 'development') {
+      if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') {
         const latency = performance.now() - event.timestamp;
         if (latency > 10) { // Log if latency > 10ms
           console.log(`APC40Controller: Timing sync latency: ${latency.toFixed(2)}ms`);
@@ -551,11 +549,12 @@ export class APC40Controller implements HardwareController {
 
       // Check if step is active in any track and get velocity
       for (const track of state.pattern) {
-        if (track[step]) {
+        const stepData = track[step];
+        if (stepData) {
           stepActive = true;
           // Get velocity from track data if available
-          if (typeof track[step] === 'object' && 'velocity' in track[step]) {
-            velocity = (track[step] as { velocity: number }).velocity;
+          if (typeof stepData === 'object' && stepData && 'velocity' in stepData) {
+            velocity = (stepData as { velocity: number }).velocity;
           }
           break; // Use first active track's velocity
         }
@@ -645,18 +644,11 @@ export class APC40Controller implements HardwareController {
 
     // Track batch performance
     const batchDuration = performance.now() - batchStartTime;
-    if (process.env.NODE_ENV === 'development' && batchDuration > 5) {
+    if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development' && batchDuration > 5) {
       console.log(`APC40Controller: LED batch processed: ${batchSize} LEDs in ${batchDuration.toFixed(2)}ms`);
     }
   }
 
-  /**
-   * Update single LED with intensity consideration (legacy method)
-   */
-  private updateLEDWithIntensity(note: number, color: number, intensity: number): void {
-    // Use the new batched update system
-    this.queueLEDUpdate(note, color);
-  }
 
   /**
    * Record LED update performance metrics
@@ -680,15 +672,6 @@ export class APC40Controller implements HardwareController {
     }
   }
 
-  /**
-   * Update a single LED using MIDI Note On
-   */
-  private updateLED(note: number, color: number): void {
-    if (!this.midiOutput) return;
-
-    const ledCommand = createLedControl(note, color);
-    this.sendMidiMessage(ledCommand);
-  }
 
   /**
    * Clear all LEDs using batched updates
@@ -888,18 +871,6 @@ export class APC40Controller implements HardwareController {
     }
   }
 
-  /**
-   * Get error code for error message
-   */
-  private getErrorCode(errorMessage: string): string {
-    if (errorMessage.includes('not found')) return APC40_ERROR_CODES.DEVICE_NOT_FOUND;
-    if (errorMessage.includes('connection')) return APC40_ERROR_CODES.CONNECTION_FAILED;
-    if (errorMessage.includes('initialization')) return APC40_ERROR_CODES.INITIALIZATION_FAILED;
-    if (errorMessage.includes('SysEx')) return APC40_ERROR_CODES.SYSEX_FAILED;
-    if (errorMessage.includes('LED')) return APC40_ERROR_CODES.LED_UPDATE_FAILED;
-    if (errorMessage.includes('heartbeat')) return APC40_ERROR_CODES.HEARTBEAT_TIMEOUT;
-    return 'UNKNOWN_ERROR';
-  }
 
   /**
    * Setup error recovery event listeners

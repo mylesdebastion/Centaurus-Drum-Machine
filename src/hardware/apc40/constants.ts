@@ -31,7 +31,7 @@ export const APC40_MODE_SWITCH = {
  * This mode enables LED control via MIDI Note On messages
  */
 export function createModeSwitch(): number[] {
-  return APC40_MODE_SWITCH.ABLETON_LIVE_MODE;
+  return [...APC40_MODE_SWITCH.ABLETON_LIVE_MODE];
 }
 
 /**

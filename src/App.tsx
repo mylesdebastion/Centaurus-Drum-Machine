@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { WelcomeScreen } from './components/Welcome/WelcomeScreen';
 import { JamSession } from './components/JamSession/JamSession';
 import { EducationMode } from './components/Education/EducationMode';
+import { IsometricSequencer } from './components/IsometricSequencer/IsometricSequencer';
 
-type AppState = 'welcome' | 'jam' | 'education';
+type AppState = 'welcome' | 'jam' | 'education' | 'isometric';
 
 function App() {
   const [appState, setAppState] = useState<AppState>('welcome');
@@ -33,12 +34,20 @@ function App() {
     setAppState('education');
   };
 
+  const handleIsometricMode = () => {
+    setAppState('isometric');
+  };
+
   const handleLeaveSession = () => {
     setAppState('welcome');
     setSessionCode('');
   };
 
   const handleExitEducation = () => {
+    setAppState('welcome');
+  };
+
+  const handleExitIsometric = () => {
     setAppState('welcome');
   };
 
@@ -57,13 +66,21 @@ function App() {
           onExitEducation={handleExitEducation}
         />
       );
-    
+
+    case 'isometric':
+      return (
+        <IsometricSequencer
+          onBack={handleExitIsometric}
+        />
+      );
+
     default:
       return (
         <WelcomeScreen
           onStartJam={handleStartJam}
           onJoinJam={handleJoinJam}
           onEducationMode={handleEducationMode}
+          onIsometricMode={handleIsometricMode}
         />
       );
   }
