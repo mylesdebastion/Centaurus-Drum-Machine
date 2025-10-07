@@ -17,10 +17,11 @@ sleep 10
 echo ""
 echo "Select startup mode:"
 echo "  1) Home Page"
-echo "  2) Jam Mode (default)"
+echo "  2) Jam Mode"
 echo "  3) Education Mode"
+echo "  4) Isometric Sequencer (default)"
 echo ""
-echo -n "Enter selection (1-3) or wait 5 seconds for Jam Mode: "
+echo -n "Enter selection (1-4) or wait 5 seconds for Isometric Sequencer: "
 
 # Read with timeout
 MODE_PATH=""
@@ -39,15 +40,19 @@ if read -t 5 -n 1 choice; then
             MODE_PATH="/education"
             echo "Starting in Education Mode..."
             ;;
+        4)
+            MODE_PATH="/isometric"
+            echo "Starting in Isometric Sequencer mode..."
+            ;;
         *)
-            MODE_PATH="/jam"
-            echo "Invalid selection. Starting in Jam Mode (default)..."
+            MODE_PATH="/isometric"
+            echo "Invalid selection. Starting in Isometric Sequencer (default)..."
             ;;
     esac
 else
     echo ""
-    MODE_PATH="/jam"
-    echo "No selection made. Starting in Jam Mode (default)..."
+    MODE_PATH="/isometric"
+    echo "No selection made. Starting in Isometric Sequencer (default)..."
 fi
 
 echo ""

@@ -1,14 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { WelcomeScreen } from './components/Welcome/WelcomeScreen';
 import { JamSession } from './components/JamSession/JamSession';
 import { EducationMode } from './components/Education/EducationMode';
 import { IsometricSequencer } from './components/IsometricSequencer/IsometricSequencer';
 
-type AppState = 'welcome' | 'jam' | 'education' | 'isometric';
-
 function App() {
-  const [appState, setAppState] = useState<AppState>('welcome');
   const [sessionCode, setSessionCode] = useState<string>('');
+  const navigate = useNavigate();
 
   const generateSessionCode = (): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -22,68 +21,75 @@ function App() {
   const handleStartJam = () => {
     const code = generateSessionCode();
     setSessionCode(code);
-    setAppState('jam');
+    navigate('/jam');
   };
 
   const handleJoinJam = (code: string) => {
     setSessionCode(code);
-    setAppState('jam');
+    navigate('/jam');
   };
 
   const handleEducationMode = () => {
-    setAppState('education');
+    navigate('/education');
   };
 
   const handleIsometricMode = () => {
-    setAppState('isometric');
+    navigate('/isometric');
   };
 
   const handleLeaveSession = () => {
-    setAppState('welcome');
+    navigate('/');
     setSessionCode('');
   };
 
   const handleExitEducation = () => {
-    setAppState('welcome');
+    navigate('/');
   };
 
   const handleExitIsometric = () => {
-    setAppState('welcome');
+    navigate('/');
   };
 
-  switch (appState) {
-    case 'jam':
-      return (
-        <JamSession
-          sessionCode={sessionCode}
-          onLeaveSession={handleLeaveSession}
-        />
-      );
-    
-    case 'education':
-      return (
-        <EducationMode
-          onExitEducation={handleExitEducation}
-        />
-      );
-
-    case 'isometric':
-      return (
-        <IsometricSequencer
-          onBack={handleExitIsometric}
-        />
-      );
-
-    default:
-      return (
-        <WelcomeScreen
-          onStartJam={handleStartJam}
-          onJoinJam={handleJoinJam}
-          onEducationMode={handleEducationMode}
-          onIsometricMode={handleIsometricMode}
-        />
-      );
-  }
+  return (
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <WelcomeScreen
+            onStartJam={handleStartJam}
+            onJoinJam={handleJoinJam}
+            onEducationMode={handleEducationMode}
+            onIsometricMode={handleIsometricMode}
+          />
+        }
+      />
+      <Route
+        path="/jam"
+        element={
+          <JamSession
+            sessionCode={sessionCode}
+            onLeaveSession={handleLeaveSession}
+          />
+        }
+      />
+      <Route
+        path="/education"
+        element={
+          <EducationMode
+            onExitEducation={handleExitEducation}
+          />
+        }
+      />
+      <Route
+        path="/isometric"
+        element={
+          <IsometricSequencer
+            onBack={handleExitIsometric}
+          />
+        }
+      />
+    </Routes>
+  );
 }
 
 export default App;
