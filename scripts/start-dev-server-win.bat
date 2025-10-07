@@ -59,6 +59,9 @@ if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" (
     )
 )
 
+REM Minimize this console window to keep it out of the way
+powershell -window minimized -command ""
+
 echo.
 echo Server is running and browser opened!
 echo Keep this window open - closing it will stop the server.
