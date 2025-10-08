@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { WelcomeScreen } from './components/Welcome/WelcomeScreen';
 import { JamSession } from './components/JamSession/JamSession';
