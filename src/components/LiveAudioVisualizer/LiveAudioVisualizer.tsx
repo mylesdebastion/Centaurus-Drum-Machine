@@ -1,36 +1,75 @@
 /**
  * LiveAudioVisualizer - DJ/Musician live audio visualization module
  *
- * Proof of concept: Basic spectrum analyzer with frequency bars
- * Future: Ripple, Waveform, LED Matrix output
+ * Features:
+ * - Audio input capture with device selection
+ * - Multiple visualization modes (Spectrum, Waveform, Ripple)
+ * - Gain/sensitivity control
+ * - LED matrix output via WLED
+ * - Real-time 60fps rendering
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { AudioInputManager, DEFAULT_AUDIO_CONFIG } from './AudioInputManager';
-import { getFrequencyColor } from '../../utils/colorMapping';
+import { VisualizationEngine, VisualizationMode, DEFAULT_VIZ_ENGINE_CONFIG } from './VisualizationEngine';
+import { LEDMatrixManager } from './LEDMatrixManager';
+import { RippleDirection } from './visualizations/RippleVisualization';
+import { Mic, Settings, Activity, ArrowLeft } from 'lucide-react';
 
 interface LiveAudioVisualizerProps {
-  onExit?: () => void;
+  onBack?: () => void;
 }
 
-export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onExit }) => {
+export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioManagerRef = useRef<AudioInputManager | null>(null);
+  const vizEngineRef = useRef<VisualizationEngine | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [currentMode, setCurrentMode] = useState<VisualizationMode>('spectrum');
+  const [gain, setGain] = useState(1.0); // 100%
+  const [showSettings, setShowSettings] = useState(false);
+  const [fps, setFps] = useState(0);
+
+  // Stats
   const [rms, setRMS] = useState(0);
   const [peakFreq, setPeakFreq] = useState({ frequency: 0, amplitude: 0 });
 
+  // FPS calculation
+  const fpsCounterRef = useRef({ frames: 0, lastTime: Date.now() });
+
+  // Initialize visualization engine
+  useEffect(() => {
+    vizEngineRef.current = new VisualizationEngine(DEFAULT_VIZ_ENGINE_CONFIG);
+    return () => {
+      vizEngineRef.current = null;
+    };
+  }, []);
+
+  // Enumerate audio devices
+  const enumerateDevices = useCallback(async () => {
+    const manager = new AudioInputManager();
+    const audioDevices = await manager.getAudioInputDevices();
+    setDevices(audioDevices);
+    if (audioDevices.length > 0 && !selectedDeviceId) {
+      setSelectedDeviceId(audioDevices[0].deviceId);
+    }
+  }, [selectedDeviceId]);
+
   // Initialize audio input
-  const handleStart = async () => {
+  const handleStart = async (deviceId?: string) => {
     try {
       setError(null);
       const manager = new AudioInputManager(DEFAULT_AUDIO_CONFIG);
-      await manager.initialize();
+      // Don't pass deviceId on first initialization (empty string causes issues)
+      await manager.initialize(deviceId && deviceId.length > 0 ? deviceId : undefined);
       audioManagerRef.current = manager;
       setIsInitialized(true);
+      await enumerateDevices(); // Update device list after permission granted
       startVisualization();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to initialize audio');
@@ -47,61 +86,77 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onExit
     if (!ctx) return;
 
     const manager = audioManagerRef.current;
-    if (!manager) return;
+    const vizEngine = vizEngineRef.current;
+    if (!manager || !vizEngine) return;
 
     const render = () => {
-      const frequencyData = manager.getFrequencyData();
-      const bufferLength = manager.getBufferLength();
       const width = canvas.width;
       const height = canvas.height;
 
-      // Clear canvas
-      ctx.fillStyle = '#1a1a2e';
-      ctx.fillRect(0, 0, width, height);
+      // Render visualization
+      vizEngine.render(ctx, manager, width, height);
 
-      // Draw frequency bars - use fewer bars for better visibility
-      const numBars = Math.min(128, bufferLength);
-      const barWidth = width / numBars;
-      const binSize = Math.floor(bufferLength / numBars);
-
-      for (let i = 0; i < numBars; i++) {
-        // Average multiple frequency bins for each bar
-        let sum = 0;
-        const startBin = i * binSize;
-        const endBin = Math.min(startBin + binSize, bufferLength);
-
-        for (let j = startBin; j < endBin; j++) {
-          sum += frequencyData[j];
-        }
-
-        const avgAmplitude = sum / binSize;
-        const normalizedAmplitude = avgAmplitude / 255;
-        const barHeight = normalizedAmplitude * height;
-
-        // Calculate normalized frequency (0-1) for color mapping
-        const normalizedFrequency = i / numBars;
-
-        // Get color based on frequency (using existing colorMapping.ts)
-        const color = getFrequencyColor(normalizedFrequency, 'spectrum');
-
-        // Apply amplitude to opacity AND brightness (quiet sounds are dimmer/more transparent)
-        const opacity = Math.max(0.3, normalizedAmplitude);
-        const brightness = Math.max(0.5, normalizedAmplitude);
-
-        ctx.fillStyle = `rgba(${Math.floor(color.r * brightness)}, ${Math.floor(color.g * brightness)}, ${Math.floor(color.b * brightness)}, ${opacity})`;
-        ctx.fillRect(i * barWidth, height - barHeight, barWidth - 2, barHeight);
+      // Update LED matrix if enabled
+      const ledManager = (window as any).ledMatrixManager;
+      if (ledManager && ledManager.getConfig && ledManager.getConfig().enabled) {
+        // Extract canvas pixel data and convert to LED matrix grid
+        const matrixConfig = ledManager.getConfig();
+        const grid = extractMatrixGrid(ctx, matrixConfig.width, matrixConfig.height, width, height);
+        ledManager.sendToWLED(grid);
       }
 
-      // Update metrics
+      // Update stats
       const currentRMS = manager.getRMS();
       const currentPeak = manager.getPeakFrequency();
       setRMS(currentRMS);
       setPeakFreq(currentPeak);
 
+      // Calculate FPS
+      fpsCounterRef.current.frames++;
+      const now = Date.now();
+      if (now - fpsCounterRef.current.lastTime >= 1000) {
+        setFps(fpsCounterRef.current.frames);
+        fpsCounterRef.current.frames = 0;
+        fpsCounterRef.current.lastTime = now;
+      }
+
       animationFrameRef.current = requestAnimationFrame(render);
     };
 
     render();
+  };
+
+  /**
+   * Extract LED matrix grid from canvas pixels
+   */
+  const extractMatrixGrid = (
+    ctx: CanvasRenderingContext2D,
+    matrixWidth: number,
+    matrixHeight: number,
+    canvasWidth: number,
+    canvasHeight: number
+  ): { r: number; g: number; b: number }[][] => {
+    const grid: { r: number; g: number; b: number }[][] = [];
+    const scaleX = canvasWidth / matrixWidth;
+    const scaleY = canvasHeight / matrixHeight;
+
+    for (let y = 0; y < matrixHeight; y++) {
+      grid[y] = [];
+      for (let x = 0; x < matrixWidth; x++) {
+        // Sample pixel from canvas (center of each LED cell)
+        const pixelX = Math.floor(x * scaleX + scaleX / 2);
+        const pixelY = Math.floor(y * scaleY + scaleY / 2);
+        const imageData = ctx.getImageData(pixelX, pixelY, 1, 1).data;
+
+        grid[y][x] = {
+          r: imageData[0],
+          g: imageData[1],
+          b: imageData[2],
+        };
+      }
+    }
+
+    return grid;
   };
 
   // Cleanup on unmount
@@ -134,21 +189,72 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onExit
     return () => window.removeEventListener('resize', resizeCanvas);
   }, []);
 
+  // Handle mode change
+  const handleModeChange = (mode: VisualizationMode) => {
+    setCurrentMode(mode);
+    if (vizEngineRef.current) {
+      vizEngineRef.current.setMode(mode);
+    }
+  };
+
+  // Handle gain change
+  const handleGainChange = (newGain: number) => {
+    setGain(newGain);
+    if (audioManagerRef.current) {
+      audioManagerRef.current.setGain(newGain);
+    }
+  };
+
+  // Handle ripple direction change
+  const handleRippleDirection = (direction: RippleDirection) => {
+    if (vizEngineRef.current) {
+      vizEngineRef.current.setRippleDirection(direction);
+    }
+  };
+
+  // Handle canvas click for ripple origin
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (currentMode !== 'ripple') return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width; // Normalize to 0-1
+    const y = (e.clientY - rect.top) / rect.height; // Normalize to 0-1
+
+    if (vizEngineRef.current) {
+      vizEngineRef.current.setRippleOrigin(x, y);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-gray-900 flex flex-col">
       {/* Header */}
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
+      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold text-white">DJ Visualizer</h1>
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+              title="Back"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-400" />
+            </button>
+          )}
+          <h1 className="text-2xl font-bold text-white">Live Audio Visualizer</h1>
           <span className="px-2 py-1 text-xs font-semibold bg-orange-500 text-white rounded">
             Beta
           </span>
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Audio metrics */}
+          {/* Stats */}
           {isInitialized && (
             <div className="flex gap-6 text-sm">
+              <div className="text-gray-400">
+                FPS: <span className="text-white font-mono">{fps}</span>
+              </div>
               <div className="text-gray-400">
                 RMS: <span className="text-white font-mono">{(rms * 100).toFixed(1)}%</span>
               </div>
@@ -159,77 +265,180 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onExit
           )}
 
           <button
-            onClick={onExit}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+            onClick={() => setShowSettings(!showSettings)}
+            className={`p-2 rounded-lg transition-colors ${
+              showSettings ? 'bg-primary-600 text-white' : 'hover:bg-gray-700 text-gray-400'
+            }`}
+            title="Settings"
           >
-            Exit
+            <Settings className="w-5 h-5" />
           </button>
         </div>
       </header>
 
-      {/* Main visualization area */}
-      <main className="flex-1 flex flex-col items-center justify-center p-6">
-        {!isInitialized && !error && (
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-white mb-4">
-              Live Audio Spectrum Analyzer
-            </h2>
-            <p className="text-gray-400 mb-8 max-w-md">
-              Visualize live audio input with real-time frequency analysis.
-              Click Start to enable microphone access.
-            </p>
-            <button
-              onClick={handleStart}
-              className="px-8 py-4 bg-primary-600 hover:bg-primary-500 text-white text-lg font-semibold rounded-lg transition-colors shadow-lg"
-            >
-              🎤 Start Audio Input
-            </button>
-          </div>
-        )}
-
-        {error && (
-          <div className="text-center">
-            <div className="bg-red-900/20 border border-red-500 rounded-lg p-6 max-w-md">
-              <h3 className="text-red-400 font-semibold mb-2">Audio Error</h3>
-              <p className="text-gray-300 text-sm">{error}</p>
-              <button
-                onClick={handleStart}
-                className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"
-              >
-                Retry
-              </button>
-            </div>
-          </div>
-        )}
-
-        {isInitialized && (
-          <div className="w-full h-full flex flex-col gap-4">
-            {/* Canvas visualization */}
-            <div className="flex-1 bg-gray-800 rounded-lg overflow-hidden shadow-2xl border border-gray-700">
-              <canvas
-                ref={canvasRef}
-                className="w-full h-full"
-              />
-            </div>
-
-            {/* Controls (placeholder for future features) */}
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <div className="flex items-center gap-4">
-                <span className="text-gray-400 text-sm">Visualization Mode:</span>
-                <button className="px-3 py-1.5 bg-primary-600 text-white text-sm rounded transition-colors">
-                  Spectrum
-                </button>
-                <button className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded transition-colors">
-                  Ripple (Coming Soon)
-                </button>
-                <button className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded transition-colors">
-                  Waveform (Coming Soon)
+      {/* Main content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Visualization area */}
+        <main className="flex-1 flex flex-col p-6">
+          {!isInitialized && !error && (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center max-w-md">
+                <Mic className="w-16 h-16 text-primary-500 mx-auto mb-4" />
+                <h2 className="text-3xl font-bold text-white mb-4">
+                  Live Audio Spectrum Analyzer
+                </h2>
+                <p className="text-gray-400 mb-8">
+                  Visualize live audio input with real-time frequency analysis.
+                  Click Start to enable microphone access.
+                </p>
+                <button
+                  onClick={() => handleStart(selectedDeviceId)}
+                  className="px-8 py-4 bg-primary-600 hover:bg-primary-500 text-white text-lg font-semibold rounded-lg transition-colors shadow-lg"
+                >
+                  🎤 Start Audio Input
                 </button>
               </div>
             </div>
-          </div>
+          )}
+
+          {error && (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="bg-red-900/20 border border-red-500 rounded-lg p-6 max-w-md">
+                <h3 className="text-red-400 font-semibold mb-2">Audio Error</h3>
+                <p className="text-gray-300 text-sm mb-4">{error}</p>
+                <button
+                  onClick={() => handleStart(selectedDeviceId)}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isInitialized && (
+            <>
+              {/* Canvas visualization */}
+              <div className="flex-1 bg-gray-800 rounded-lg overflow-hidden shadow-2xl border border-gray-700 mb-4">
+                <canvas
+                  ref={canvasRef}
+                  className="w-full h-full cursor-crosshair"
+                  onClick={handleCanvasClick}
+                />
+              </div>
+
+              {/* Controls */}
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center gap-4 flex-wrap">
+                  {/* Mode selector */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 text-sm">Mode:</span>
+                    <button
+                      onClick={() => handleModeChange('spectrum')}
+                      className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                        currentMode === 'spectrum'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                      }`}
+                    >
+                      <Activity className="w-4 h-4 inline mr-1" />
+                      Spectrum
+                    </button>
+                    <button
+                      onClick={() => handleModeChange('waveform')}
+                      className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                        currentMode === 'waveform'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                      }`}
+                    >
+                      Waveform
+                    </button>
+                    <button
+                      onClick={() => handleModeChange('ripple')}
+                      className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                        currentMode === 'ripple'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                      }`}
+                    >
+                      Ripple
+                    </button>
+                  </div>
+
+                  {/* Ripple direction controls (only visible in ripple mode) */}
+                  {currentMode === 'ripple' && (
+                    <div className="flex items-center gap-2 border-l border-gray-700 pl-4">
+                      <span className="text-gray-400 text-sm">Direction:</span>
+                      {(['radial', 'bottom-top', 'left-right'] as RippleDirection[]).map((dir) => (
+                        <button
+                          key={dir}
+                          onClick={() => handleRippleDirection(dir)}
+                          className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+                        >
+                          {dir}
+                        </button>
+                      ))}
+                      <span className="text-xs text-gray-500">(or click canvas)</span>
+                    </div>
+                  )}
+
+                  {/* Gain control */}
+                  <div className="flex items-center gap-2 border-l border-gray-700 pl-4 ml-auto">
+                    <span className="text-gray-400 text-sm">Gain:</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={gain}
+                      onChange={(e) => handleGainChange(parseFloat(e.target.value))}
+                      className="w-32"
+                    />
+                    <span className="text-white font-mono text-sm w-12 text-right">
+                      {(gain * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </main>
+
+        {/* Settings sidebar */}
+        {showSettings && (
+          <aside className="w-80 bg-gray-800 border-l border-gray-700 p-6 overflow-y-auto flex-shrink-0">
+            <h3 className="text-lg font-semibold text-white mb-4">Settings</h3>
+
+            {/* Audio input device selector */}
+            <div className="mb-6">
+              <label className="block text-sm text-gray-400 mb-2">Audio Input Device</label>
+              <select
+                value={selectedDeviceId}
+                onChange={(e) => setSelectedDeviceId(e.target.value)}
+                disabled={isInitialized}
+                className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-primary-500 focus:outline-none disabled:opacity-50 text-sm"
+              >
+                {devices.map((device) => (
+                  <option key={device.deviceId} value={device.deviceId}>
+                    {device.label || `Device ${device.deviceId.substring(0, 8)}`}
+                  </option>
+                ))}
+              </select>
+              {isInitialized && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Restart to change device
+                </p>
+              )}
+            </div>
+
+            {/* LED Matrix Manager */}
+            <div className="mb-6">
+              <LEDMatrixManager />
+            </div>
+          </aside>
         )}
-      </main>
+      </div>
     </div>
   );
 };

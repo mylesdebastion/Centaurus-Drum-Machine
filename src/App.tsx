@@ -102,7 +102,7 @@ function App() {
         path="/dj-visualizer"
         element={
           <LiveAudioVisualizer
-            onExit={handleExitDJVisualizer}
+            onBack={handleExitDJVisualizer}
           />
         }
       />

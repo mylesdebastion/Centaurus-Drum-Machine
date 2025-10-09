@@ -32,6 +32,7 @@ export class AudioInputManager {
   private splitter: ChannelSplitterNode | null = null;
   private mediaStream: MediaStream | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
+  private gainNode: GainNode | null = null;
 
   private frequencyData: Uint8Array | null = null;
   private timeData: Uint8Array | null = null;
@@ -42,31 +43,61 @@ export class AudioInputManager {
 
   private isRunning = false;
   private config: AudioInputConfig;
+  private currentDeviceId: string | null = null;
 
   constructor(config: AudioInputConfig = DEFAULT_AUDIO_CONFIG) {
     this.config = config;
   }
 
   /**
+   * Enumerate available audio input devices
+   */
+  async getAudioInputDevices(): Promise<MediaDeviceInfo[]> {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter(device => device.kind === 'audioinput');
+  }
+
+  /**
    * Request microphone access and initialize audio pipeline
    */
-  async initialize(): Promise<void> {
+  async initialize(deviceId?: string): Promise<void> {
     try {
-      // Request microphone access with stereo configuration
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 2,
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        },
-      });
+      // Request microphone access with flexible configuration
+      const constraints: MediaStreamConstraints = {
+        audio: deviceId
+          ? {
+              deviceId: { ideal: deviceId }, // Use ideal instead of exact
+              channelCount: { ideal: 2 }, // Prefer stereo but allow mono
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+            }
+          : {
+              channelCount: { ideal: 2 },
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+            },
+      };
+
+      this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      this.currentDeviceId = deviceId || null;
 
       // Create AudioContext (same pattern as audioEngine.ts)
       this.audioContext = new AudioContext();
 
       // Create source from media stream
       this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
+
+      // Detect number of channels
+      const audioTrack = this.mediaStream.getAudioTracks()[0];
+      const settings = audioTrack.getSettings();
+      const channelCount = settings.channelCount || 1;
+      console.log(`🎤 Audio input: ${channelCount} channel(s)`);
+
+      // Create gain node for volume control (default gain = 1.0)
+      this.gainNode = this.audioContext.createGain();
+      this.gainNode.gain.value = 1.0;
 
       // Create mono analyser for combined visualization
       this.analyserNode = this.audioContext.createAnalyser();
@@ -75,26 +106,42 @@ export class AudioInputManager {
       this.analyserNode.minDecibels = this.config.minDecibels;
       this.analyserNode.maxDecibels = this.config.maxDecibels;
 
-      // Create stereo channel splitter for L/R separation
-      this.splitter = this.audioContext.createChannelSplitter(2);
-
-      // Create separate analysers for left and right channels
-      this.leftAnalyser = this.audioContext.createAnalyser();
-      this.leftAnalyser.fftSize = this.config.fftSize;
-      this.leftAnalyser.smoothingTimeConstant = this.config.smoothingTimeConstant;
-
-      this.rightAnalyser = this.audioContext.createAnalyser();
-      this.rightAnalyser.fftSize = this.config.fftSize;
-      this.rightAnalyser.smoothingTimeConstant = this.config.smoothingTimeConstant;
-
       // Connect audio graph:
-      // Source -> Mono Analyser (for combined visualization)
-      this.sourceNode.connect(this.analyserNode);
+      // Source -> Gain -> Mono Analyser (for combined visualization)
+      this.sourceNode.connect(this.gainNode);
+      this.gainNode.connect(this.analyserNode);
 
-      // Source -> Splitter -> L/R Analysers (for stereo visualization)
-      this.sourceNode.connect(this.splitter);
-      this.splitter.connect(this.leftAnalyser, 0);
-      this.splitter.connect(this.rightAnalyser, 1);
+      // Create stereo channel splitter for L/R separation (if stereo available)
+      if (channelCount >= 2) {
+        this.splitter = this.audioContext.createChannelSplitter(2);
+
+        // Create separate analysers for left and right channels
+        this.leftAnalyser = this.audioContext.createAnalyser();
+        this.leftAnalyser.fftSize = this.config.fftSize;
+        this.leftAnalyser.smoothingTimeConstant = this.config.smoothingTimeConstant;
+
+        this.rightAnalyser = this.audioContext.createAnalyser();
+        this.rightAnalyser.fftSize = this.config.fftSize;
+        this.rightAnalyser.smoothingTimeConstant = this.config.smoothingTimeConstant;
+
+        // Gain -> Splitter -> L/R Analysers (for stereo visualization)
+        this.gainNode.connect(this.splitter);
+        this.splitter.connect(this.leftAnalyser, 0);
+        this.splitter.connect(this.rightAnalyser, 1);
+      } else {
+        // Mono source: just duplicate the mono signal for left/right
+        this.leftAnalyser = this.audioContext.createAnalyser();
+        this.leftAnalyser.fftSize = this.config.fftSize;
+        this.leftAnalyser.smoothingTimeConstant = this.config.smoothingTimeConstant;
+
+        this.rightAnalyser = this.audioContext.createAnalyser();
+        this.rightAnalyser.fftSize = this.config.fftSize;
+        this.rightAnalyser.smoothingTimeConstant = this.config.smoothingTimeConstant;
+
+        // Connect mono signal to both analysers
+        this.gainNode.connect(this.leftAnalyser);
+        this.gainNode.connect(this.rightAnalyser);
+      }
 
       // Initialize data arrays
       const bufferLength = this.analyserNode.frequencyBinCount;
@@ -211,6 +258,35 @@ export class AudioInputManager {
   }
 
   /**
+   * Set gain/sensitivity (0.0 - 2.0, where 1.0 = 100%)
+   * 0-1.0 = quieter, 1.0-2.0 = louder/more sensitive
+   */
+  setGain(gain: number): void {
+    if (!this.gainNode) {
+      console.warn('Gain node not initialized');
+      return;
+    }
+    // Clamp gain between 0 and 2 (0% to 200%)
+    const clampedGain = Math.max(0, Math.min(2, gain));
+    this.gainNode.gain.value = clampedGain;
+    console.log(`🎚️ Gain set to ${(clampedGain * 100).toFixed(0)}%`);
+  }
+
+  /**
+   * Get current gain value
+   */
+  getGain(): number {
+    return this.gainNode?.gain.value || 1.0;
+  }
+
+  /**
+   * Get current audio input device ID
+   */
+  getCurrentDeviceId(): string | null {
+    return this.currentDeviceId;
+  }
+
+  /**
    * Get audio context sample rate
    */
   getSampleRate(): number {
@@ -283,6 +359,11 @@ export class AudioInputManager {
     if (this.splitter) {
       this.splitter.disconnect();
       this.splitter = null;
+    }
+
+    if (this.gainNode) {
+      this.gainNode.disconnect();
+      this.gainNode = null;
     }
 
     // Stop media stream tracks
