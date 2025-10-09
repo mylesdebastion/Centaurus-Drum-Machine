@@ -49,7 +49,12 @@ export class SpectrumVisualization {
     const { numBars, peakHold, peakFallSpeed, minOpacity, minBrightness } = this.config;
     const bufferLength = frequencyData.length;
     const barWidth = width / numBars;
-    const binSize = Math.floor(bufferLength / numBars);
+
+    // Logarithmic frequency scaling for musical range
+    const sampleRate = 44100;
+    const nyquist = sampleRate / 2;
+    const minFreq = 50;   // 50 Hz (bass)
+    const maxFreq = 8000; // 8 kHz (high treble)
 
     // Clear canvas
     ctx.fillStyle = '#1a1a2e';
@@ -58,16 +63,25 @@ export class SpectrumVisualization {
     const now = Date.now();
 
     for (let i = 0; i < numBars; i++) {
-      // Average multiple frequency bins for each bar
-      let sum = 0;
-      const startBin = i * binSize;
-      const endBin = Math.min(startBin + binSize, bufferLength);
+      // Logarithmic frequency distribution
+      // Each bar represents a log-spaced frequency band
+      const logPosition = i / (numBars - 1); // 0 to 1
+      const freqHz = minFreq * Math.pow(maxFreq / minFreq, logPosition);
 
-      for (let j = startBin; j < endBin; j++) {
+      // Convert frequency to FFT bin index
+      const binIndex = Math.floor((freqHz / nyquist) * bufferLength);
+
+      // Get amplitude from this bin (and nearby bins for smoothing)
+      const smoothRange = Math.max(1, Math.floor(bufferLength / numBars / 4));
+      let sum = 0;
+      let count = 0;
+
+      for (let j = Math.max(0, binIndex - smoothRange); j <= Math.min(bufferLength - 1, binIndex + smoothRange); j++) {
         sum += frequencyData[j];
+        count++;
       }
 
-      const avgAmplitude = sum / binSize;
+      const avgAmplitude = sum / count;
       const normalizedAmplitude = avgAmplitude / 255; // 0.0 - 1.0
       const barHeight = normalizedAmplitude * height;
 
@@ -84,8 +98,8 @@ export class SpectrumVisualization {
         }
       }
 
-      // Calculate normalized frequency (0-1) for color mapping
-      const normalizedFrequency = i / numBars;
+      // Use logarithmic position for color mapping (matches frequency distribution)
+      const normalizedFrequency = logPosition;
 
       // Get color based on frequency (using existing colorMapping.ts)
       const color = getFrequencyColor(normalizedFrequency, 'spectrum');
@@ -94,16 +108,16 @@ export class SpectrumVisualization {
       const opacity = Math.max(minOpacity, normalizedAmplitude);
       const brightness = Math.max(minBrightness, normalizedAmplitude);
 
-      // Draw main bar
+      // Draw main bar (solid blocks, no gaps)
       ctx.fillStyle = `rgba(${Math.floor(color.r * brightness)}, ${Math.floor(color.g * brightness)}, ${Math.floor(color.b * brightness)}, ${opacity})`;
-      ctx.fillRect(i * barWidth, height - barHeight, barWidth - 2, barHeight);
+      ctx.fillRect(i * barWidth, height - barHeight, barWidth, barHeight);
 
       // Draw peak hold indicator
       if (peakHold && this.peakValues[i] > 0) {
         const peakHeight = this.peakValues[i] * height;
         const peakY = height - peakHeight;
         ctx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, 1.0)`;
-        ctx.fillRect(i * barWidth, peakY - 2, barWidth - 2, 2);
+        ctx.fillRect(i * barWidth, peakY - 2, barWidth, 2);
       }
     }
   }

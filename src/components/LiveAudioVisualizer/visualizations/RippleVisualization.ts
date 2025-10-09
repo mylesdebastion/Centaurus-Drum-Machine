@@ -182,8 +182,22 @@ export class RippleVisualization {
       }
     }
 
-    // Normalize to 0-1
-    const normalizedFreq = maxIndex / frequencyData.length;
+    // Convert bin index to actual frequency (assuming 44.1kHz sample rate)
+    // Nyquist frequency = sampleRate / 2
+    const sampleRate = 44100; // Default sample rate
+    const nyquist = sampleRate / 2;
+    const freqHz = (maxIndex / frequencyData.length) * nyquist;
+
+    // Apply logarithmic scaling for better color distribution
+    // Musical range: 50Hz (bass) to 8kHz (high treble)
+    // This spreads out the frequencies where most music happens
+    const minFreq = 50;
+    const maxFreq = 8000;
+    const clampedFreq = Math.max(minFreq, Math.min(maxFreq, freqHz));
+
+    // Logarithmic mapping: log(freq/minFreq) / log(maxFreq/minFreq)
+    const normalizedFreq = Math.log(clampedFreq / minFreq) / Math.log(maxFreq / minFreq);
+
     const normalizedAmp = maxAmplitude / 255;
 
     return { frequency: normalizedFreq, amplitude: normalizedAmp };

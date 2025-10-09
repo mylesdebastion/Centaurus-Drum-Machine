@@ -29,7 +29,7 @@ export const DEFAULT_WAVEFORM_CONFIG: WaveformConfig = {
   stereoLayout: 'overlay',
   triggerLevel: 128, // Zero crossing
   showGrid: true,
-  showTechnicalReadout: true,
+  showTechnicalReadout: false, // Disabled - readings shown in main UI
   lineColor: '#00FF00', // Oscilloscope green
   lineWidth: 2,
   gridColor: 'rgba(0, 255, 0, 0.2)',
