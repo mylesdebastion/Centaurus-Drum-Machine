@@ -64,3 +64,52 @@ Before implementing any UI component:
 4. **Integrate with existing patterns** - extend `.btn-primary`, `.track-row`, etc.
 
 **Remember**: The original bolt.new code achieved high quality through systematic design thinking, comprehensive component patterns, and consistent visual hierarchies. All additions should maintain this same level of quality and consistency while leveraging modern UI patterns from shadcn/ui.
+
+## TypeScript Error Handling
+
+### Unused Variable Errors (`noUnusedLocals: true`)
+
+This project enforces strict TypeScript settings including `noUnusedLocals: true`, which treats unused variables as **build-breaking errors**. When encountering unused variable errors:
+
+**CRITICAL**: Never remove code/imports just to satisfy TypeScript errors without understanding the broader context. Always check:
+1. Documentation in `/docs/stories/` for planned features
+2. Related code that may use the import/variable in the future
+3. Whether this is work-in-progress functionality
+
+**Preferred Solutions (in order of preference):**
+
+1. **Option 2 - Underscore Prefix (Preferred for active development)**
+   - Use when functionality is partially implemented but variable isn't used yet
+   - Signals intentional future use without breaking the build
+   - Example: `const [_midiNotes, setMidiNotes] = useState<MIDINote[]>([]);`
+   - Use case: State is being set but not yet consumed by components
+
+2. **Option 3 - Comment Out (Preferred for early-stage features)**
+   - Use when feature is planned but not yet actively being developed
+   - Keeps code nearby for easy restoration
+   - Use case: Commented code with "Reserved for future" or "TODO" notes
+
+3. **Option 1 - Complete Implementation**
+   - Only if the feature can be quickly integrated without scope creep
+   - Ensure proper testing and documentation
+
+**Examples:**
+
+```typescript
+// ✅ GOOD - Underscore prefix for work-in-progress
+const [_midiNotes, setMidiNotes] = useState<MIDINote[]>([]); // Reserved for visualization integration
+
+// ✅ GOOD - Comment out early-stage features
+// const [midiNotes, setMidiNotes] = useState<MIDINote[]>([]);
+// TODO: Integrate with frequency visualizer per story 4.1
+
+// ❌ BAD - Removing imports/types without checking docs/stories
+// Removed MIDINote import because it was unused
+// (May break planned features documented in /docs/stories/)
+```
+
+**Before Fixing TypeScript Errors:**
+1. Check `/docs/stories/` for feature documentation
+2. Search codebase for related functionality
+3. Verify if removal would break planned integrations
+4. Choose appropriate fix strategy (underscore vs comment vs implement)

@@ -6,7 +6,7 @@ import { LiveAudioVisualizer } from '../LiveAudioVisualizer/LiveAudioVisualizer'
 import { UserList } from './UserList';
 import { MobileNavigation } from '../Layout/MobileNavigation';
 import { ResponsiveContainer } from '../Layout/ResponsiveContainer';
-import { DrumTrack, VisualizerSettings, User } from '../../types';
+import { DrumTrack, VisualizerSettings, User, MIDINote } from '../../types';
 import { createDefaultPattern } from '../../utils/drumPatterns';
 
 interface JamSessionProps {
@@ -31,7 +31,7 @@ export const JamSession: React.FC<JamSessionProps> = ({
   const [tempo, setTempo] = useState(120);
   const [isConnected] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
-  // const [midiNotes, setMidiNotes] = useState<MIDINote[]>([]); // Reserved for future MIDI visualization
+  const [_midiNotes, setMidiNotes] = useState<MIDINote[]>([]); // Reserved for future MIDI visualization integration
   const [isMobile, setIsMobile] = useState(false);
   const [activeView, setActiveView] = useState<'drum' | 'users' | 'settings'>('drum');
 
@@ -58,21 +58,21 @@ export const JamSession: React.FC<JamSessionProps> = ({
 
     const interval = setInterval(() => {
       setCurrentStep((prev) => (prev + 1) % 16);
-      
-      // Reserved for future MIDI visualization
-      // tracks.forEach((track, trackIndex) => {
-      //   if (track.steps[currentStep] && !track.muted) {
-      //     const note: MIDINote = {
-      //       note: 36 + trackIndex * 2, // MIDI note numbers
-      //       velocity: track.velocities[currentStep],
-      //       channel: 10, // Drum channel
-      //       timestamp: Date.now(),
-      //       userId: '1'
-      //     };
-      //
-      //     setMidiNotes(prev => [...prev.slice(-10), note]); // Keep last 10 notes
-      //   }
-      // });
+
+      // Generate MIDI notes for active steps (for future visualization integration)
+      tracks.forEach((track, trackIndex) => {
+        if (track.steps[currentStep] && !track.muted) {
+          const note: MIDINote = {
+            note: 36 + trackIndex * 2, // MIDI note numbers
+            velocity: track.velocities[currentStep],
+            channel: 10, // Drum channel
+            timestamp: Date.now(),
+            userId: '1'
+          };
+
+          setMidiNotes(prev => [...prev.slice(-10), note]); // Keep last 10 notes
+        }
+      });
     }, (60 / tempo / 4) * 1000); // 16th note timing
 
     return () => clearInterval(interval);
