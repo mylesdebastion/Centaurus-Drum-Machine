@@ -116,7 +116,7 @@ export class SpectrumVisualization {
       const normalizedFrequency = i / (numBars - 1);
 
       // Get color based on frequency (using existing colorMapping.ts)
-      const color = getFrequencyColor(normalizedFrequency, 'spectrum');
+      const color = getFrequencyColor(normalizedFrequency, 'spectrum', this.config.scaleType);
 
       // Apply amplitude to opacity AND brightness (quiet sounds are dimmer/more transparent)
       const opacity = Math.max(minOpacity, normalizedAmplitude);
