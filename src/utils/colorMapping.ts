@@ -82,47 +82,71 @@ export const getNoteColor = (note: number, mode: ColorMode): RGBColor => {
 };
 
 /**
- * Get color for drum track based on General MIDI drum mapping and color mode
+ * Get color for drum track based on sonic frequency content and color mode
  */
 export const getDrumTrackColor = (trackName: string, mode: ColorMode): string => {
-  // General MIDI drum note mapping
-  const drumNoteMap: Record<string, number> = {
-    'Kick': 36,      // Bass Drum 1 (low frequency)
-    'Snare': 38,     // Acoustic Snare (mid frequency)
-    'Hi-Hat': 42,    // Closed Hi-Hat (high frequency)
-    'Perc': 39,      // Hand Clap (mid-high frequency)
-    'Crash': 49,     // Crash Cymbal 1
-    'Ride': 51,      // Ride Cymbal 1
-    'Tom': 45,       // Low Tom
-    'Clap': 39       // Hand Clap
+  // Map drum names to their dominant frequency in Hz
+  const drumFrequencyMap: Record<string, number> = {
+    'Kick': 80,        // Low bass fundamental + first harmonics
+    'Snare': 550,      // Adjusted for yellow color mapping
+    'Hi-Hat': 10000,   // High frequency content (8-12 kHz)
+    'Perc': 1500,      // Mid-high percussion
+    'Crash': 12000,    // Very high cymbal wash (8-15 kHz)
+    'Ride': 4000,      // High-mid cymbal ping (3-6 kHz)
+    'Tom': 150,        // Mid-low tom fundamental
+    'Clap': 2200       // Adjusted for green-blue/cyan color mapping
   };
 
-  const midiNote = drumNoteMap[trackName] || 60; // Default to middle C if not found
-  const color = getNoteColor(midiNote, mode);
+  // Get the frequency for this drum (default to 1kHz if not found)
+  const freqHz = drumFrequencyMap[trackName] || 1000;
+
+  // Convert frequency to normalized value using log scale (50-8000 Hz)
+  const minFreq = 50;
+  const maxFreq = 8000;
+  const clampedFreq = Math.max(minFreq, Math.min(maxFreq, freqHz));
+  const normalizedFreq = Math.log(clampedFreq / minFreq) / Math.log(maxFreq / minFreq);
+
+  // Get color based on frequency (using quadratic scale for better bass emphasis)
+  const color = getFrequencyColor(normalizedFreq, mode, 'quadratic');
   return rgbToHex(color);
 };
 
 /**
  * Get frequency-based color for audio visualization
  */
-export const getFrequencyColor = (frequency: number, mode: ColorMode): RGBColor => {
+export const getFrequencyColor = (
+  frequency: number,
+  mode: ColorMode,
+  scaleType: 'log' | 'linear' | 'quadratic' = 'log'
+): RGBColor => {
   // Map frequency (0-1) to appropriate color based on mode
   switch (mode) {
-    case 'spectrum':
-      // Map frequency (0-1) to red-violet spectrum
-      const hue = frequency * 270; // 0 = red (0°), 1 = violet (270°)
+    case 'spectrum': {
+      let hue;
+
+      if (scaleType === 'quadratic') {
+        // Quadratic color mapping - emphasizes bass frequencies with smooth transitions
+        // This spreads out low frequencies (0-250 Hz) in red-orange while maintaining
+        // smooth color transitions without discontinuities
+        hue = Math.pow(frequency, 2) * 270;
+      } else {
+        // Linear color mapping for log and linear scale types
+        hue = frequency * 270; // 0 = red (0°), 1 = violet (270°)
+      }
+
       return hslToRgb(hue, 85, 55);
-    
+    }
+
     case 'chromatic':
       // For frequency data, treat as continuous spectrum
       const chromaticHue = frequency * 360;
       return hslToRgb(chromaticHue, 70, 55);
-    
+
     case 'harmonic':
       // For frequency, use a warm-to-cool progression
       const harmonicHue = frequency * 240; // Blue to red range
       return hslToRgb(harmonicHue, 65, 50);
-    
+
     default:
       return { r: 255, g: 255, b: 255 };
   }

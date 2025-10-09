@@ -47,32 +47,34 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
   onRemoveTrack,
   onLoadDefaultPattern
 }) => {
-  // Initialize audio engine on component mount
-  React.useEffect(() => {
-    const initAudio = async () => {
-      try {
-        await audioEngine.initialize();
-      } catch (error) {
-        console.error('Failed to initialize audio:', error);
-      }
-    };
-    
-    initAudio();
-    
-    // Cleanup on unmount
-    return () => {
-      audioEngine.dispose();
-    };
-  }, []);
+  // Initialize audio engine on play (requires user interaction for Tone.js)
+  const handlePlay = async () => {
+    try {
+      console.log('[DrumMachine] Initializing audio engine on play...');
+      await audioEngine.initialize();
+      console.log('[DrumMachine] Audio engine ready, starting playback');
+      onPlay();
+    } catch (error) {
+      console.error('[DrumMachine] Failed to initialize audio:', error);
+    }
+  };
 
   // Play drum sounds when steps are active
   React.useEffect(() => {
     if (!isPlaying) return;
 
+    console.log('[DrumMachine] Playing step', currentStep);
     tracks.forEach((track) => {
       if (track.steps[currentStep] && !track.muted) {
         const velocity = track.velocities[currentStep] * track.volume;
+        console.log('[DrumMachine] Playing drum:', track.name, 'velocity:', velocity);
         audioEngine.playDrum(track.name, velocity);
+
+        // Send drum hit to frequency source manager for visualization
+        const sourceManager = (window as any).frequencySourceManager;
+        if (sourceManager) {
+          sourceManager.addDrumHit(track.name, velocity);
+        }
       }
     });
   }, [currentStep, isPlaying, tracks]);
@@ -101,7 +103,7 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
       <TransportControls
         isPlaying={isPlaying}
         tempo={tempo}
-        onPlay={onPlay}
+        onPlay={handlePlay}
         onStop={onStop}
         onTempoChange={onTempoChange}
       />

@@ -53,7 +53,7 @@ export const createDefaultPattern = (): DrumTrack[] => {
   const clapTrack = createEmptyTrack('clap');
   // Empty by default - user can add their own pattern
 
-  return [kickTrack, snareTrack, hihatTrack, clapTrack];
+  return [kickTrack, snareTrack, clapTrack, hihatTrack];
 };
 
 // Get available instruments that aren't already in use

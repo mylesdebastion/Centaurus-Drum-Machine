@@ -60,12 +60,13 @@ export class VisualizationEngine {
       }
 
       case 'waveform': {
+        const peakFreq = audioManager.getPeakFrequency();
         if (stereo) {
           const { left, right } = audioManager.getStereoWaveformData();
-          this.waveformViz.renderStereo(ctx, left, right, width, height);
+          this.waveformViz.renderStereo(ctx, left, right, width, height, peakFreq.frequency);
         } else {
           const timeData = audioManager.getWaveformData();
-          this.waveformViz.render(ctx, timeData, width, height);
+          this.waveformViz.render(ctx, timeData, width, height, peakFreq.frequency);
         }
         break;
       }

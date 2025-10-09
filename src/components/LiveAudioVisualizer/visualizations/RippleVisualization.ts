@@ -73,8 +73,16 @@ export class RippleVisualization {
     const smoothedAmp = this.smooth(this.smoothingAmp, amplitude, this.config.smoothingLength);
     const smoothedFreq = this.smooth(this.smoothingFreq, frequency, this.config.smoothingLength);
 
-    // AudioLux frequency mode mapping (ripple.cpp line 1977-1980)
-    const hue = 192 * smoothedFreq; // 0 (red) to 192 (cyan)
+    // Frequency to hue mapping - quadratic for quadratic scale, linear otherwise
+    let hue;
+    if (this.config.scaleType === 'quadratic') {
+      // Quadratic color mapping - emphasizes bass frequencies with smooth transitions
+      hue = Math.pow(smoothedFreq, 2) * 192; // Quadratic curve (0 = red, 192 = cyan)
+    } else {
+      // Linear color mapping for log and linear scales (AudioLux original)
+      hue = 192 * smoothedFreq; // 0 (red) to 192 (cyan)
+    }
+
     const val = 255 * smoothedAmp; // brightness
     const sat = 255; // full saturation
 

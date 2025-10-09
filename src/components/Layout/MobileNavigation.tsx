@@ -1,9 +1,9 @@
 import React from 'react';
-import { Music, Eye, Users, Settings } from 'lucide-react';
+import { Music, Users, Settings } from 'lucide-react';
 
 interface MobileNavigationProps {
-  activeView: 'drum' | 'visualizer' | 'users' | 'settings';
-  onViewChange: (view: 'drum' | 'visualizer' | 'users' | 'settings') => void;
+  activeView: 'drum' | 'users' | 'settings';
+  onViewChange: (view: 'drum' | 'users' | 'settings') => void;
   userCount: number;
 }
 
@@ -14,7 +14,6 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
 }) => {
   const navItems = [
     { id: 'drum' as const, icon: Music, label: 'Drums' },
-    { id: 'visualizer' as const, icon: Eye, label: 'Visual' },
     { id: 'users' as const, icon: Users, label: 'Users', badge: userCount },
     { id: 'settings' as const, icon: Settings, label: 'Settings' }
   ];

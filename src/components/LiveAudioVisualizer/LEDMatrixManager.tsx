@@ -84,8 +84,8 @@ export const LEDMatrixManager: React.FC<LEDMatrixManagerProps> = ({
         return;
       }
 
-      // Try to connect to bridge on multiple ports (same as SingleLaneVisualizer)
-      const ports = [21325, 21326, 21327, 21328, 21329];
+      // Try to connect to bridge on multiple ports
+      const ports = [8080, 21325, 21326, 21327, 21328, 21329];
 
       for (const port of ports) {
         try {
@@ -103,7 +103,9 @@ export const LEDMatrixManager: React.FC<LEDMatrixManagerProps> = ({
 
     const tryConnect = (port: number): Promise<void> => {
       return new Promise((resolve, reject) => {
-        const ws = new WebSocket(`ws://localhost:${port}`);
+        // Auto-detect protocol: use wss:// on HTTPS pages, ws:// on HTTP pages
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//localhost:${port}`);
         let connected = false;
 
         const timeout = setTimeout(() => {

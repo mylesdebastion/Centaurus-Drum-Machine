@@ -41,27 +41,34 @@ export const CompactDrumMachine: React.FC<CompactDrumMachineProps> = ({
   const availableInstruments = getAvailableInstruments(tracks);
   const canAddMore = tracks.length < 8;
 
-  // Initialize audio engine on component mount
-  React.useEffect(() => {
-    const initAudio = async () => {
-      try {
-        await audioEngine.initialize();
-      } catch (error) {
-        console.error('Failed to initialize audio:', error);
-      }
-    };
-    
-    initAudio();
-  }, []);
+  // Initialize audio engine on play (requires user interaction for Tone.js)
+  const handlePlay = async () => {
+    try {
+      console.log('[CompactDrumMachine] Initializing audio engine on play...');
+      await audioEngine.initialize();
+      console.log('[CompactDrumMachine] Audio engine ready, starting playback');
+      onPlay();
+    } catch (error) {
+      console.error('[CompactDrumMachine] Failed to initialize audio:', error);
+    }
+  };
 
   // Play drum sounds when steps are active
   React.useEffect(() => {
     if (!isPlaying) return;
 
+    console.log('[CompactDrumMachine] Playing step', currentStep);
     tracks.forEach((track) => {
       if (track.steps[currentStep] && !track.muted) {
         const velocity = track.velocities[currentStep] * track.volume;
+        console.log('[CompactDrumMachine] Playing drum:', track.name, 'velocity:', velocity);
         audioEngine.playDrum(track.name, velocity);
+
+        // Send drum hit to frequency source manager for visualization
+        const sourceManager = (window as any).frequencySourceManager;
+        if (sourceManager) {
+          sourceManager.addDrumHit(track.name, velocity);
+        }
       }
     });
   }, [currentStep, isPlaying, tracks]);
@@ -124,7 +131,7 @@ export const CompactDrumMachine: React.FC<CompactDrumMachineProps> = ({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <button
-            onClick={isPlaying ? onStop : onPlay}
+            onClick={isPlaying ? onStop : handlePlay}
             className={`p-2 rounded-lg transition-colors ${
               isPlaying
                 ? 'bg-red-600 hover:bg-red-700 text-white'
