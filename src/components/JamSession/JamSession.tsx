@@ -179,7 +179,7 @@ export const JamSession: React.FC<JamSessionProps> = ({
       <div className="p-4 md:p-6 pb-20 md:pb-6">
         {/* Mobile Layout - tab-based views, all mounted */}
         <div className={isMobile ? 'space-y-4' : 'hidden'}>
-          {/* Drum Tab - Drum Machine + Visualizer */}
+          {/* Drum Tab - Drum Machine only (Visualizer rendered once below) */}
           <div className={activeView === 'drum' ? 'space-y-4' : 'hidden'}>
             <CompactDrumMachine
               tracks={tracks}
@@ -194,7 +194,7 @@ export const JamSession: React.FC<JamSessionProps> = ({
               onAddTrack={handleAddTrack}
               onLoadDefaultPattern={handleLoadDefaultPattern}
             />
-            <LiveAudioVisualizer embedded />
+            {/* Visualizer moved outside conditional rendering - see below */}
           </div>
 
           {/* Users Tab - Users + Session Info */}
@@ -281,7 +281,7 @@ export const JamSession: React.FC<JamSessionProps> = ({
 
         {/* Desktop Layout - always rendered, visibility controlled */}
         <div className={!isMobile ? 'grid lg:grid-cols-4 gap-6' : 'hidden'}>
-          {/* Desktop: Left column - Drum Machine + Visualizer */}
+          {/* Desktop: Left column - Drum Machine only (Visualizer rendered once below) */}
           <div className="lg:col-span-3 space-y-6">
             <DrumMachine
               tracks={tracks}
@@ -304,8 +304,7 @@ export const JamSession: React.FC<JamSessionProps> = ({
               onLoadDefaultPattern={handleLoadDefaultPattern}
             />
 
-            {/* Visualizer - same width as drum machine */}
-            <LiveAudioVisualizer embedded />
+            {/* Visualizer moved outside conditional rendering - see below */}
           </div>
 
           {/* Desktop: Right Sidebar - Users and Session Info */}
@@ -349,6 +348,21 @@ export const JamSession: React.FC<JamSessionProps> = ({
             </div>
           </div>
         </div>
+
+        {/* 🚨 CRITICAL FIX: Single LiveAudioVisualizer instance rendered ONCE
+             - Component never unmounts during breakpoint changes (resize/rotation)
+             - Audio context, WLED LEDs, and animation frames persist across layout changes
+             - CSS visibility controls whether component is shown, NOT conditional rendering
+             - Layout prop hints mobile vs desktop, but doesn't affect component lifecycle */}
+        <LiveAudioVisualizer
+          embedded
+          layout={isMobile ? 'mobile' : 'desktop'}
+          className={
+            isMobile
+              ? activeView === 'drum' ? '' : 'hidden'  // Mobile: show only on 'drum' tab
+              : ''  // Desktop: always show
+          }
+        />
       </div>
 
       {/* Mobile Navigation */}

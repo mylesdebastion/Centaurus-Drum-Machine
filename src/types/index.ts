@@ -69,6 +69,28 @@ export interface LessonStep {
   completed: boolean;
 }
 
+// Responsive Layout Types
+export type LayoutStrategy = 'tabs' | 'collapsible' | 'hybrid';
+export type Breakpoint = 'mobile' | 'tablet' | 'desktop';
+export type Orientation = 'portrait' | 'landscape';
+
+export interface ResponsiveContextValue {
+  isMobile: boolean;
+  isTablet: boolean;
+  isDesktop: boolean;
+  breakpoint: Breakpoint;
+  orientation: Orientation;
+  isTouchDevice: boolean;
+  layoutStrategy?: LayoutStrategy;
+}
+
+export interface NavTab {
+  id: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  badge?: number;
+}
+
 // Re-export hardware types for convenient access
 export type {
   ConnectionStatus,

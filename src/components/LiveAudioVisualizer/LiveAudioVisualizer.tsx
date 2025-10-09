@@ -21,9 +21,16 @@ import { Mic, Settings, Activity, ArrowLeft, Music, Drum } from 'lucide-react';
 interface LiveAudioVisualizerProps {
   onBack?: () => void;
   embedded?: boolean; // When true, renders in a compact embedded mode
+  layout?: 'mobile' | 'desktop'; // Layout hint for responsive rendering (does NOT cause remount)
+  className?: string; // Additional CSS classes for visibility control
 }
 
-export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack, embedded = false }) => {
+export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
+  onBack,
+  embedded = false,
+  layout: _layout = 'desktop', // Reserved for future mobile-specific optimizations
+  className = ''
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioManagerRef = useRef<AudioInputManager | null>(null);
   const vizEngineRef = useRef<VisualizationEngine | null>(null);
@@ -187,7 +194,11 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
 
   // Cleanup on unmount
   useEffect(() => {
+    // 🚨 CRITICAL LIFECYCLE LOGGING - Track component mount/unmount for debugging
+    console.log('[LiveAudioVisualizer] MOUNTED');
+
     return () => {
+      console.log('[LiveAudioVisualizer] UNMOUNTED - Cleaning up audio/LED/animation state');
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
@@ -289,7 +300,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
   // Embedded mode: simplified layout without full-screen wrapper
   if (embedded) {
     return (
-      <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+      <div className={`bg-gray-800 rounded-xl p-6 border border-gray-700 ${className}`}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold">Live Audio Visualizer</h2>
           <div className="flex items-center gap-4">
