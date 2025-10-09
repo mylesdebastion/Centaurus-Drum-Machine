@@ -113,3 +113,57 @@ const [_midiNotes, setMidiNotes] = useState<MIDINote[]>([]); // Reserved for vis
 2. Search codebase for related functionality
 3. Verify if removal would break planned integrations
 4. Choose appropriate fix strategy (underscore vs comment vs implement)
+
+## Development Server Management
+
+### Port Configuration (`strictPort: true`)
+
+This project uses **strict port enforcement** in `vite.config.ts`:
+- **Fixed port**: 5173 (always)
+- **strictPort: true** - Vite will **fail** if port 5173 is busy instead of auto-selecting a new port
+- **Why**: Prevents confusion from multiple dev servers running on different ports
+
+### When Dev Server Fails to Start
+
+If you see an error like:
+```
+Port 5173 is already in use
+```
+
+**Follow this process:**
+
+1. **Check what's running on port 5173:**
+   ```bash
+   # Windows
+   netstat -ano | findstr :5173
+
+   # Linux/Mac
+   lsof -ti:5173
+   ```
+
+2. **Kill the existing process:**
+   ```bash
+   # Windows (use PID from netstat output)
+   taskkill /PID <PID> /F
+
+   # Linux/Mac
+   kill -9 $(lsof -ti:5173)
+   ```
+
+3. **Then restart the dev server:**
+   ```bash
+   npm run dev
+   ```
+
+### Development Workflow Guidelines
+
+**CRITICAL**: Before starting a new dev server:
+- **Always check** if a server is already running on port 5173
+- **Never** start multiple dev servers on different ports
+- **Always kill** previous dev server processes before starting a new one
+- **Use the same port** (5173) for consistency across sessions
+
+**Preferred approach when making code changes:**
+- Let Vite's HMR (Hot Module Replacement) handle updates automatically
+- Only restart the server if HMR fails or config changes are made
+- Check running processes before starting a new dev session

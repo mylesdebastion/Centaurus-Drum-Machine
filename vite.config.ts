@@ -8,7 +8,8 @@ export default defineConfig({
   plugins: [react(), wledBridgePlugin()],
   server: {
     host: '0.0.0.0', // Listen on all network interfaces for tablet/mobile access
-    port: 5173
+    port: 5173,
+    strictPort: true // Fail if port is busy instead of using next available port
   },
   test: {
     globals: true,
