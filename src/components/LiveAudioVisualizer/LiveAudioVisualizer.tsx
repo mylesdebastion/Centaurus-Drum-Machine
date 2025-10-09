@@ -14,17 +14,22 @@ import { AudioInputManager, DEFAULT_AUDIO_CONFIG } from './AudioInputManager';
 import { VisualizationEngine, VisualizationMode, DEFAULT_VIZ_ENGINE_CONFIG } from './VisualizationEngine';
 import { LEDMatrixManager } from './LEDMatrixManager';
 import { RippleDirection } from './visualizations/RippleVisualization';
-import { Mic, Settings, Activity, ArrowLeft } from 'lucide-react';
+import { FrequencySourceManager, FrequencyMixMode } from '../../utils/frequencySourceManager';
+import { FrequencyDataAdapter } from './FrequencyDataAdapter';
+import { Mic, Settings, Activity, ArrowLeft, Music, Drum } from 'lucide-react';
 
 interface LiveAudioVisualizerProps {
   onBack?: () => void;
+  embedded?: boolean; // When true, renders in a compact embedded mode
 }
 
-export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack }) => {
+export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack, embedded = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioManagerRef = useRef<AudioInputManager | null>(null);
   const vizEngineRef = useRef<VisualizationEngine | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const sourceManagerRef = useRef<FrequencySourceManager | null>(null);
+  const adapterRef = useRef<FrequencyDataAdapter | null>(null);
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +41,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
   const [showSettings, setShowSettings] = useState(false);
   const [fps, setFps] = useState(0);
   const [currentRippleDirection, setCurrentRippleDirection] = useState<RippleDirection>('radial');
+  const [frequencySource, setFrequencySource] = useState<FrequencyMixMode>('mic-only');
 
   // Stats
   const [rms, setRMS] = useState(0);
@@ -44,11 +50,20 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
   // FPS calculation
   const fpsCounterRef = useRef({ frames: 0, lastTime: Date.now() });
 
-  // Initialize visualization engine
+  // Initialize visualization engine and frequency source manager
   useEffect(() => {
     vizEngineRef.current = new VisualizationEngine(DEFAULT_VIZ_ENGINE_CONFIG);
+    sourceManagerRef.current = new FrequencySourceManager();
+    adapterRef.current = new FrequencyDataAdapter(sourceManagerRef.current);
+
+    // Expose source manager globally for drum machine integration
+    (window as any).frequencySourceManager = sourceManagerRef.current;
+
     return () => {
       vizEngineRef.current = null;
+      sourceManagerRef.current = null;
+      adapterRef.current = null;
+      delete (window as any).frequencySourceManager;
     };
   }, []);
 
@@ -65,17 +80,26 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
   // Initialize audio input
   const handleStart = async (deviceId?: string) => {
     try {
+      console.log('[LiveAudioVisualizer] Starting audio initialization...');
       setError(null);
       const manager = new AudioInputManager(DEFAULT_AUDIO_CONFIG);
       // Don't pass deviceId on first initialization (empty string causes issues)
       await manager.initialize(deviceId && deviceId.length > 0 ? deviceId : undefined);
+      console.log('[LiveAudioVisualizer] Audio manager initialized successfully');
       audioManagerRef.current = manager;
+
+      // Register audio manager with adapter (which also registers with source manager)
+      if (adapterRef.current) {
+        adapterRef.current.setAudioManager(manager);
+      }
+
       setIsInitialized(true);
       await enumerateDevices(); // Update device list after permission granted
+      console.log('[LiveAudioVisualizer] Starting visualization loop...');
       startVisualization();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to initialize audio');
-      console.error('Audio initialization error:', err);
+      console.error('[LiveAudioVisualizer] Audio initialization error:', err);
     }
   };
 
@@ -87,16 +111,16 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const manager = audioManagerRef.current;
+    const adapter = adapterRef.current;
     const vizEngine = vizEngineRef.current;
-    if (!manager || !vizEngine) return;
+    if (!adapter || !vizEngine) return;
 
     const render = () => {
       const width = canvas.width;
       const height = canvas.height;
 
-      // Render visualization
-      vizEngine.render(ctx, manager, width, height);
+      // Render visualization using adapter (which mixes all sources)
+      vizEngine.render(ctx, adapter as any, width, height);
 
       // Update LED matrix if enabled
       const ledManager = (window as any).ledMatrixManager;
@@ -107,9 +131,9 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
         ledManager.sendToWLED(grid);
       }
 
-      // Update stats
-      const currentRMS = manager.getRMS();
-      const currentPeak = manager.getPeakFrequency();
+      // Update stats from adapter
+      const currentRMS = adapter.getRMS();
+      const currentPeak = adapter.getPeakFrequency();
       setRMS(currentRMS);
       setPeakFreq(currentPeak);
 
@@ -207,6 +231,14 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
     }
   };
 
+  // Handle frequency source change
+  const handleFrequencySourceChange = (mode: FrequencyMixMode) => {
+    setFrequencySource(mode);
+    if (sourceManagerRef.current) {
+      sourceManagerRef.current.setMixMode(mode);
+    }
+  };
+
   // Update visualization scale type when changed
   useEffect(() => {
     if (vizEngineRef.current) {
@@ -254,6 +286,268 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
     }
   };
 
+  // Embedded mode: simplified layout without full-screen wrapper
+  if (embedded) {
+    return (
+      <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold">Live Audio Visualizer</h2>
+          <div className="flex items-center gap-4">
+            {isInitialized && (
+              <div className="flex gap-4 text-sm">
+                <div className="text-gray-400">
+                  {fps} FPS
+                </div>
+                <div className="text-gray-400">
+                  {(rms * 100).toFixed(0)}%
+                </div>
+                <div className="text-gray-400">
+                  {peakFreq.frequency.toFixed(0)} Hz
+                </div>
+              </div>
+            )}
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {!isInitialized && !error && (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <Mic className="w-12 h-12 text-primary-500 mx-auto mb-3" />
+              <p className="text-gray-400 mb-4">
+                Click to enable microphone access
+              </p>
+              <button
+                onClick={() => handleStart(selectedDeviceId)}
+                className="px-6 py-3 bg-primary-600 hover:bg-primary-500 text-white font-semibold rounded-lg transition-colors"
+              >
+                🎤 Start Audio Input
+              </button>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-900/20 border border-red-500 rounded-lg p-4">
+            <h3 className="text-red-400 font-semibold mb-2">Audio Error</h3>
+            <p className="text-gray-300 text-sm mb-3">{error}</p>
+            <button
+              onClick={() => handleStart(selectedDeviceId)}
+              className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {isInitialized && (
+          <>
+            <div className="bg-gray-900 rounded-lg overflow-hidden mb-4" style={{ height: '256px' }}>
+              <canvas
+                ref={canvasRef}
+                className="w-full h-full cursor-crosshair"
+                onClick={handleCanvasClick}
+              />
+            </div>
+
+            <div className="bg-gray-700 rounded-lg p-3 space-y-3">
+              <div className="flex items-center gap-3 flex-wrap text-sm">
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => handleModeChange('spectrum')}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                      currentMode === 'spectrum'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                    }`}
+                  >
+                    Spectrum
+                  </button>
+                  <button
+                    onClick={() => handleModeChange('waveform')}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                      currentMode === 'waveform'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                    }`}
+                  >
+                    Waveform
+                  </button>
+                  <button
+                    onClick={() => handleModeChange('ripple')}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                      currentMode === 'ripple'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                    }`}
+                  >
+                    Ripple
+                  </button>
+                </div>
+
+                {currentMode === 'ripple' && (
+                  <div className="flex gap-1 border-l border-gray-600 pl-3">
+                    <button
+                      onClick={() => handleRippleDirection('radial')}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                        currentRippleDirection === 'radial'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                      }`}
+                    >
+                      radial
+                    </button>
+                    <button
+                      onClick={() => handleRippleDirection('bottom-top')}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                        currentRippleDirection === 'bottom-top' || currentRippleDirection === 'top-bottom'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                      }`}
+                    >
+                      {currentRippleDirection === 'bottom-top' ? 'top-bottom' : 'bottom-top'}
+                    </button>
+                    <button
+                      onClick={() => handleRippleDirection('left-right')}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                        currentRippleDirection === 'left-right' || currentRippleDirection === 'right-left'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                      }`}
+                    >
+                      {currentRippleDirection === 'left-right' ? 'right-left' : 'left-right'}
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 border-l border-gray-600 pl-3 ml-auto">
+                  <span className="text-gray-400 text-xs">Gain:</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value={gain}
+                    onChange={(e) => handleGainChange(parseFloat(e.target.value))}
+                    className="w-24"
+                  />
+                  <span className="text-white font-mono text-xs w-10 text-right">
+                    {(gain * 100).toFixed(0)}%
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 border-l border-gray-600 pl-3">
+                  <span className="text-gray-400 text-xs">Scale:</span>
+                  <select
+                    value={frequencyScale}
+                    onChange={(e) => setFrequencyScale(e.target.value as 'log' | 'linear' | 'quadratic')}
+                    className="px-2 py-1 text-xs bg-gray-600 text-gray-300 rounded border border-gray-500 focus:border-primary-500 focus:outline-none"
+                  >
+                    <option value="log">Log</option>
+                    <option value="quadratic">Quad</option>
+                    <option value="linear">Linear</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Frequency Source Selector - Second Row */}
+              <div className="flex items-center gap-2 flex-wrap text-sm pt-2 border-t border-gray-600">
+                <span className="text-gray-400 text-xs">Source:</span>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => handleFrequencySourceChange('mic-only')}
+                    className={`px-2 py-1 text-xs rounded transition-colors flex items-center gap-1 ${
+                      frequencySource === 'mic-only'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                    }`}
+                    title="Microphone audio only"
+                  >
+                    <Mic className="w-3 h-3" />
+                    Mic
+                  </button>
+                  <button
+                    onClick={() => handleFrequencySourceChange('drums-only')}
+                    className={`px-2 py-1 text-xs rounded transition-colors flex items-center gap-1 ${
+                      frequencySource === 'drums-only'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                    }`}
+                    title="Drum machine synthetic frequencies"
+                  >
+                    <Drum className="w-3 h-3" />
+                    Drums
+                  </button>
+                  <button
+                    onClick={() => handleFrequencySourceChange('midi-only')}
+                    className={`px-2 py-1 text-xs rounded transition-colors flex items-center gap-1 ${
+                      frequencySource === 'midi-only'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                    }`}
+                    title="MIDI note synthetic frequencies"
+                  >
+                    <Music className="w-3 h-3" />
+                    MIDI
+                  </button>
+                  <button
+                    onClick={() => handleFrequencySourceChange('mic+drums')}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                      frequencySource === 'mic+drums'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                    }`}
+                    title="Blend microphone and drum frequencies"
+                  >
+                    Mic+Drums
+                  </button>
+                  <button
+                    onClick={() => handleFrequencySourceChange('all')}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                      frequencySource === 'all'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                    }`}
+                    title="Mix all sources"
+                  >
+                    All
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {showSettings && (
+              <div className="mt-4 bg-gray-700 rounded-lg p-4 space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Audio Input Device</label>
+                  <select
+                    value={selectedDeviceId}
+                    onChange={(e) => setSelectedDeviceId(e.target.value)}
+                    disabled={isInitialized}
+                    className="w-full px-3 py-2 bg-gray-600 text-white rounded border border-gray-500 focus:border-primary-500 focus:outline-none disabled:opacity-50 text-sm"
+                  >
+                    {devices.map((device) => (
+                      <option key={device.deviceId} value={device.deviceId}>
+                        {device.label || `Device ${device.deviceId.substring(0, 8)}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <LEDMatrixManager />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // Full-screen mode: original layout
   return (
     <div className="fixed inset-0 bg-gray-900 flex flex-col">
       {/* Header */}
@@ -459,6 +753,71 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
                       <option value="quadratic">Quadratic</option>
                       <option value="linear">Linear</option>
                     </select>
+                  </div>
+
+                  {/* Frequency Source selector */}
+                  <div className="flex items-center gap-2 border-l border-gray-700 pl-4">
+                    <span className="text-gray-400 text-sm">Source:</span>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleFrequencySourceChange('mic-only')}
+                        className={`px-2 py-1 text-xs rounded transition-colors flex items-center gap-1 ${
+                          frequencySource === 'mic-only'
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        }`}
+                        title="Microphone audio only"
+                      >
+                        <Mic className="w-3 h-3" />
+                        Mic
+                      </button>
+                      <button
+                        onClick={() => handleFrequencySourceChange('drums-only')}
+                        className={`px-2 py-1 text-xs rounded transition-colors flex items-center gap-1 ${
+                          frequencySource === 'drums-only'
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        }`}
+                        title="Drum machine synthetic frequencies"
+                      >
+                        <Drum className="w-3 h-3" />
+                        Drums
+                      </button>
+                      <button
+                        onClick={() => handleFrequencySourceChange('midi-only')}
+                        className={`px-2 py-1 text-xs rounded transition-colors flex items-center gap-1 ${
+                          frequencySource === 'midi-only'
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        }`}
+                        title="MIDI note synthetic frequencies"
+                      >
+                        <Music className="w-3 h-3" />
+                        MIDI
+                      </button>
+                      <button
+                        onClick={() => handleFrequencySourceChange('mic+drums')}
+                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                          frequencySource === 'mic+drums'
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        }`}
+                        title="Blend microphone and drums"
+                      >
+                        Mic+Drums
+                      </button>
+                      <button
+                        onClick={() => handleFrequencySourceChange('all')}
+                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                          frequencySource === 'all'
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        }`}
+                        title="Mix all sources"
+                      >
+                        All
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

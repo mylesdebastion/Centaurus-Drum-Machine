@@ -6,7 +6,10 @@
  * - Stereo L/R channel overlay
  * - Technical overlays (RMS, peak, frequency estimate)
  * - Grid with time/amplitude divisions
+ * - Frequency-based color mapping
  */
+
+import { getFrequencyColor, ColorMode } from '../../../utils/colorMapping';
 
 export type WaveformMode = 'scrolling' | 'triggered';
 export type StereoLayout = 'overlay' | 'split' | 'xy';
@@ -17,11 +20,13 @@ export interface WaveformConfig {
   triggerLevel: number; // 0-255 (128 = zero crossing)
   showGrid: boolean;
   showTechnicalReadout: boolean;
-  lineColor: string; // CSS color
+  lineColor: string; // CSS color (fallback if no frequency data)
   lineWidth: number;
   gridColor: string;
   stereoLeftColor: string; // For stereo overlay
   stereoRightColor: string;
+  colorMode: ColorMode; // Frequency-based color mode
+  useFrequencyColors: boolean; // Enable frequency-based coloring
 }
 
 export const DEFAULT_WAVEFORM_CONFIG: WaveformConfig = {
@@ -30,11 +35,13 @@ export const DEFAULT_WAVEFORM_CONFIG: WaveformConfig = {
   triggerLevel: 128, // Zero crossing
   showGrid: true,
   showTechnicalReadout: false, // Disabled - readings shown in main UI
-  lineColor: '#00FF00', // Oscilloscope green
+  lineColor: '#00FF00', // Oscilloscope green (fallback)
   lineWidth: 2,
   gridColor: 'rgba(0, 255, 0, 0.02)', // Extremely dim grid
   stereoLeftColor: '#00FF00', // Green
   stereoRightColor: '#00FFFF', // Cyan
+  colorMode: 'spectrum',
+  useFrequencyColors: true, // Enable frequency-based coloring by default
 };
 
 export class WaveformVisualization {
@@ -51,9 +58,10 @@ export class WaveformVisualization {
     ctx: CanvasRenderingContext2D,
     timeData: Uint8Array,
     width: number,
-    height: number
+    height: number,
+    peakFrequency?: number // Optional peak frequency for color mapping
   ): void {
-    const { mode, showGrid, lineColor, lineWidth } = this.config;
+    const { mode, showGrid, lineWidth, useFrequencyColors, colorMode, lineColor } = this.config;
 
     // Clear canvas (pure black for LED output)
     ctx.fillStyle = '#000000';
@@ -64,11 +72,17 @@ export class WaveformVisualization {
       this.drawGrid(ctx, width, height);
     }
 
+    // Determine line color based on peak frequency
+    let color = lineColor; // Fallback
+    if (useFrequencyColors && peakFrequency !== undefined) {
+      color = this.getFrequencyBasedColor(peakFrequency, colorMode);
+    }
+
     // Draw waveform
     if (mode === 'scrolling') {
-      this.renderScrolling(ctx, timeData, width, height, lineColor, lineWidth);
+      this.renderScrolling(ctx, timeData, width, height, color, lineWidth);
     } else {
-      this.renderTriggered(ctx, timeData, width, height, lineColor, lineWidth);
+      this.renderTriggered(ctx, timeData, width, height, color, lineWidth);
     }
 
     // Draw technical readout
@@ -86,9 +100,10 @@ export class WaveformVisualization {
     leftData: Uint8Array,
     rightData: Uint8Array,
     width: number,
-    height: number
+    height: number,
+    peakFrequency?: number // Optional peak frequency for color mapping
   ): void {
-    const { stereoLayout, showGrid } = this.config;
+    const { stereoLayout, showGrid, useFrequencyColors, colorMode, stereoLeftColor, stereoRightColor } = this.config;
 
     // Clear canvas (pure black for LED output)
     ctx.fillStyle = '#000000';
@@ -99,17 +114,26 @@ export class WaveformVisualization {
       this.drawGrid(ctx, width, height);
     }
 
+    // Determine colors based on peak frequency
+    let leftColor = stereoLeftColor;
+    let rightColor = stereoRightColor;
+    if (useFrequencyColors && peakFrequency !== undefined) {
+      const baseColor = this.getFrequencyBasedColor(peakFrequency, colorMode);
+      leftColor = baseColor;
+      rightColor = this.adjustColorBrightness(baseColor, 0.8); // Slightly dimmer for right channel
+    }
+
     if (stereoLayout === 'overlay') {
       // Draw both channels overlaid
-      this.renderScrolling(ctx, leftData, width, height, this.config.stereoLeftColor, 1.5, 0.8);
-      this.renderScrolling(ctx, rightData, width, height, this.config.stereoRightColor, 1.5, 0.8);
+      this.renderScrolling(ctx, leftData, width, height, leftColor, 1.5, 0.8);
+      this.renderScrolling(ctx, rightData, width, height, rightColor, 1.5, 0.8);
     } else if (stereoLayout === 'split') {
       // Draw L on top half, R on bottom half
       const halfHeight = height / 2;
-      this.renderScrolling(ctx, leftData, width, halfHeight, this.config.stereoLeftColor, 1.5);
+      this.renderScrolling(ctx, leftData, width, halfHeight, leftColor, 1.5);
       ctx.save();
       ctx.translate(0, halfHeight);
-      this.renderScrolling(ctx, rightData, width, halfHeight, this.config.stereoRightColor, 1.5);
+      this.renderScrolling(ctx, rightData, width, halfHeight, rightColor, 1.5);
       ctx.restore();
     }
 
@@ -314,6 +338,38 @@ export class WaveformVisualization {
     ctx.fillText('R:', 20, 70);
     ctx.fillText(`RMS: ${(rightMetrics.rms * 100).toFixed(1)}%`, 45, 70);
     ctx.fillText(`Peak: ${(rightMetrics.peak * 100).toFixed(1)}%`, 45, 90);
+  }
+
+  /**
+   * Get frequency-based color from Hz value
+   */
+  private getFrequencyBasedColor(frequencyHz: number, colorMode: ColorMode): string {
+    // Map frequency to normalized 0-1 range using log scale (50-8000 Hz)
+    const minFreq = 50;
+    const maxFreq = 8000;
+    const clampedFreq = Math.max(minFreq, Math.min(maxFreq, frequencyHz));
+    const normalizedFreq = Math.log(clampedFreq / minFreq) / Math.log(maxFreq / minFreq);
+
+    // Get RGB color
+    const rgb = getFrequencyColor(normalizedFreq, colorMode, 'quadratic');
+
+    // Convert to CSS color string
+    return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+  }
+
+  /**
+   * Adjust color brightness
+   */
+  private adjustColorBrightness(color: string, factor: number): string {
+    // Parse RGB color
+    const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (!match) return color;
+
+    const r = Math.round(parseInt(match[1]) * factor);
+    const g = Math.round(parseInt(match[2]) * factor);
+    const b = Math.round(parseInt(match[3]) * factor);
+
+    return `rgb(${r}, ${g}, ${b})`;
   }
 
   /**

@@ -88,13 +88,13 @@ export const getDrumTrackColor = (trackName: string, mode: ColorMode): string =>
   // Map drum names to their dominant frequency in Hz
   const drumFrequencyMap: Record<string, number> = {
     'Kick': 80,        // Low bass fundamental + first harmonics
-    'Snare': 250,      // Dominant snare frequency (200-300 Hz)
+    'Snare': 550,      // Adjusted for yellow color mapping
     'Hi-Hat': 10000,   // High frequency content (8-12 kHz)
     'Perc': 1500,      // Mid-high percussion
     'Crash': 12000,    // Very high cymbal wash (8-15 kHz)
     'Ride': 4000,      // High-mid cymbal ping (3-6 kHz)
     'Tom': 150,        // Mid-low tom fundamental
-    'Clap': 1500       // Mid-high hand clap
+    'Clap': 2200       // Adjusted for green-blue/cyan color mapping
   };
 
   // Get the frequency for this drum (default to 1kHz if not found)
