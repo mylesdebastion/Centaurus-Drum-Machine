@@ -4,6 +4,7 @@ import * as Tone from 'tone';
 export class AudioEngine {
   private static instance: AudioEngine;
   private isInitialized = false;
+  private isInitializing = false;
   private drumSamples: { [key: string]: Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth } = {};
   private masterVolume: Tone.Volume;
 
@@ -19,12 +20,31 @@ export class AudioEngine {
   }
 
   public async initialize(): Promise<void> {
-    if (this.isInitialized) return;
+    console.log('[AudioEngine] initialize() called, isInitialized:', this.isInitialized, 'isInitializing:', this.isInitializing);
+
+    if (this.isInitialized) {
+      console.log('[AudioEngine] Already initialized, returning early');
+      return;
+    }
+
+    if (this.isInitializing) {
+      console.log('[AudioEngine] Already initializing, waiting...');
+      // Wait for initialization to complete
+      while (this.isInitializing) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      return;
+    }
+
+    this.isInitializing = true;
 
     try {
+      console.log('[AudioEngine] Starting Tone.js audio context...');
       // Start the audio context (required for Web Audio)
       await Tone.start();
-      
+      console.log('[AudioEngine] Tone.js started successfully');
+
+      console.log('[AudioEngine] Creating drum samples...');
       // Create drum samples using Tone.js built-in sounds
       this.drumSamples = {
         'kick': new Tone.MembraneSynth({
@@ -85,15 +105,25 @@ export class AudioEngine {
       };
 
       this.isInitialized = true;
-      console.log('Audio engine initialized successfully');
+      this.isInitializing = false;
+      console.log('[AudioEngine] ✅ Audio engine initialized successfully, isInitialized:', this.isInitialized);
+      console.log('[AudioEngine] Drum samples created:', Object.keys(this.drumSamples));
     } catch (error) {
-      console.error('Failed to initialize audio engine:', error);
+      console.error('[AudioEngine] ❌ Failed to initialize audio engine:', error);
+      this.isInitialized = false;
+      this.isInitializing = false;
     }
   }
 
   public playDrum(instrumentName: string, velocity: number = 0.8, time?: number): void {
     if (!this.isInitialized) {
-      console.warn('Audio engine not initialized');
+      console.error('[AudioEngine] ❌ Audio engine not initialized - cannot play', instrumentName);
+      console.error('[AudioEngine] Current state:', {
+        isInitialized: this.isInitialized,
+        isInitializing: this.isInitializing,
+        hasDrumSamples: Object.keys(this.drumSamples).length > 0,
+        drumSampleKeys: Object.keys(this.drumSamples)
+      });
       return;
     }
 
