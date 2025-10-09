@@ -84,8 +84,8 @@ export const LEDMatrixManager: React.FC<LEDMatrixManagerProps> = ({
         return;
       }
 
-      // Try to connect to bridge on multiple ports (same as SingleLaneVisualizer)
-      const ports = [21325, 21326, 21327, 21328, 21329];
+      // Try to connect to bridge on multiple ports
+      const ports = [8080, 21325, 21326, 21327, 21328, 21329];
 
       for (const port of ports) {
         try {
