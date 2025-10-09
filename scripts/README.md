@@ -1,3 +1,57 @@
+# Audiolux Jam Scripts
+
+This directory contains utility scripts for running and managing the Audiolux Jam application.
+
+## Quick Start Scripts
+
+### Automatic Startup (For Workshops/Kiosks)
+
+Start the dev server and automatically open the browser - perfect for workshop environments where the system needs to boot directly into the application.
+
+#### Windows 11 (NUC)
+```bash
+# Run once to enable autostart on boot
+scripts\setup-autostart-win.bat
+
+# Manual start
+scripts\start-dev-server.bat
+
+# Remove autostart
+scripts\remove-autostart-win.bat
+```
+
+#### macOS
+```bash
+# Run once to enable autostart on login
+bash scripts/setup-autostart-mac.sh
+
+# Manual start
+bash scripts/start-dev-server.sh
+
+# Remove autostart
+bash scripts/remove-autostart-mac.sh
+```
+
+#### Raspberry Pi (Linux)
+```bash
+# Run once to enable autostart on boot
+sudo bash scripts/setup-autostart-rpi.sh
+
+# Manual start
+bash scripts/start-dev-server.sh
+
+# Remove autostart
+sudo bash scripts/remove-autostart-rpi.sh
+```
+
+**What happens on boot:**
+1. Dev server starts automatically
+2. Waits 10 seconds for server initialization
+3. Opens browser to http://localhost:5173
+4. Application is ready to use!
+
+---
+
 # WLED WebSocket Bridge
 
 ## The Problem

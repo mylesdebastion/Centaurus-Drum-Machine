@@ -6,6 +6,10 @@ import { wledBridgePlugin } from './vite-plugins/wled-bridge'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), wledBridgePlugin()],
+  server: {
+    host: '0.0.0.0', // Listen on all network interfaces for tablet/mobile access
+    port: 5173
+  },
   test: {
     globals: true,
     environment: 'jsdom',
