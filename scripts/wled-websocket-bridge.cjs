@@ -44,23 +44,56 @@ try {
 // Create WebSocket server (with or without SSL)
 const wss = server
   ? new WebSocket.Server({ server })
-  : new WebSocket.Server({ port: WEBSOCKET_PORT });
+  : new WebSocket.Server({ port: WEBSOCKET_PORT, host: '0.0.0.0' });
 
 if (server) {
-  server.listen(WEBSOCKET_PORT);
+  server.listen(WEBSOCKET_PORT, '0.0.0.0');
 }
 
 // Create UDP client
 const udpClient = dgram.createSocket('udp4');
 
-console.log(`🌉 WLED WebSocket Bridge started on port ${WEBSOCKET_PORT}`);
+const os = require('os');
+
+// Get local network IP addresses
+const getNetworkIPs = () => {
+  const interfaces = os.networkInterfaces();
+  const ips = [];
+  for (const name in interfaces) {
+    for (const iface of interfaces[name]) {
+      // Skip internal (loopback) and non-IPv4 addresses
+      if (iface.family === 'IPv4' && !iface.internal) {
+        ips.push(iface.address);
+      }
+    }
+  }
+  return ips;
+};
+
+const networkIPs = getNetworkIPs();
+
+console.log(`🌉 WLED WebSocket Bridge started on port ${WEBSOCKET_PORT} (listening on 0.0.0.0)`);
 console.log(`📡 Forwarding to WLED devices on UDP port ${WLED_UDP_PORT}`);
 if (server) {
   console.log(`🔗 Connect browser to:`);
-  console.log(`   - ws://localhost:${WEBSOCKET_PORT} (HTTP pages)`);
-  console.log(`   - wss://localhost:${WEBSOCKET_PORT} (HTTPS pages)`);
+  console.log(`   - ws://localhost:${WEBSOCKET_PORT} (HTTP pages, desktop)`);
+  console.log(`   - wss://localhost:${WEBSOCKET_PORT} (HTTPS pages, desktop)`);
+  if (networkIPs.length > 0) {
+    console.log(`\n📱 For mobile devices on the same network:`);
+    networkIPs.forEach(ip => {
+      console.log(`   - ws://${ip}:${WEBSOCKET_PORT} (HTTP pages)`);
+      console.log(`   - wss://${ip}:${WEBSOCKET_PORT} (HTTPS pages)`);
+    });
+  }
 } else {
-  console.log(`🔗 Connect browser to: ws://localhost:${WEBSOCKET_PORT} (insecure only)`);
+  console.log(`🔗 Connect browser to:`);
+  console.log(`   - ws://localhost:${WEBSOCKET_PORT} (desktop)`);
+  if (networkIPs.length > 0) {
+    console.log(`\n📱 For mobile devices:`);
+    networkIPs.forEach(ip => {
+      console.log(`   - ws://${ip}:${WEBSOCKET_PORT}`);
+    });
+  }
 }
 
 wss.on('connection', (ws) => {

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The WLED WebSocket Bridge enables browser-based LED control by converting WebSocket messages to UDP WARLS packets. It supports both insecure (`ws://`) and secure (`wss://`) connections, allowing LED control from both HTTP and HTTPS pages.
+The WLED WebSocket Bridge enables browser-based LED control by converting WebSocket messages to UDP WARLS packets. It supports both insecure (`ws://`) and secure (`wss://`) connections, allowing LED control from both HTTP and HTTPS pages on **desktop and mobile devices**.
 
 ## Features
 
@@ -10,7 +10,9 @@ The WLED WebSocket Bridge enables browser-based LED control by converting WebSoc
 - ✅ Auto-detects SSL certificates for secure connections
 - ✅ UDP WARLS protocol for WLED devices
 - ✅ Works from localhost and remote HTTPS deployments
+- ✅ **Seamless mobile device support** - auto-detects network configuration
 - ✅ No server-side rendering - all LED data generated client-side
+- ✅ Smart connection fallback with localStorage caching
 
 ## Quick Start
 
@@ -51,14 +53,24 @@ In the web app's LED Matrix Manager:
 ```
 ┌─────────────┐     WebSocket      ┌──────────────┐     UDP WARLS      ┌──────────┐
 │   Browser   │ ──────────────────▶│ Bridge (Node)│ ──────────────────▶│   WLED   │
-│ (Client-side)│  ws:// or wss://  │  Port 8080   │   Port 21324       │  Device  │
+│ (Desktop/   │  ws:// or wss://   │  Port 8080   │   Port 21324       │  Device  │
+│  Mobile)    │                     │ (0.0.0.0)    │                     │          │
 └─────────────┘                     └──────────────┘                     └──────────┘
 ```
 
 1. **Browser** generates LED data client-side (no server processing)
-2. **WebSocket** sends RGB data to local bridge
+2. **WebSocket** sends RGB data to bridge (auto-detects host)
 3. **Bridge** converts to UDP WARLS packets
 4. **WLED** receives and displays on LED strip
+
+### Smart Host Detection
+
+The client automatically tries multiple connection strategies:
+1. **Last successful host** from localStorage (fastest for returning users)
+2. **localhost** (works for desktop browsers)
+3. **Page hostname** (works when mobile accesses dev server via network IP like `192.168.1.100:5173`)
+
+This means **no configuration needed** - it just works on desktop and mobile!
 
 ## Protocol Auto-Detection
 
@@ -138,15 +150,29 @@ Bytes 2-n:    RGB data (3 bytes per LED: R, G, B)
 
 ## Deployment Scenarios
 
-### Local Development
+### Local Development (Desktop)
 - App: `http://localhost:5173`
 - Bridge: `ws://localhost:8080`
-- ✅ Works - no certificate needed
+- ✅ Works - no certificate needed, auto-connects
 
-### Vercel Production
+### Local Development (Mobile)
+- App: `http://192.168.1.100:5173` (access dev server from phone)
+- Bridge: `ws://192.168.1.100:8080`
+- ✅ Works - auto-detects network IP from page hostname
+
+### Vercel Production (Desktop)
 - App: `https://jam-dev.audiolux.app`
 - Bridge: `wss://localhost:8080`
 - ✅ Works - requires SSL certificate and user acceptance
+
+### Vercel Production (Mobile)
+- App: `https://jam-dev.audiolux.app` (on phone)
+- Bridge: `wss://192.168.1.100:8080` (on computer)
+- ✅ Works - requires:
+  1. SSL certificate on bridge
+  2. User acceptance of self-signed cert
+  3. Both devices on same Wi-Fi
+  4. First-time: visit `https://192.168.1.100:8080` in mobile browser to accept cert
 
 ### Remote Server (Not Supported)
 - Bridge must run on user's local machine

@@ -16,6 +16,7 @@ import { LEDMatrixManager } from './LEDMatrixManager';
 import { RippleDirection } from './visualizations/RippleVisualization';
 import { FrequencySourceManager, FrequencyMixMode } from '../../utils/frequencySourceManager';
 import { FrequencyDataAdapter } from './FrequencyDataAdapter';
+import { CollapsiblePanel } from '../Layout/CollapsiblePanel';
 import { Mic, Settings, Activity, ArrowLeft, Music, Drum } from 'lucide-react';
 
 interface LiveAudioVisualizerProps {
@@ -301,25 +302,26 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
   if (embedded) {
     return (
       <div className={`bg-gray-800 rounded-xl p-6 border border-gray-700 ${className}`}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold">Live Audio Visualizer</h2>
-          <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between mb-4 gap-2">
+          <h2 className="text-2xl font-bold flex-shrink-0">Live Audio Visualizer</h2>
+          <div className="flex items-center gap-3 flex-shrink-0">
             {isInitialized && (
-              <div className="flex gap-4 text-sm">
-                <div className="text-gray-400">
-                  {fps} FPS
+              <div className="flex gap-2 text-sm font-mono">
+                <div className="text-gray-400 whitespace-nowrap">
+                  <span className="inline-block w-6 text-right">{fps}</span> FPS
                 </div>
-                <div className="text-gray-400">
-                  {(rms * 100).toFixed(0)}%
+                <div className="text-gray-400 whitespace-nowrap">
+                  <span className="inline-block w-8 text-right">{(rms * 100).toFixed(0)}</span>%
                 </div>
-                <div className="text-gray-400">
-                  {peakFreq.frequency.toFixed(0)} Hz
+                <div className="text-gray-400 whitespace-nowrap">
+                  <span className="inline-block w-10 text-right">{peakFreq.frequency.toFixed(0)}</span> Hz
                 </div>
               </div>
             )}
             <button
               onClick={() => setShowSettings(!showSettings)}
-              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+              className="p-3 hover:bg-gray-700 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label="Toggle settings"
             >
               <Settings className="w-5 h-5" />
             </button>
@@ -371,7 +373,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                 <div className="flex gap-1">
                   <button
                     onClick={() => handleModeChange('spectrum')}
-                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                    className={`px-3 py-2 text-xs rounded transition-colors min-h-[44px] flex items-center justify-center ${
                       currentMode === 'spectrum'
                         ? 'bg-primary-600 text-white'
                         : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
@@ -381,7 +383,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                   </button>
                   <button
                     onClick={() => handleModeChange('waveform')}
-                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                    className={`px-3 py-2 text-xs rounded transition-colors min-h-[44px] flex items-center justify-center ${
                       currentMode === 'waveform'
                         ? 'bg-primary-600 text-white'
                         : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
@@ -391,7 +393,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                   </button>
                   <button
                     onClick={() => handleModeChange('ripple')}
-                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                    className={`px-3 py-2 text-xs rounded transition-colors min-h-[44px] flex items-center justify-center ${
                       currentMode === 'ripple'
                         ? 'bg-primary-600 text-white'
                         : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
@@ -405,7 +407,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                   <div className="flex gap-1 border-l border-gray-600 pl-3">
                     <button
                       onClick={() => handleRippleDirection('radial')}
-                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                      className={`px-3 py-2 text-xs rounded transition-colors min-h-[44px] flex items-center justify-center ${
                         currentRippleDirection === 'radial'
                           ? 'bg-primary-600 text-white'
                           : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
@@ -415,7 +417,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                     </button>
                     <button
                       onClick={() => handleRippleDirection('bottom-top')}
-                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                      className={`px-3 py-2 text-xs rounded transition-colors min-h-[44px] flex items-center justify-center ${
                         currentRippleDirection === 'bottom-top' || currentRippleDirection === 'top-bottom'
                           ? 'bg-primary-600 text-white'
                           : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
@@ -425,7 +427,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                     </button>
                     <button
                       onClick={() => handleRippleDirection('left-right')}
-                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                      className={`px-3 py-2 text-xs rounded transition-colors min-h-[44px] flex items-center justify-center ${
                         currentRippleDirection === 'left-right' || currentRippleDirection === 'right-left'
                           ? 'bg-primary-600 text-white'
                           : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
@@ -472,7 +474,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                 <div className="flex gap-1">
                   <button
                     onClick={() => handleFrequencySourceChange('mic-only')}
-                    className={`px-2 py-1 text-xs rounded transition-colors flex items-center gap-1 ${
+                    className={`px-3 py-2 text-xs rounded transition-colors flex items-center gap-1 min-h-[44px] ${
                       frequencySource === 'mic-only'
                         ? 'bg-primary-600 text-white'
                         : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
@@ -484,7 +486,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                   </button>
                   <button
                     onClick={() => handleFrequencySourceChange('drums-only')}
-                    className={`px-2 py-1 text-xs rounded transition-colors flex items-center gap-1 ${
+                    className={`px-3 py-2 text-xs rounded transition-colors flex items-center gap-1 min-h-[44px] ${
                       frequencySource === 'drums-only'
                         ? 'bg-primary-600 text-white'
                         : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
@@ -496,7 +498,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                   </button>
                   <button
                     onClick={() => handleFrequencySourceChange('midi-only')}
-                    className={`px-2 py-1 text-xs rounded transition-colors flex items-center gap-1 ${
+                    className={`px-3 py-2 text-xs rounded transition-colors flex items-center gap-1 min-h-[44px] ${
                       frequencySource === 'midi-only'
                         ? 'bg-primary-600 text-white'
                         : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
@@ -508,7 +510,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                   </button>
                   <button
                     onClick={() => handleFrequencySourceChange('mic+drums')}
-                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                    className={`px-3 py-2 text-xs rounded transition-colors min-h-[44px] flex items-center justify-center ${
                       frequencySource === 'mic+drums'
                         ? 'bg-primary-600 text-white'
                         : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
@@ -519,7 +521,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                   </button>
                   <button
                     onClick={() => handleFrequencySourceChange('all')}
-                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                    className={`px-3 py-2 text-xs rounded transition-colors min-h-[44px] flex items-center justify-center ${
                       frequencySource === 'all'
                         ? 'bg-primary-600 text-white'
                         : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
@@ -533,23 +535,32 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
             </div>
 
             {showSettings && (
-              <div className="mt-4 bg-gray-700 rounded-lg p-4 space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Audio Input Device</label>
-                  <select
-                    value={selectedDeviceId}
-                    onChange={(e) => setSelectedDeviceId(e.target.value)}
-                    disabled={isInitialized}
-                    className="w-full px-3 py-2 bg-gray-600 text-white rounded border border-gray-500 focus:border-primary-500 focus:outline-none disabled:opacity-50 text-sm"
-                  >
-                    {devices.map((device) => (
-                      <option key={device.deviceId} value={device.deviceId}>
-                        {device.label || `Device ${device.deviceId.substring(0, 8)}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <LEDMatrixManager />
+              <div className="mt-4">
+                <CollapsiblePanel title="Settings" defaultOpen={true}>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-2">Audio Input Device</label>
+                      <select
+                        value={selectedDeviceId}
+                        onChange={(e) => setSelectedDeviceId(e.target.value)}
+                        disabled={isInitialized}
+                        className="w-full px-3 py-2 bg-gray-600 text-white rounded border border-gray-500 focus:border-primary-500 focus:outline-none disabled:opacity-50 text-sm"
+                      >
+                        {devices.map((device) => (
+                          <option key={device.deviceId} value={device.deviceId}>
+                            {device.label || `Device ${device.deviceId.substring(0, 8)}`}
+                          </option>
+                        ))}
+                      </select>
+                      {isInitialized && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Restart to change device
+                        </p>
+                      )}
+                    </div>
+                    <LEDMatrixManager />
+                  </div>
+                </CollapsiblePanel>
               </div>
             )}
           </>

@@ -359,8 +359,8 @@ export const JamSession: React.FC<JamSessionProps> = ({
           layout={isMobile ? 'mobile' : 'desktop'}
           className={
             isMobile
-              ? activeView === 'drum' ? '' : 'hidden'  // Mobile: show only on 'drum' tab
-              : ''  // Desktop: always show
+              ? activeView === 'drum' ? 'mt-4' : 'hidden'  // Mobile: show with margin on 'drum' tab
+              : 'mt-6'  // Desktop: always show with margin
           }
         />
       </div>

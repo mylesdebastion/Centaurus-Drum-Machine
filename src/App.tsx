@@ -5,6 +5,7 @@ import { JamSession } from './components/JamSession/JamSession';
 import { EducationMode } from './components/Education/EducationMode';
 import { IsometricSequencer } from './components/IsometricSequencer/IsometricSequencer';
 import { LiveAudioVisualizer } from './components/LiveAudioVisualizer/LiveAudioVisualizer';
+import { WLEDDirectTest } from './components/WLEDExperiment/WLEDDirectTest';
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
@@ -59,6 +60,14 @@ function App() {
     navigate('/');
   };
 
+  const handleWLEDExperiment = () => {
+    navigate('/wled-test');
+  };
+
+  const handleExitWLEDExperiment = () => {
+    navigate('/');
+  };
+
   return (
     <Routes>
       <Route
@@ -70,6 +79,7 @@ function App() {
             onEducationMode={handleEducationMode}
             onIsometricMode={handleIsometricMode}
             onDJVisualizer={handleDJVisualizer}
+            onWLEDExperiment={handleWLEDExperiment}
           />
         }
       />
@@ -103,6 +113,14 @@ function App() {
         element={
           <LiveAudioVisualizer
             onBack={handleExitDJVisualizer}
+          />
+        }
+      />
+      <Route
+        path="/wled-test"
+        element={
+          <WLEDDirectTest
+            onBack={handleExitWLEDExperiment}
           />
         }
       />
