@@ -4,6 +4,7 @@ import { WelcomeScreen } from './components/Welcome/WelcomeScreen';
 import { JamSession } from './components/JamSession/JamSession';
 import { EducationMode } from './components/Education/EducationMode';
 import { IsometricSequencer } from './components/IsometricSequencer/IsometricSequencer';
+import { LiveAudioVisualizer } from './components/LiveAudioVisualizer/LiveAudioVisualizer';
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
@@ -50,6 +51,14 @@ function App() {
     navigate('/');
   };
 
+  const handleDJVisualizer = () => {
+    navigate('/dj-visualizer');
+  };
+
+  const handleExitDJVisualizer = () => {
+    navigate('/');
+  };
+
   return (
     <Routes>
       <Route
@@ -60,6 +69,7 @@ function App() {
             onJoinJam={handleJoinJam}
             onEducationMode={handleEducationMode}
             onIsometricMode={handleIsometricMode}
+            onDJVisualizer={handleDJVisualizer}
           />
         }
       />
@@ -85,6 +95,14 @@ function App() {
         element={
           <IsometricSequencer
             onBack={handleExitIsometric}
+          />
+        }
+      />
+      <Route
+        path="/dj-visualizer"
+        element={
+          <LiveAudioVisualizer
+            onExit={handleExitDJVisualizer}
           />
         }
       />

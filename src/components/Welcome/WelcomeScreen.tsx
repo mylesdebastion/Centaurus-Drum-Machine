@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
-import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3 } from 'lucide-react';
+import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onStartJam: () => void;
   onJoinJam: (code: string) => void;
   onEducationMode: () => void;
   onIsometricMode: () => void;
+  onDJVisualizer: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onStartJam,
   onJoinJam,
   onEducationMode,
-  onIsometricMode
+  onIsometricMode,
+  onDJVisualizer
 }) => {
   const [joinCode, setJoinCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
@@ -151,6 +153,25 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </p>
 
           <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+            {/* DJ Visualizer */}
+            <button
+              onClick={onDJVisualizer}
+              className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-orange-500/50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <Activity className="w-6 h-6 text-orange-400" />
+                <h3 className="font-semibold text-white">DJ Visualizer</h3>
+                <span className="text-xs bg-orange-600/30 text-orange-300 px-2 py-1 rounded">Beta</span>
+              </div>
+              <p className="text-sm text-gray-400 mb-4">
+                Live audio visualization with spectrum analyzer, ripple effects, and LED matrix output
+              </p>
+              <div className="flex items-center gap-2 text-sm text-orange-400 group-hover:text-orange-300">
+                <span>Launch Visualizer</span>
+                <Play className="w-4 h-4" />
+              </div>
+            </button>
+
             {/* Multiplayer Jam */}
             <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
               <div className="flex items-center gap-3 mb-3">
