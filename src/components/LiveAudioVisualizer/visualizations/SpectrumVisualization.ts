@@ -16,6 +16,7 @@ export interface SpectrumConfig {
   peakFallSpeed: number; // Speed of peak fall (0.01 - 0.1)
   minOpacity: number; // Minimum opacity for quiet sounds (0.0 - 1.0)
   minBrightness: number; // Minimum brightness multiplier (0.0 - 1.0)
+  scaleType: 'log' | 'linear' | 'quadratic'; // Frequency scaling type
 }
 
 export const DEFAULT_SPECTRUM_CONFIG: SpectrumConfig = {
@@ -24,6 +25,7 @@ export const DEFAULT_SPECTRUM_CONFIG: SpectrumConfig = {
   peakFallSpeed: 0.05,
   minOpacity: 0.3,
   minBrightness: 0.5,
+  scaleType: 'log',
 };
 
 export class SpectrumVisualization {
@@ -56,20 +58,32 @@ export class SpectrumVisualization {
     const minFreq = 50;   // 50 Hz (bass)
     const maxFreq = 8000; // 8 kHz (high treble)
 
-    // Clear canvas
-    ctx.fillStyle = '#1a1a2e';
+    // Clear canvas (pure black for LED output)
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, width, height);
 
     const now = Date.now();
 
     for (let i = 0; i < numBars; i++) {
-      // Logarithmic frequency distribution
-      // Each bar represents a log-spaced frequency band
-      const logPosition = i / (numBars - 1); // 0 to 1
-      const freqHz = minFreq * Math.pow(maxFreq / minFreq, logPosition);
+      let binIndex: number;
 
-      // Convert frequency to FFT bin index
-      const binIndex = Math.floor((freqHz / nyquist) * bufferLength);
+      if (this.config.scaleType === 'log') {
+        // Logarithmic frequency distribution
+        // Each bar represents a log-spaced frequency band
+        const logPosition = i / (numBars - 1); // 0 to 1
+        const freqHz = minFreq * Math.pow(maxFreq / minFreq, logPosition);
+        // Convert frequency to FFT bin index
+        binIndex = Math.floor((freqHz / nyquist) * bufferLength);
+      } else if (this.config.scaleType === 'quadratic') {
+        // Quadratic frequency distribution (between linear and log)
+        const position = i / (numBars - 1); // 0 to 1
+        const quadPosition = position * position; // Square the position
+        const freqHz = minFreq + (maxFreq - minFreq) * quadPosition;
+        binIndex = Math.floor((freqHz / nyquist) * bufferLength);
+      } else {
+        // Linear frequency distribution
+        binIndex = Math.floor((i / numBars) * bufferLength);
+      }
 
       // Get amplitude from this bin (and nearby bins for smoothing)
       const smoothRange = Math.max(1, Math.floor(bufferLength / numBars / 4));
@@ -98,8 +112,8 @@ export class SpectrumVisualization {
         }
       }
 
-      // Use logarithmic position for color mapping (matches frequency distribution)
-      const normalizedFrequency = logPosition;
+      // Use position for color mapping (matches frequency distribution)
+      const normalizedFrequency = i / (numBars - 1);
 
       // Get color based on frequency (using existing colorMapping.ts)
       const color = getFrequencyColor(normalizedFrequency, 'spectrum');

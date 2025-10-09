@@ -18,6 +18,7 @@ export interface LEDMatrixConfig {
   ipAddress: string;
   orientation: 'horizontal' | 'vertical';
   serpentine: boolean; // Zigzag wiring pattern (common in LED matrices)
+  reverse: boolean; // When false (default): reversed for bottom-to-top wiring. When true: normal top-to-bottom
   enabled: boolean;
 }
 
@@ -27,12 +28,13 @@ interface LEDMatrixManagerProps {
 }
 
 const DEFAULT_CONFIG: LEDMatrixConfig = {
-  width: 16,
-  height: 16,
-  ipAddress: '192.168.8.160',
+  width: 1,
+  height: 90,
+  ipAddress: '192.168.8.158',
   orientation: 'horizontal',
   serpentine: true,
-  enabled: false,
+  reverse: false,
+  enabled: true,
 };
 
 interface RGB {
@@ -205,6 +207,12 @@ export const LEDMatrixManager: React.FC<LEDMatrixManagerProps> = ({
 
     const linearData = gridToLinear(grid);
 
+    // Reverse the array by default (for bottom-to-top LED wiring)
+    // Only skip reversal if "reverse" is explicitly checked
+    if (!config.reverse) {
+      linearData.reverse();
+    }
+
     const message = {
       ipAddress: config.ipAddress,
       ledData: linearData,
@@ -283,10 +291,10 @@ export const LEDMatrixManager: React.FC<LEDMatrixManagerProps> = ({
             <label className="block text-sm text-gray-400 mb-1">Width (LEDs)</label>
             <input
               type="number"
-              min="4"
-              max="64"
+              min="1"
+              max="256"
               value={config.width}
-              onChange={(e) => setConfig({ ...config, width: parseInt(e.target.value) || 16 })}
+              onChange={(e) => setConfig({ ...config, width: parseInt(e.target.value) || 90 })}
               className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-primary-500 focus:outline-none"
             />
           </div>
@@ -294,10 +302,10 @@ export const LEDMatrixManager: React.FC<LEDMatrixManagerProps> = ({
             <label className="block text-sm text-gray-400 mb-1">Height (LEDs)</label>
             <input
               type="number"
-              min="4"
+              min="1"
               max="64"
               value={config.height}
-              onChange={(e) => setConfig({ ...config, height: parseInt(e.target.value) || 16 })}
+              onChange={(e) => setConfig({ ...config, height: parseInt(e.target.value) || 1 })}
               className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-primary-500 focus:outline-none"
             />
           </div>
@@ -334,6 +342,18 @@ export const LEDMatrixManager: React.FC<LEDMatrixManagerProps> = ({
             />
             <label htmlFor="serpentine" className="text-sm text-gray-400">
               Serpentine wiring
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="reverse"
+              checked={config.reverse}
+              onChange={(e) => setConfig({ ...config, reverse: e.target.checked })}
+              className="w-4 h-4 text-primary-600 bg-gray-700 border-gray-600 rounded focus:ring-primary-500"
+            />
+            <label htmlFor="reverse" className="text-sm text-gray-400">
+              Reverse output
             </label>
           </div>
         </div>

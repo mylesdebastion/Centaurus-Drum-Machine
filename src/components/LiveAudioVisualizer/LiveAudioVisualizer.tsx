@@ -31,7 +31,8 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [currentMode, setCurrentMode] = useState<VisualizationMode>('ripple');
-  const [gain, setGain] = useState(1.0); // 100%
+  const [gain, setGain] = useState(0.5); // 50%
+  const [frequencyScale, setFrequencyScale] = useState<'log' | 'linear' | 'quadratic'>('log');
   const [showSettings, setShowSettings] = useState(false);
   const [fps, setFps] = useState(0);
   const [currentRippleDirection, setCurrentRippleDirection] = useState<RippleDirection>('radial');
@@ -205,6 +206,14 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
       audioManagerRef.current.setGain(newGain);
     }
   };
+
+  // Update visualization scale type when changed
+  useEffect(() => {
+    if (vizEngineRef.current) {
+      vizEngineRef.current.updateSpectrumConfig({ scaleType: frequencyScale });
+      vizEngineRef.current.updateRippleConfig({ scaleType: frequencyScale });
+    }
+  }, [frequencyScale]);
 
   // Handle ripple direction change with toggle logic
   const handleRippleDirection = (buttonDirection: RippleDirection) => {
@@ -437,45 +446,57 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
                       {(gain * 100).toFixed(0)}%
                     </span>
                   </div>
+
+                  {/* Frequency scale selector */}
+                  <div className="flex items-center gap-2 border-l border-gray-700 pl-4">
+                    <span className="text-gray-400 text-sm">Scale:</span>
+                    <select
+                      value={frequencyScale}
+                      onChange={(e) => setFrequencyScale(e.target.value as 'log' | 'linear' | 'quadratic')}
+                      className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded border border-gray-600 focus:border-primary-500 focus:outline-none"
+                    >
+                      <option value="log">Log</option>
+                      <option value="quadratic">Quadratic</option>
+                      <option value="linear">Linear</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </>
           )}
         </main>
 
-        {/* Settings sidebar */}
-        {showSettings && (
-          <aside className="w-80 bg-gray-800 border-l border-gray-700 p-6 overflow-y-auto flex-shrink-0">
-            <h3 className="text-lg font-semibold text-white mb-4">Settings</h3>
+        {/* Settings sidebar - always rendered but conditionally visible */}
+        <aside className={`w-80 bg-gray-800 border-l border-gray-700 p-6 overflow-y-auto flex-shrink-0 ${showSettings ? '' : 'hidden'}`}>
+          <h3 className="text-lg font-semibold text-white mb-4">Settings</h3>
 
-            {/* Audio input device selector */}
-            <div className="mb-6">
-              <label className="block text-sm text-gray-400 mb-2">Audio Input Device</label>
-              <select
-                value={selectedDeviceId}
-                onChange={(e) => setSelectedDeviceId(e.target.value)}
-                disabled={isInitialized}
-                className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-primary-500 focus:outline-none disabled:opacity-50 text-sm"
-              >
-                {devices.map((device) => (
-                  <option key={device.deviceId} value={device.deviceId}>
-                    {device.label || `Device ${device.deviceId.substring(0, 8)}`}
-                  </option>
-                ))}
-              </select>
-              {isInitialized && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Restart to change device
-                </p>
-              )}
-            </div>
+          {/* Audio input device selector */}
+          <div className="mb-6">
+            <label className="block text-sm text-gray-400 mb-2">Audio Input Device</label>
+            <select
+              value={selectedDeviceId}
+              onChange={(e) => setSelectedDeviceId(e.target.value)}
+              disabled={isInitialized}
+              className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-primary-500 focus:outline-none disabled:opacity-50 text-sm"
+            >
+              {devices.map((device) => (
+                <option key={device.deviceId} value={device.deviceId}>
+                  {device.label || `Device ${device.deviceId.substring(0, 8)}`}
+                </option>
+              ))}
+            </select>
+            {isInitialized && (
+              <p className="text-xs text-gray-500 mt-1">
+                Restart to change device
+              </p>
+            )}
+          </div>
 
-            {/* LED Matrix Manager */}
-            <div className="mb-6">
-              <LEDMatrixManager />
-            </div>
-          </aside>
-        )}
+          {/* LED Matrix Manager - Always rendered for LED output */}
+          <div className="mb-6">
+            <LEDMatrixManager />
+          </div>
+        </aside>
       </div>
     </div>
   );

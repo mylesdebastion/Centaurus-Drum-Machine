@@ -21,7 +21,7 @@ export interface VisualizationEngineConfig {
 }
 
 export const DEFAULT_VIZ_ENGINE_CONFIG: VisualizationEngineConfig = {
-  mode: 'spectrum',
+  mode: 'ripple',
   stereo: false,
   spectrumConfig: DEFAULT_SPECTRUM_CONFIG,
   waveformConfig: DEFAULT_WAVEFORM_CONFIG,

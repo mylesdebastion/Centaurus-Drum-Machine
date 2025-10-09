@@ -32,7 +32,7 @@ export const DEFAULT_WAVEFORM_CONFIG: WaveformConfig = {
   showTechnicalReadout: false, // Disabled - readings shown in main UI
   lineColor: '#00FF00', // Oscilloscope green
   lineWidth: 2,
-  gridColor: 'rgba(0, 255, 0, 0.2)',
+  gridColor: 'rgba(0, 255, 0, 0.02)', // Extremely dim grid
   stereoLeftColor: '#00FF00', // Green
   stereoRightColor: '#00FFFF', // Cyan
 };
@@ -55,8 +55,8 @@ export class WaveformVisualization {
   ): void {
     const { mode, showGrid, lineColor, lineWidth } = this.config;
 
-    // Clear canvas
-    ctx.fillStyle = '#1a1a2e';
+    // Clear canvas (pure black for LED output)
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, width, height);
 
     // Draw grid
@@ -90,8 +90,8 @@ export class WaveformVisualization {
   ): void {
     const { stereoLayout, showGrid } = this.config;
 
-    // Clear canvas
-    ctx.fillStyle = '#1a1a2e';
+    // Clear canvas (pure black for LED output)
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, width, height);
 
     // Draw grid
@@ -235,8 +235,8 @@ export class WaveformVisualization {
       ctx.stroke();
     }
 
-    // Center line (brighter)
-    ctx.strokeStyle = gridColor.replace('0.2', '0.5'); // Increase alpha
+    // Center line (slightly brighter)
+    ctx.strokeStyle = gridColor.replace('0.02', '0.05'); // Increase alpha slightly
     ctx.beginPath();
     ctx.moveTo(0, height / 2);
     ctx.lineTo(width, height / 2);

@@ -27,6 +27,7 @@ export interface RippleConfig {
   smoothingLength: number; // Number of frames to average for smoothing
   showOriginIndicator: boolean;
   originIndicatorDuration: number; // ms to show indicator after setting
+  scaleType: 'log' | 'linear' | 'quadratic'; // Frequency scaling type
 }
 
 export const DEFAULT_RIPPLE_CONFIG: RippleConfig = {
@@ -36,6 +37,7 @@ export const DEFAULT_RIPPLE_CONFIG: RippleConfig = {
   smoothingLength: 5,
   showOriginIndicator: true,
   originIndicatorDuration: 1000,
+  scaleType: 'log',
 };
 
 interface RGB {
@@ -188,15 +190,30 @@ export class RippleVisualization {
     const nyquist = sampleRate / 2;
     const freqHz = (maxIndex / frequencyData.length) * nyquist;
 
-    // Apply logarithmic scaling for better color distribution
-    // Musical range: 50Hz (bass) to 8kHz (high treble)
-    // This spreads out the frequencies where most music happens
-    const minFreq = 50;
-    const maxFreq = 8000;
-    const clampedFreq = Math.max(minFreq, Math.min(maxFreq, freqHz));
+    let normalizedFreq: number;
 
-    // Logarithmic mapping: log(freq/minFreq) / log(maxFreq/minFreq)
-    const normalizedFreq = Math.log(clampedFreq / minFreq) / Math.log(maxFreq / minFreq);
+    if (this.config.scaleType === 'log') {
+      // Apply logarithmic scaling for better color distribution
+      // Musical range: 50Hz (bass) to 8kHz (high treble)
+      // This spreads out the frequencies where most music happens
+      const minFreq = 50;
+      const maxFreq = 8000;
+      const clampedFreq = Math.max(minFreq, Math.min(maxFreq, freqHz));
+
+      // Logarithmic mapping: log(freq/minFreq) / log(maxFreq/minFreq)
+      normalizedFreq = Math.log(clampedFreq / minFreq) / Math.log(maxFreq / minFreq);
+    } else if (this.config.scaleType === 'quadratic') {
+      // Quadratic scaling (between linear and log)
+      const minFreq = 50;
+      const maxFreq = 8000;
+      const clampedFreq = Math.max(minFreq, Math.min(maxFreq, freqHz));
+
+      // Quadratic mapping: sqrt((freq - min) / (max - min))
+      normalizedFreq = Math.sqrt((clampedFreq - minFreq) / (maxFreq - minFreq));
+    } else {
+      // Linear scaling: just normalize to 0-1 based on Nyquist frequency
+      normalizedFreq = freqHz / nyquist;
+    }
 
     const normalizedAmp = maxAmplitude / 255;
 
