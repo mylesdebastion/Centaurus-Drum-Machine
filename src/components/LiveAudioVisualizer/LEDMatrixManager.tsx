@@ -65,41 +65,82 @@ export const LEDMatrixManager: React.FC<LEDMatrixManagerProps> = ({
     setPreviewData(grid);
   }, [config.width, config.height]);
 
-  // Connect to WLED WebSocket bridge
+  // Connect to WLED WebSocket bridge (use global window.wledBridge)
   useEffect(() => {
     if (!config.enabled) {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
       setWsConnected(false);
       return;
     }
 
-    const ws = new WebSocket('ws://localhost:8080');
-
-    ws.onopen = () => {
-      console.log('🔌 Connected to WLED bridge');
-      setWsConnected(true);
-    };
-
-    ws.onclose = () => {
-      console.log('🔌 Disconnected from WLED bridge');
-      setWsConnected(false);
-    };
-
-    ws.onerror = (error) => {
-      console.error('❌ WebSocket error:', error);
-      setWsConnected(false);
-    };
-
-    wsRef.current = ws;
-
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
+    // Try to use existing global bridge connection
+    const connectBridge = async () => {
+      // Check if global bridge exists and is open
+      if (window.wledBridge && window.wledBridge.readyState === WebSocket.OPEN) {
+        console.log('🌉 Using existing WLED WebSocket bridge');
+        wsRef.current = window.wledBridge;
+        setWsConnected(true);
+        return;
       }
+
+      // Try to connect to bridge on multiple ports (same as SingleLaneVisualizer)
+      const ports = [21325, 21326, 21327, 21328, 21329];
+
+      for (const port of ports) {
+        try {
+          await tryConnect(port);
+          console.log(`🌉 Connected to WLED WebSocket bridge on port ${port}`);
+          return;
+        } catch (error) {
+          console.log(`⚠️ Port ${port} not available, trying next...`);
+        }
+      }
+
+      console.error('❌ Could not connect to WLED WebSocket bridge on any port');
+      setWsConnected(false);
+    };
+
+    const tryConnect = (port: number): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        const ws = new WebSocket(`ws://localhost:${port}`);
+        let connected = false;
+
+        const timeout = setTimeout(() => {
+          if (!connected) {
+            ws.close();
+            reject(new Error(`Connection timeout on port ${port}`));
+          }
+        }, 1000);
+
+        ws.onopen = () => {
+          connected = true;
+          clearTimeout(timeout);
+          window.wledBridge = ws;
+          wsRef.current = ws;
+          setWsConnected(true);
+          resolve();
+        };
+
+        ws.onerror = () => {
+          clearTimeout(timeout);
+          reject(new Error(`Connection failed on port ${port}`));
+        };
+
+        ws.onclose = () => {
+          console.log('🔌 WebSocket bridge disconnected');
+          if (wsRef.current === ws) {
+            wsRef.current = null;
+            setWsConnected(false);
+          }
+        };
+      });
+    };
+
+    connectBridge();
+
+    // Don't close the global bridge on unmount - other components might use it
+    return () => {
+      // Just clear our ref, don't close the global bridge
+      wsRef.current = null;
     };
   }, [config.enabled]);
 

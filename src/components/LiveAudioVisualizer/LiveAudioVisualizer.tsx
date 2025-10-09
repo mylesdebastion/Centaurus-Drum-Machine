@@ -30,10 +30,11 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
   const [error, setError] = useState<string | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
-  const [currentMode, setCurrentMode] = useState<VisualizationMode>('spectrum');
+  const [currentMode, setCurrentMode] = useState<VisualizationMode>('ripple');
   const [gain, setGain] = useState(1.0); // 100%
   const [showSettings, setShowSettings] = useState(false);
   const [fps, setFps] = useState(0);
+  const [currentRippleDirection, setCurrentRippleDirection] = useState<RippleDirection>('radial');
 
   // Stats
   const [rms, setRMS] = useState(0);
@@ -205,10 +206,26 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
     }
   };
 
-  // Handle ripple direction change
-  const handleRippleDirection = (direction: RippleDirection) => {
+  // Handle ripple direction change with toggle logic
+  const handleRippleDirection = (buttonDirection: RippleDirection) => {
+    let newDirection = buttonDirection;
+
+    // Toggle between opposite directions
+    if (buttonDirection === 'bottom-top' && currentRippleDirection === 'bottom-top') {
+      newDirection = 'top-bottom';
+    } else if (buttonDirection === 'bottom-top' && currentRippleDirection === 'top-bottom') {
+      newDirection = 'bottom-top';
+    } else if (buttonDirection === 'left-right' && currentRippleDirection === 'left-right') {
+      newDirection = 'right-left';
+    } else if (buttonDirection === 'left-right' && currentRippleDirection === 'right-left') {
+      newDirection = 'left-right';
+    } else if (buttonDirection === 'radial') {
+      newDirection = 'radial';
+    }
+
+    setCurrentRippleDirection(newDirection);
     if (vizEngineRef.current) {
-      vizEngineRef.current.setRippleDirection(direction);
+      vizEngineRef.current.setRippleDirection(newDirection);
     }
   };
 
@@ -370,15 +387,36 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({ onBack
                   {currentMode === 'ripple' && (
                     <div className="flex items-center gap-2 border-l border-gray-700 pl-4">
                       <span className="text-gray-400 text-sm">Direction:</span>
-                      {(['radial', 'bottom-top', 'left-right'] as RippleDirection[]).map((dir) => (
-                        <button
-                          key={dir}
-                          onClick={() => handleRippleDirection(dir)}
-                          className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
-                        >
-                          {dir}
-                        </button>
-                      ))}
+                      <button
+                        onClick={() => handleRippleDirection('radial')}
+                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                          currentRippleDirection === 'radial'
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        }`}
+                      >
+                        radial
+                      </button>
+                      <button
+                        onClick={() => handleRippleDirection('bottom-top')}
+                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                          currentRippleDirection === 'bottom-top' || currentRippleDirection === 'top-bottom'
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        }`}
+                      >
+                        {currentRippleDirection === 'bottom-top' ? 'top-bottom' : 'bottom-top'}
+                      </button>
+                      <button
+                        onClick={() => handleRippleDirection('left-right')}
+                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                          currentRippleDirection === 'left-right' || currentRippleDirection === 'right-left'
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        }`}
+                      >
+                        {currentRippleDirection === 'left-right' ? 'right-left' : 'left-right'}
+                      </button>
                       <span className="text-xs text-gray-500">(or click canvas)</span>
                     </div>
                   )}
