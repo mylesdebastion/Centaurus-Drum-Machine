@@ -103,7 +103,9 @@ export const LEDMatrixManager: React.FC<LEDMatrixManagerProps> = ({
 
     const tryConnect = (port: number): Promise<void> => {
       return new Promise((resolve, reject) => {
-        const ws = new WebSocket(`ws://localhost:${port}`);
+        // Auto-detect protocol: use wss:// on HTTPS pages, ws:// on HTTP pages
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//localhost:${port}`);
         let connected = false;
 
         const timeout = setTimeout(() => {
