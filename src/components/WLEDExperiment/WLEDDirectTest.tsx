@@ -6,147 +6,33 @@
  *
  * Goal: Validate mobile devices can control WLED controllers directly
  * for future multi-client architecture where each user owns their devices.
+ *
+ * Story 6.1 Phase 0: Now using unified WLEDDeviceManager component
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Wifi, WifiOff, Zap, Info } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { ArrowLeft, Info } from 'lucide-react';
+import WLEDDeviceManager from '../WLED/WLEDDeviceManager';
 
 interface WLEDDirectTestProps {
   onBack: () => void;
 }
 
-interface WLEDConnection {
-  ip: string;
-  ws: WebSocket | null;
-  connected: boolean;
-  lastError: string | null;
-}
-
 export const WLEDDirectTest: React.FC<WLEDDirectTestProps> = ({ onBack }) => {
-  const [wledIP, setWledIP] = useState('192.168.8.158'); // Default from LEDMatrixManager
-  const [connection, setConnection] = useState<WLEDConnection>({
-    ip: '',
-    ws: null,
-    connected: false,
-    lastError: null,
-  });
-  const [testMode, setTestMode] = useState<'idle' | 'rainbow' | 'audio'>('idle');
-  const [fps, setFps] = useState(0);
-  const wsRef = useRef<WebSocket | null>(null);
+  const [testMode, setTestMode] = useState<'idle' | 'rainbow'>('idle');
   const animationFrameRef = useRef<number>();
-  const fpsCounterRef = useRef({ frames: 0, lastTime: Date.now() });
+  const [ledColors, setLedColors] = useState<string[]>([]);
 
-  // Connect to WLED WebSocket
-  const connectToWLED = () => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log('Already connected');
-      return;
+  // Generate rainbow LED data
+  const generateRainbowColors = (hue: number): string[] => {
+    const colors: string[] = [];
+    for (let i = 0; i < 60; i++) {
+      const h = (hue + i * 6) % 360;
+      const rgb = hslToRgb(h / 360, 1, 0.5);
+      const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+      colors.push(hex);
     }
-
-    try {
-      // WLED WebSocket endpoint
-      const wsUrl = `ws://${wledIP}/ws`;
-      console.log(`🔌 Connecting to WLED at ${wsUrl}`);
-
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        console.log('✅ Connected to WLED');
-        setConnection({
-          ip: wledIP,
-          ws,
-          connected: true,
-          lastError: null,
-        });
-
-        // Request initial state
-        ws.send(JSON.stringify({ v: true }));
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log('📥 WLED state:', data);
-        } catch (e) {
-          console.warn('Failed to parse WLED message:', e);
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error('❌ WebSocket error:', error);
-        setConnection(prev => ({
-          ...prev,
-          connected: false,
-          lastError: 'Connection failed - check IP and network',
-        }));
-      };
-
-      ws.onclose = () => {
-        console.log('🔌 Disconnected from WLED');
-        setConnection(prev => ({
-          ...prev,
-          connected: false,
-          ws: null,
-        }));
-        wsRef.current = null;
-      };
-    } catch (error) {
-      console.error('❌ Failed to create WebSocket:', error);
-      setConnection(prev => ({
-        ...prev,
-        connected: false,
-        lastError: error instanceof Error ? error.message : 'Unknown error',
-      }));
-    }
-  };
-
-  // Disconnect from WLED
-  const disconnect = () => {
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-    setTestMode('idle');
-    setConnection(prev => ({
-      ...prev,
-      connected: false,
-      ws: null,
-    }));
-  };
-
-  // Send LED data to WLED using JSON API
-  const sendLEDData = (colors: string[]) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.warn('WebSocket not connected');
-      return;
-    }
-
-    try {
-      // WLED JSON API: Set individual LED colors
-      // Format: {"seg":{"i":["FF0000","00FF00","0000FF"]}}
-      const message = {
-        seg: {
-          i: colors,
-        },
-      };
-
-      wsRef.current.send(JSON.stringify(message));
-
-      // Update FPS counter
-      fpsCounterRef.current.frames++;
-      const now = Date.now();
-      if (now - fpsCounterRef.current.lastTime >= 1000) {
-        setFps(fpsCounterRef.current.frames);
-        fpsCounterRef.current.frames = 0;
-        fpsCounterRef.current.lastTime = now;
-      }
-    } catch (error) {
-      console.error('❌ Failed to send LED data:', error);
-    }
+    return colors;
   };
 
   // Test: Rainbow animation
@@ -155,18 +41,9 @@ export const WLEDDirectTest: React.FC<WLEDDirectTestProps> = ({ onBack }) => {
     let hue = 0;
 
     const animate = () => {
-      // Generate 90 LEDs with rainbow pattern
-      const colors: string[] = [];
-      for (let i = 0; i < 90; i++) {
-        const h = (hue + i * 4) % 360;
-        const rgb = hslToRgb(h / 360, 1, 0.5);
-        const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
-        colors.push(hex);
-      }
-
-      sendLEDData(colors);
+      const colors = generateRainbowColors(hue);
+      setLedColors(colors);
       hue = (hue + 2) % 360;
-
       animationFrameRef.current = requestAnimationFrame(animate);
     };
 
@@ -179,9 +56,7 @@ export const WLEDDirectTest: React.FC<WLEDDirectTestProps> = ({ onBack }) => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
-    // Turn off all LEDs
-    const black = Array(90).fill('000000');
-    sendLEDData(black);
+    setLedColors([]);
   };
 
   // Helper: HSL to RGB
@@ -222,20 +97,8 @@ export const WLEDDirectTest: React.FC<WLEDDirectTestProps> = ({ onBack }) => {
         return hex.length === 1 ? '0' + hex : hex;
       })
       .join('')
-      .toUpperCase();
+      .toLowerCase();
   };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-4 sm:p-6">
@@ -249,13 +112,6 @@ export const WLEDDirectTest: React.FC<WLEDDirectTestProps> = ({ onBack }) => {
             <ArrowLeft className="w-5 h-5" />
             <span>Back to Home</span>
           </button>
-          <div className="flex items-center gap-2">
-            {connection.connected ? (
-              <Wifi className="w-5 h-5 text-green-400" />
-            ) : (
-              <WifiOff className="w-5 h-5 text-gray-500" />
-            )}
-          </div>
         </div>
 
         {/* Title */}
@@ -284,102 +140,57 @@ export const WLEDDirectTest: React.FC<WLEDDirectTestProps> = ({ onBack }) => {
           </div>
         </div>
 
-        {/* Connection Panel */}
-        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 mb-6">
-          <h2 className="text-xl font-bold mb-4 text-white">Connection</h2>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                WLED Device IP Address
-              </label>
-              <input
-                type="text"
-                value={wledIP}
-                onChange={(e) => setWledIP(e.target.value)}
-                placeholder="192.168.1.100"
-                disabled={connection.connected}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-purple-500 focus:outline-none disabled:opacity-50"
-              />
-            </div>
-
-            {connection.lastError && (
-              <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3">
-                <p className="text-sm text-red-300">{connection.lastError}</p>
-              </div>
-            )}
-
-            {connection.connected ? (
-              <div className="flex items-center gap-3">
-                <div className="flex-1 bg-green-900/20 border border-green-500/30 rounded-lg p-3">
-                  <p className="text-sm text-green-300">
-                    ✅ Connected to {connection.ip}
-                  </p>
-                </div>
-                <button
-                  onClick={disconnect}
-                  className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
-                >
-                  Disconnect
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={connectToWLED}
-                className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                <Zap className="w-5 h-5" />
-                Connect to WLED
-              </button>
-            )}
-          </div>
+        {/* WLED Device Manager */}
+        <div className="mb-6">
+          <WLEDDeviceManager
+            ledData={ledColors}
+            layout="desktop"
+            storageKey="wled-test-devices"
+            deviceType="strip"
+            showVirtualPreview={true}
+          />
         </div>
 
         {/* Test Controls */}
-        {connection.connected && (
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 mb-6">
-            <h2 className="text-xl font-bold mb-4 text-white">Tests</h2>
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 mb-6">
+          <h2 className="text-xl font-bold mb-4 text-white">Tests</h2>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-white">Rainbow Animation</h3>
-                  <p className="text-sm text-gray-400">
-                    Animated rainbow pattern across 90 LEDs
-                  </p>
-                </div>
-                {testMode === 'rainbow' ? (
-                  <button
-                    onClick={stopTest}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
-                  >
-                    Stop
-                  </button>
-                ) : (
-                  <button
-                    onClick={startRainbowTest}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
-                    disabled={testMode !== 'idle'}
-                  >
-                    Start
-                  </button>
-                )}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-white">Rainbow Animation</h3>
+                <p className="text-sm text-gray-400">
+                  Animated rainbow pattern (60 LEDs)
+                </p>
               </div>
-
-              <div className="bg-gray-700/50 rounded-lg p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-400">Frame Rate:</span>
-                  <span className="text-lg font-bold text-white">{fps} FPS</span>
-                </div>
-              </div>
+              {testMode === 'rainbow' ? (
+                <button
+                  onClick={stopTest}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  Stop
+                </button>
+              ) : (
+                <button
+                  onClick={startRainbowTest}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+                  disabled={testMode !== 'idle'}
+                >
+                  Start
+                </button>
+              )}
             </div>
           </div>
-        )}
+        </div>
 
         {/* Technical Notes */}
         <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700">
           <h2 className="text-xl font-bold mb-4 text-white">Technical Notes</h2>
           <div className="space-y-3 text-sm text-gray-300">
+            <div>
+              <span className="font-semibold text-white">Architecture:</span> Unified
+              WLEDDeviceManager component (Story 6.1 Phase 0)
+            </div>
             <div>
               <span className="font-semibold text-white">Connection:</span> Direct WebSocket
               to <code className="bg-gray-700 px-2 py-1 rounded">ws://[ip]/ws</code>
@@ -387,16 +198,16 @@ export const WLEDDirectTest: React.FC<WLEDDirectTestProps> = ({ onBack }) => {
             <div>
               <span className="font-semibold text-white">Protocol:</span> WLED JSON API{' '}
               <code className="bg-gray-700 px-2 py-1 rounded">
-                {`{"seg":{"i":["FF0000",..."]}}`}
+                {`{"seg":[{"col":[[r,g,b],...]}]}`}
               </code>
             </div>
             <div>
-              <span className="font-semibold text-white">Target:</span> 30 FPS for 90 LEDs (~8
-              KB/s)
+              <span className="font-semibold text-white">Features:</span> Multi-device support,
+              responsive grid, localStorage persistence, auto-reconnect
             </div>
             <div>
-              <span className="font-semibold text-white">Next Step:</span> Integrate with live
-              audio analysis for audio-reactive lighting
+              <span className="font-semibold text-white">Next Step:</span> Integrate into
+              /dj-visualizer and /jam routes for audio-reactive lighting
             </div>
           </div>
         </div>
