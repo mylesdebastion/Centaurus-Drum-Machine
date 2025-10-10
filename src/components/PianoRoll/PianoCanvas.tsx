@@ -117,13 +117,13 @@ export const PianoCanvas: React.FC<PianoCanvasProps> = ({
 
       // 3-tier brightness system:
       // - Triggered: 1.0 (full brightness)
-      // - In-key (not triggered): 0.4 (medium brightness)
-      // - Out-of-key: 0.1 (dim)
-      let brightness = 0.1; // Default: out-of-key
+      // - In-key (not triggered): 0.65 (bright)
+      // - Out-of-key: 0.2 (dim but colored)
+      let brightness = 0.2; // Default: out-of-key (dim but colored)
       if (isActive || isPressed) {
         brightness = 1.0; // Triggered
       } else if (scaleNotes && scaleNotes.includes(noteClass)) {
-        brightness = 0.4; // In-key but not triggered
+        brightness = 0.65; // In-key but not triggered
       }
 
       ctx.fillStyle = `rgb(${color.r * brightness}, ${color.g * brightness}, ${color.b * brightness})`;
@@ -173,13 +173,13 @@ export const PianoCanvas: React.FC<PianoCanvasProps> = ({
 
           // 3-tier brightness system:
           // - Triggered: 1.0 (full brightness)
-          // - In-key (not triggered): 0.4 (medium brightness)
-          // - Out-of-key: 0.15 (slightly brighter than white keys for visibility)
-          let brightness = 0.15; // Default: out-of-key (slightly brighter for black keys)
+          // - In-key (not triggered): 0.65 (bright)
+          // - Out-of-key: 0.25 (dim but colored, slightly brighter for visibility)
+          let brightness = 0.25; // Default: out-of-key (slightly brighter for black keys)
           if (isActive || isPressed) {
             brightness = 1.0; // Triggered
           } else if (scaleNotes && scaleNotes.includes(blackNoteClass)) {
-            brightness = 0.4; // In-key but not triggered
+            brightness = 0.65; // In-key but not triggered
           }
 
           ctx.fillStyle = `rgb(${color.r * brightness}, ${color.g * brightness}, ${color.b * brightness})`;

@@ -33,6 +33,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
   const [selectedScale, setSelectedScale] = useState('major');
   const [showKeyMenu, setShowKeyMenu] = useState(false);
   const [showScaleMenu, setShowScaleMenu] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Root note positions (chromatic scale)
   const rootPositions: Record<string, number> = {
@@ -113,14 +114,14 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
 
       // 3-tier brightness system:
       // - Triggered: 1.0 (full brightness)
-      // - In-key (not triggered): 0.4 (medium brightness)
-      // - Out-of-key: 0.1 (dim)
-      let brightness = 0.1; // Default: out-of-key
+      // - In-key (not triggered): 0.65 (bright)
+      // - Out-of-key: 0.2 (dim but colored)
+      let brightness = 0.2; // Default: out-of-key (dim but colored)
       const isActive = activeNotes.has(midiNote);
       if (isActive) {
         brightness = 1.0; // Triggered
       } else if (currentScaleNotes.includes(noteClass)) {
-        brightness = 0.4; // In-key but not triggered
+        brightness = 0.65; // In-key but not triggered
       }
 
       ledData.push({
@@ -201,6 +202,18 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
         <div className="max-w-7xl mx-auto space-y-4">
           {/* Piano Canvas */}
           <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+            {/* Canvas Header with Settings */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-white">Piano Roll</h2>
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className="p-2 hover:bg-gray-700 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                aria-label="Toggle settings"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+            </div>
+
             <div className="h-64 sm:h-80 md:h-96">
               <PianoCanvas
                 activeNotes={activeNotes}
@@ -230,182 +243,182 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                 </div>
               </div>
             )}
+
+            {/* Settings Panel - Inline */}
+            {showSettings && (
+              <div className="mt-4 pt-4 border-t border-gray-700 space-y-4">
+                {/* Color Mode */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Color Mode
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setColorMode('chromatic')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        colorMode === 'chromatic'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                    >
+                      Chromatic
+                    </button>
+                    <button
+                      onClick={() => setColorMode('harmonic')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        colorMode === 'harmonic'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                    >
+                      Harmonic
+                    </button>
+                  </div>
+                </div>
+
+                {/* Key/Scale Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Musical Key & Scale
+                  </label>
+                  <div className="flex gap-2">
+                    {/* Root Note Selector */}
+                    <div className="relative flex-1">
+                      <button
+                        onClick={() => {
+                          setShowKeyMenu(!showKeyMenu);
+                          setShowScaleMenu(false);
+                        }}
+                        className="w-full px-4 py-2 bg-gray-700 text-gray-300 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors flex items-center justify-between"
+                      >
+                        <span>Key: {selectedRoot}</span>
+                        <span className="text-xs">▼</span>
+                      </button>
+
+                      {showKeyMenu && (
+                        <div className="absolute top-full mt-1 left-0 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-48 overflow-y-auto">
+                          {Object.keys(rootPositions).map((root) => (
+                            <button
+                              key={root}
+                              onClick={() => {
+                                setSelectedRoot(root);
+                                setShowKeyMenu(false);
+                              }}
+                              className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors ${
+                                selectedRoot === root ? 'bg-primary-900 text-primary-400' : 'text-white'
+                              }`}
+                            >
+                              {root}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Scale Selector */}
+                    <div className="relative flex-1">
+                      <button
+                        onClick={() => {
+                          setShowScaleMenu(!showScaleMenu);
+                          setShowKeyMenu(false);
+                        }}
+                        className="w-full px-4 py-2 bg-gray-700 text-gray-300 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors flex items-center justify-between"
+                      >
+                        <span className="truncate">
+                          {selectedScale.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                        </span>
+                        <span className="text-xs ml-1">▼</span>
+                      </button>
+
+                      {showScaleMenu && (
+                        <div className="absolute top-full mt-1 left-0 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-64 overflow-y-auto">
+                          {Object.keys(scalePatterns).map((scale) => (
+                            <button
+                              key={scale}
+                              onClick={() => {
+                                setSelectedScale(scale);
+                                setShowScaleMenu(false);
+                              }}
+                              className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors ${
+                                selectedScale === scale ? 'bg-primary-900 text-primary-400' : 'text-white'
+                              }`}
+                            >
+                              {scale.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Out-of-scale: dim but colored (20%). In-scale: bright (65%). Active: full brightness (100%).
+                  </p>
+                </div>
+
+                {/* Visible Octaves */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Visible Octaves: {visibleOctaves}
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="7"
+                    step="1"
+                    value={visibleOctaves}
+                    onChange={(e) => setVisibleOctaves(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Start Octave */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Start Octave: C{startOctave}
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="7"
+                    step="1"
+                    value={startOctave}
+                    onChange={(e) => setStartOctave(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+
+                {/* WLED Output */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <input
+                      type="checkbox"
+                      id="wled-enabled"
+                      checked={wledEnabled}
+                      onChange={(e) => setWledEnabled(e.target.checked)}
+                      className="w-4 h-4 text-primary-600 bg-gray-700 border-gray-600 rounded"
+                    />
+                    <label htmlFor="wled-enabled" className="text-sm font-medium text-gray-300">
+                      Enable WLED Output (144 LEDs)
+                    </label>
+                  </div>
+
+                  {wledEnabled && (
+                    <input
+                      type="text"
+                      value={wledIP}
+                      onChange={(e) => setWledIP(e.target.value)}
+                      placeholder="WLED IP (e.g., 192.168.8.106)"
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                    />
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* MIDI Setup Panel */}
           <CollapsiblePanel title="MIDI Setup" defaultOpen={true} mobileOnly={true}>
             <MIDIDeviceSelector showKeyboardToggle={true} />
-          </CollapsiblePanel>
-
-          {/* Settings Panel */}
-          <CollapsiblePanel title="Settings" defaultOpen={false}>
-            <div className="space-y-4">
-              {/* Color Mode */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Color Mode
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setColorMode('chromatic')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      colorMode === 'chromatic'
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
-                  >
-                    Chromatic
-                  </button>
-                  <button
-                    onClick={() => setColorMode('harmonic')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      colorMode === 'harmonic'
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
-                  >
-                    Harmonic
-                  </button>
-                </div>
-              </div>
-
-              {/* Key/Scale Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Musical Key & Scale
-                </label>
-                <div className="flex gap-2">
-                  {/* Root Note Selector */}
-                  <div className="relative flex-1">
-                    <button
-                      onClick={() => {
-                        setShowKeyMenu(!showKeyMenu);
-                        setShowScaleMenu(false);
-                      }}
-                      className="w-full px-4 py-2 bg-gray-700 text-gray-300 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors flex items-center justify-between"
-                    >
-                      <span>Key: {selectedRoot}</span>
-                      <span className="text-xs">▼</span>
-                    </button>
-
-                    {showKeyMenu && (
-                      <div className="absolute top-full mt-1 left-0 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-48 overflow-y-auto">
-                        {Object.keys(rootPositions).map((root) => (
-                          <button
-                            key={root}
-                            onClick={() => {
-                              setSelectedRoot(root);
-                              setShowKeyMenu(false);
-                            }}
-                            className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors ${
-                              selectedRoot === root ? 'bg-primary-900 text-primary-400' : 'text-white'
-                            }`}
-                          >
-                            {root}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Scale Selector */}
-                  <div className="relative flex-1">
-                    <button
-                      onClick={() => {
-                        setShowScaleMenu(!showScaleMenu);
-                        setShowKeyMenu(false);
-                      }}
-                      className="w-full px-4 py-2 bg-gray-700 text-gray-300 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors flex items-center justify-between"
-                    >
-                      <span className="truncate">
-                        {selectedScale.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-                      </span>
-                      <span className="text-xs ml-1">▼</span>
-                    </button>
-
-                    {showScaleMenu && (
-                      <div className="absolute top-full mt-1 left-0 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-64 overflow-y-auto">
-                        {Object.keys(scalePatterns).map((scale) => (
-                          <button
-                            key={scale}
-                            onClick={() => {
-                              setSelectedScale(scale);
-                              setShowScaleMenu(false);
-                            }}
-                            className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors ${
-                              selectedScale === scale ? 'bg-primary-900 text-primary-400' : 'text-white'
-                            }`}
-                          >
-                            {scale.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  In-key notes are brighter. Triggered notes are full brightness.
-                </p>
-              </div>
-
-              {/* Visible Octaves */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Visible Octaves: {visibleOctaves}
-                </label>
-                <input
-                  type="range"
-                  min="1"
-                  max="7"
-                  step="1"
-                  value={visibleOctaves}
-                  onChange={(e) => setVisibleOctaves(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-
-              {/* Start Octave */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Start Octave: C{startOctave}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="7"
-                  step="1"
-                  value={startOctave}
-                  onChange={(e) => setStartOctave(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-
-              {/* WLED Output */}
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <input
-                    type="checkbox"
-                    id="wled-enabled"
-                    checked={wledEnabled}
-                    onChange={(e) => setWledEnabled(e.target.checked)}
-                    className="w-4 h-4 text-primary-600 bg-gray-700 border-gray-600 rounded"
-                  />
-                  <label htmlFor="wled-enabled" className="text-sm font-medium text-gray-300">
-                    Enable WLED Output (144 LEDs)
-                  </label>
-                </div>
-
-                {wledEnabled && (
-                  <input
-                    type="text"
-                    value={wledIP}
-                    onChange={(e) => setWledIP(e.target.value)}
-                    placeholder="WLED IP (e.g., 192.168.8.106)"
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
-                  />
-                )}
-              </div>
-            </div>
           </CollapsiblePanel>
 
           {/* Info Panel */}

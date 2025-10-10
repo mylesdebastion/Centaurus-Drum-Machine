@@ -496,6 +496,93 @@ Best for: Visualizers, canvas-based tools, immersive experiences
 
 **Example views:** PianoRoll, LiveAudioVisualizer (full-screen mode)
 
+### Inline Settings Pattern
+
+For modular components and visualizers, use a consistent settings icon within the component container that toggles inline settings below the main content.
+
+**Implementation pattern:**
+
+```tsx
+// 1. Add showSettings state
+const [showSettings, setShowSettings] = useState(false);
+
+// 2. Create container with header and settings icon
+<div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+  {/* Container Header with Settings Icon */}
+  <div className="flex items-center justify-between mb-4">
+    <h2 className="text-lg font-semibold text-white">Piano Roll</h2>
+    <button
+      onClick={() => setShowSettings(!showSettings)}
+      className="p-2 hover:bg-gray-700 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+      aria-label="Toggle settings"
+    >
+      <Settings className="w-5 h-5" />
+    </button>
+  </div>
+
+  {/* Main content */}
+  <div className="h-64 sm:h-80 md:h-96">
+    {/* Canvas or visualizer */}
+  </div>
+
+  {/* Optional active state display */}
+  {activeState && (
+    <div className="mt-4 pt-4 border-t border-gray-700">
+      {/* Active notes, status, etc. */}
+    </div>
+  )}
+
+  {/* 3. Inline settings panel - expands within the same container */}
+  {showSettings && (
+    <div className="mt-4 pt-4 border-t border-gray-700 space-y-4">
+      {/* Settings controls inline */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Setting Name
+        </label>
+        {/* Control */}
+      </div>
+    </div>
+  )}
+</div>
+```
+
+**Pattern characteristics:**
+- Settings cog icon positioned in upper right of **container header** (not page header)
+- Icon button with 44px touch target (`min-w-[44px] min-h-[44px]`)
+- Smooth hover transition (`hover:bg-gray-700 transition-colors`)
+- Settings expand **inline within the same card**, maintaining context
+- Settings use divider (`border-t border-gray-700`) to visually separate from content
+- Settings hidden by default, revealed on click
+- No modal overlays or separate panels
+
+**Visual consistency:**
+- Matches Live Audio Visualizer settings pattern (embedded mode)
+- Matches Piano Roll Visualizer settings pattern
+- Consistent with anti-modal philosophy (inline, non-blocking)
+
+**Where to use:**
+- Visualizers with configurable parameters (Piano Roll, Audio Visualizer)
+- Canvas-based components with settings
+- Modular components where settings should stay in context
+- Any component where users benefit from seeing settings + content simultaneously
+
+**Where NOT to use:**
+- Global application settings (use separate settings page)
+- Simple components with 1-2 controls (show controls directly)
+- Multi-step configuration wizards (use inline expandable sections)
+
+**Example implementations:**
+- `PianoRoll.tsx:206-215` - Settings button in container header
+- `PianoRoll.tsx:247-416` - Inline settings panel within card
+- `LiveAudioVisualizer.tsx:321-327` - Settings button (embedded mode)
+
+**Benefits:**
+- Users can see their changes reflected in the visualizer immediately
+- No context switching or modal interruption
+- Settings are clearly associated with their component
+- Mobile-friendly (no overlay z-index issues)
+
 ### ViewCard Component
 
 Standard card wrapper for content sections. Automatically follows design system standards.
