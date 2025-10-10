@@ -7,6 +7,7 @@ import { IsometricSequencer } from './components/IsometricSequencer/IsometricSeq
 import { LiveAudioVisualizer } from './components/LiveAudioVisualizer/LiveAudioVisualizer';
 import { WLEDDirectTest } from './components/WLEDExperiment/WLEDDirectTest';
 import { MIDITest } from './components/MIDI/MIDITest';
+import { PianoRoll } from './components/PianoRoll/PianoRoll';
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
@@ -77,6 +78,14 @@ function App() {
     navigate('/');
   };
 
+  const handlePianoRoll = () => {
+    navigate('/piano');
+  };
+
+  const handleExitPianoRoll = () => {
+    navigate('/');
+  };
+
   return (
     <Routes>
       <Route
@@ -90,6 +99,7 @@ function App() {
             onDJVisualizer={handleDJVisualizer}
             onWLEDExperiment={handleWLEDExperiment}
             onMIDITest={handleMIDITest}
+            onPianoRoll={handlePianoRoll}
           />
         }
       />
@@ -139,6 +149,14 @@ function App() {
         element={
           <MIDITest
             onBack={handleExitMIDITest}
+          />
+        }
+      />
+      <Route
+        path="/piano"
+        element={
+          <PianoRoll
+            onBack={handleExitPianoRoll}
           />
         }
       />

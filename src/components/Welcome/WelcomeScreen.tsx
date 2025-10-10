@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2 } from 'lucide-react';
+import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2, Piano } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onStartJam: () => void;
@@ -9,6 +9,7 @@ interface WelcomeScreenProps {
   onDJVisualizer: () => void;
   onWLEDExperiment: () => void;
   onMIDITest: () => void;
+  onPianoRoll: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
@@ -18,7 +19,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onIsometricMode,
   onDJVisualizer,
   onWLEDExperiment,
-  onMIDITest
+  onMIDITest,
+  onPianoRoll
 }) => {
   const [joinCode, setJoinCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
@@ -157,6 +159,25 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </p>
 
           <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+            {/* Piano Roll Visualizer */}
+            <button
+              onClick={onPianoRoll}
+              className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-green-500/50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <Piano className="w-6 h-6 text-green-400" />
+                <h3 className="font-semibold text-white">Piano Roll</h3>
+                <span className="text-xs bg-green-600/30 text-green-300 px-2 py-1 rounded">New</span>
+              </div>
+              <p className="text-sm text-gray-400 mb-4">
+                88-key interactive piano with MIDI input and WLED LED strip output
+              </p>
+              <div className="flex items-center gap-2 text-sm text-green-400 group-hover:text-green-300">
+                <span>Launch Piano</span>
+                <Play className="w-4 h-4" />
+              </div>
+            </button>
+
             {/* MIDI Input Test */}
             <button
               onClick={onMIDITest}
@@ -165,7 +186,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               <div className="flex items-center gap-3 mb-3">
                 <Music2 className="w-6 h-6 text-blue-400" />
                 <h3 className="font-semibold text-white">MIDI Input Engine</h3>
-                <span className="text-xs bg-blue-600/30 text-blue-300 px-2 py-1 rounded">New</span>
+                <span className="text-xs bg-blue-600/30 text-blue-300 px-2 py-1 rounded">Test</span>
               </div>
               <p className="text-sm text-gray-400 mb-4">
                 Test Web MIDI API with live note visualization and keyboard fallback mode

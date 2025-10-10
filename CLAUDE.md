@@ -125,35 +125,52 @@ This project uses **strict port enforcement** in `vite.config.ts`:
 
 ### When Dev Server Fails to Start
 
+**IMPORTANT**: `npm run dev` has **no built-in stop command**. There is no `npm stop` or `npm run dev:stop`. The only ways to stop a Vite dev server are:
+- **Interactive**: Press Ctrl+C in the terminal
+- **Programmatic**: Kill the Node.js process via OS commands
+
 If you see an error like:
 ```
 Port 5173 is already in use
 ```
 
-**Follow this process:**
+**Follow this reliable process:**
 
-1. **Check what's running on port 5173:**
-   ```bash
-   # Windows
-   netstat -ano | findstr :5173
+#### Windows (Recommended Method)
+```bash
+# One-liner: Find PID, kill it, wait, then start server
+powershell -Command "Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }" && timeout /t 2 /nobreak >nul && npm run dev
+```
 
-   # Linux/Mac
-   lsof -ti:5173
-   ```
+**Or step-by-step:**
+```bash
+# 1. Find and kill process on port 5173
+powershell -Command "Get-NetTCPConnection -LocalPort 5173 | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }"
 
-2. **Kill the existing process:**
-   ```bash
-   # Windows (use PID from netstat output)
-   taskkill /PID <PID> /F
+# 2. Wait 2 seconds
+timeout /t 2 /nobreak
 
-   # Linux/Mac
-   kill -9 $(lsof -ti:5173)
-   ```
+# 3. Start dev server
+npm run dev
+```
 
-3. **Then restart the dev server:**
-   ```bash
-   npm run dev
-   ```
+#### Linux/Mac
+```bash
+# One-liner: Kill process and start server
+kill -9 $(lsof -ti:5173) 2>/dev/null; sleep 2; npm run dev
+```
+
+**Or step-by-step:**
+```bash
+# 1. Find and kill process
+kill -9 $(lsof -ti:5173)
+
+# 2. Wait 2 seconds
+sleep 2
+
+# 3. Start dev server
+npm run dev
+```
 
 ### Development Workflow Guidelines
 
@@ -167,3 +184,32 @@ Port 5173 is already in use
 - Let Vite's HMR (Hot Module Replacement) handle updates automatically
 - Only restart the server if HMR fails or config changes are made
 - Check running processes before starting a new dev session
+
+**IMPORTANT for Claude Code users:**
+- When using background Bash shells, the shell ID ≠ the actual Node.js/Vite process PID
+- Killing a background shell does NOT kill the underlying dev server process
+- Always kill the process by PORT (5173) not by shell ID
+- Use the PowerShell/lsof commands above to target the actual process
+
+**Best Practice - Restart Script:**
+Create a helper script to make restarts reliable:
+
+```bash
+# restart-dev.bat (Windows)
+@echo off
+echo Killing any process on port 5173...
+powershell -Command "Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }"
+timeout /t 2 /nobreak >nul
+echo Starting dev server...
+npm run dev
+```
+
+```bash
+# restart-dev.sh (Linux/Mac)
+#!/bin/bash
+echo "Killing any process on port 5173..."
+kill -9 $(lsof -ti:5173) 2>/dev/null
+sleep 2
+echo "Starting dev server..."
+npm run dev
+```
