@@ -29,9 +29,44 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
   const [startOctave, setStartOctave] = useState(3);
   const [wledEnabled, setWledEnabled] = useState(false);
   const [wledIP, setWledIP] = useState('192.168.8.106');
+  const [selectedRoot, setSelectedRoot] = useState('C');
+  const [selectedScale, setSelectedScale] = useState('major');
+  const [showKeyMenu, setShowKeyMenu] = useState(false);
+  const [showScaleMenu, setShowScaleMenu] = useState(false);
+
+  // Root note positions (chromatic scale)
+  const rootPositions: Record<string, number> = {
+    'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
+    'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11
+  };
+
+  // Scale interval patterns (semitones from root)
+  const scalePatterns: Record<string, number[]> = {
+    'major': [0, 2, 4, 5, 7, 9, 11],        // Major scale (Ionian)
+    'minor': [0, 2, 3, 5, 7, 8, 10],        // Natural minor scale (Aeolian)
+    'dorian': [0, 2, 3, 5, 7, 9, 10],       // Dorian mode
+    'phrygian': [0, 1, 3, 5, 7, 8, 10],     // Phrygian mode
+    'lydian': [0, 2, 4, 6, 7, 9, 11],       // Lydian mode
+    'mixolydian': [0, 2, 4, 5, 7, 9, 10],   // Mixolydian mode
+    'locrian': [0, 1, 3, 5, 6, 8, 10],      // Locrian mode
+    'harmonic_minor': [0, 2, 3, 5, 7, 8, 11], // Harmonic minor
+    'melodic_minor': [0, 2, 3, 5, 7, 9, 11],  // Melodic minor (ascending)
+    'pentatonic_major': [0, 2, 4, 7, 9],    // Major pentatonic
+    'pentatonic_minor': [0, 3, 5, 7, 10],   // Minor pentatonic
+    'blues': [0, 3, 5, 6, 7, 10],           // Blues scale
+    'chromatic': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] // All notes
+  };
+
+  // Get current scale notes
+  const getCurrentScale = useCallback(() => {
+    const rootPos = rootPositions[selectedRoot];
+    const pattern = scalePatterns[selectedScale];
+    return pattern.map(interval => (rootPos + interval) % 12);
+  }, [selectedRoot, selectedScale]);
 
   const { activeNotes, isKeyboardMode } = useMIDIInput({
     autoInitialize: true,
+    keyboardFallback: true, // Enable keyboard fallback by default
     onNoteOn: (note, velocity) => {
       // Trigger audio playback
       audioEngine.triggerPianoNoteOn(note, velocity / 127);
@@ -65,6 +100,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
    */
   const generateLEDData = useCallback((): { r: number; g: number; b: number }[] => {
     const ledData: { r: number; g: number; b: number }[] = [];
+    const currentScaleNotes = getCurrentScale();
 
     for (let ledIndex = 0; ledIndex < LED_STRIP.TOTAL_LEDS; ledIndex++) {
       // Map LED index to MIDI note
@@ -75,9 +111,17 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
       const noteClass = midiNote % 12; // Note class: 0=C, 1=C#, 2=D, etc.
       const color = getNoteColor(noteClass, colorMode);
 
-      // Check if note is active
+      // 3-tier brightness system:
+      // - Triggered: 1.0 (full brightness)
+      // - In-key (not triggered): 0.4 (medium brightness)
+      // - Out-of-key: 0.1 (dim)
+      let brightness = 0.1; // Default: out-of-key
       const isActive = activeNotes.has(midiNote);
-      const brightness = isActive ? 1.0 : 0.1;
+      if (isActive) {
+        brightness = 1.0; // Triggered
+      } else if (currentScaleNotes.includes(noteClass)) {
+        brightness = 0.4; // In-key but not triggered
+      }
 
       ledData.push({
         r: Math.round(color.r * brightness),
@@ -87,7 +131,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     }
 
     return ledData;
-  }, [activeNotes, colorMode]);
+  }, [activeNotes, colorMode, getCurrentScale]);
 
   /**
    * Send LED data to WLED (via UDP)
@@ -165,6 +209,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                 onKeyRelease={handleKeyRelease}
                 visibleOctaves={visibleOctaves}
                 startOctave={startOctave}
+                scaleNotes={getCurrentScale()}
               />
             </div>
 
@@ -222,6 +267,85 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                     Harmonic
                   </button>
                 </div>
+              </div>
+
+              {/* Key/Scale Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Musical Key & Scale
+                </label>
+                <div className="flex gap-2">
+                  {/* Root Note Selector */}
+                  <div className="relative flex-1">
+                    <button
+                      onClick={() => {
+                        setShowKeyMenu(!showKeyMenu);
+                        setShowScaleMenu(false);
+                      }}
+                      className="w-full px-4 py-2 bg-gray-700 text-gray-300 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors flex items-center justify-between"
+                    >
+                      <span>Key: {selectedRoot}</span>
+                      <span className="text-xs">▼</span>
+                    </button>
+
+                    {showKeyMenu && (
+                      <div className="absolute top-full mt-1 left-0 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-48 overflow-y-auto">
+                        {Object.keys(rootPositions).map((root) => (
+                          <button
+                            key={root}
+                            onClick={() => {
+                              setSelectedRoot(root);
+                              setShowKeyMenu(false);
+                            }}
+                            className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors ${
+                              selectedRoot === root ? 'bg-primary-900 text-primary-400' : 'text-white'
+                            }`}
+                          >
+                            {root}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Scale Selector */}
+                  <div className="relative flex-1">
+                    <button
+                      onClick={() => {
+                        setShowScaleMenu(!showScaleMenu);
+                        setShowKeyMenu(false);
+                      }}
+                      className="w-full px-4 py-2 bg-gray-700 text-gray-300 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors flex items-center justify-between"
+                    >
+                      <span className="truncate">
+                        {selectedScale.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                      </span>
+                      <span className="text-xs ml-1">▼</span>
+                    </button>
+
+                    {showScaleMenu && (
+                      <div className="absolute top-full mt-1 left-0 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-64 overflow-y-auto">
+                        {Object.keys(scalePatterns).map((scale) => (
+                          <button
+                            key={scale}
+                            onClick={() => {
+                              setSelectedScale(scale);
+                              setShowScaleMenu(false);
+                            }}
+                            className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors ${
+                              selectedScale === scale ? 'bg-primary-900 text-primary-400' : 'text-white'
+                            }`}
+                          >
+                            {scale.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  In-key notes are brighter. Triggered notes are full brightness.
+                </p>
               </div>
 
               {/* Visible Octaves */}

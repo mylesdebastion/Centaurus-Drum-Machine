@@ -26,6 +26,9 @@ interface PianoCanvasProps {
   /** Starting octave (default: 3 for C3) */
   startOctave?: number;
 
+  /** Current scale notes (for highlighting in-key notes) */
+  scaleNotes?: number[];
+
   /** Additional CSS classes */
   className?: string;
 }
@@ -55,6 +58,7 @@ export const PianoCanvas: React.FC<PianoCanvasProps> = ({
   onKeyRelease,
   visibleOctaves = PIANO_CONSTANTS.DEFAULT_VISIBLE_OCTAVES,
   startOctave = PIANO_CONSTANTS.DEFAULT_START_OCTAVE,
+  scaleNotes,
   className = '',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -110,7 +114,17 @@ export const PianoCanvas: React.FC<PianoCanvasProps> = ({
 
       // Get color
       const color = getNoteColor(noteClass, colorMode);
-      const brightness = isActive || isPressed ? 1.0 : 0.15;
+
+      // 3-tier brightness system:
+      // - Triggered: 1.0 (full brightness)
+      // - In-key (not triggered): 0.4 (medium brightness)
+      // - Out-of-key: 0.1 (dim)
+      let brightness = 0.1; // Default: out-of-key
+      if (isActive || isPressed) {
+        brightness = 1.0; // Triggered
+      } else if (scaleNotes && scaleNotes.includes(noteClass)) {
+        brightness = 0.4; // In-key but not triggered
+      }
 
       ctx.fillStyle = `rgb(${color.r * brightness}, ${color.g * brightness}, ${color.b * brightness})`;
       ctx.fillRect(x, height - whiteKeyHeight, whiteKeyWidth, whiteKeyHeight);
@@ -156,7 +170,17 @@ export const PianoCanvas: React.FC<PianoCanvasProps> = ({
 
           // Get color
           const color = getNoteColor(blackNoteClass, colorMode);
-          const brightness = isActive || isPressed ? 1.0 : 0.2;
+
+          // 3-tier brightness system:
+          // - Triggered: 1.0 (full brightness)
+          // - In-key (not triggered): 0.4 (medium brightness)
+          // - Out-of-key: 0.15 (slightly brighter than white keys for visibility)
+          let brightness = 0.15; // Default: out-of-key (slightly brighter for black keys)
+          if (isActive || isPressed) {
+            brightness = 1.0; // Triggered
+          } else if (scaleNotes && scaleNotes.includes(blackNoteClass)) {
+            brightness = 0.4; // In-key but not triggered
+          }
 
           ctx.fillStyle = `rgb(${color.r * brightness}, ${color.g * brightness}, ${color.b * brightness})`;
           ctx.fillRect(x, height - whiteKeyHeight, blackKeyWidth, blackKeyHeight);
@@ -180,7 +204,7 @@ export const PianoCanvas: React.FC<PianoCanvasProps> = ({
     });
 
     setKeyGeometries(geometries);
-  }, [activeNotes, colorMode, startNote, endNote, pressedKeys, startOctave, visibleOctaves]);
+  }, [activeNotes, colorMode, startNote, endNote, pressedKeys, startOctave, visibleOctaves, scaleNotes]);
 
   /**
    * Handle mouse/touch down
