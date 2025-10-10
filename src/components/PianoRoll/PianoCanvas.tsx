@@ -104,7 +104,7 @@ export const PianoCanvas: React.FC<PianoCanvasProps> = ({
     // Draw white keys first
     visibleWhiteKeys.forEach((midiNote, index) => {
       const x = index * whiteKeyWidth;
-      const noteClass = (midiNote - 3) % 12; // Offset to align C as note 0
+      const noteClass = midiNote % 12; // Note class: 0=C, 1=C#, 2=D, etc.
       const isActive = activeNotes.has(midiNote);
       const isPressed = pressedKeys.has(midiNote);
 
@@ -150,7 +150,7 @@ export const PianoCanvas: React.FC<PianoCanvasProps> = ({
         const blackMidiNote = midiNote + 1;
         if (blackMidiNote <= endNote) {
           const x = (index + 1) * whiteKeyWidth - blackKeyWidth / 2;
-          const blackNoteClass = (blackMidiNote - 3) % 12;
+          const blackNoteClass = blackMidiNote % 12; // Note class: 0=C, 1=C#, 2=D, etc.
           const isActive = activeNotes.has(blackMidiNote);
           const isPressed = pressedKeys.has(blackMidiNote);
 

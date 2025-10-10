@@ -72,7 +72,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
       const midiNote = keyIndex + PIANO_CONSTANTS.FIRST_MIDI_NOTE;
 
       // Get color for this note
-      const noteClass = (midiNote - 3) % 12; // Offset to align C as note 0
+      const noteClass = midiNote % 12; // Note class: 0=C, 1=C#, 2=D, etc.
       const color = getNoteColor(noteClass, colorMode);
 
       // Check if note is active
