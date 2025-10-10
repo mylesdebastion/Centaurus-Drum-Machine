@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, Wifi } from 'lucide-react';
 import { WLEDDevice, WLEDDeviceManagerProps } from './types';
 import WLEDDeviceCard from './WLEDDeviceCard';
@@ -25,6 +26,7 @@ const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
   const [newDeviceName, setNewDeviceName] = useState('');
   const [newDeviceIP, setNewDeviceIP] = useState('');
   const [ipError, setIpError] = useState('');
+
 
   // WebSocket connections (persisted across renders)
   const wsConnections = useRef<Map<string, WebSocket>>(new Map());
@@ -255,23 +257,111 @@ const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
     setDevices((prev) => prev.filter((d) => d.id !== deviceId));
   };
 
+  // Render modal (needs to be outside conditional returns)
+  const renderModal = () => {
+    if (!showAddModal) return null;
+
+    return createPortal(
+      <div
+        className="fixed inset-0 flex items-center justify-center p-4"
+        style={{
+          zIndex: 9999,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(4px)'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowAddModal(false);
+          }
+        }}
+      >
+        <div
+          className="bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-2xl border border-gray-700"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3 className="text-xl font-semibold text-white mb-4">Add WLED Device</h3>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Device Name (optional)
+              </label>
+              <input
+                type="text"
+                value={newDeviceName}
+                onChange={(e) => setNewDeviceName(e.target.value)}
+                placeholder="My LED Strip"
+                maxLength={30}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                IP Address *
+              </label>
+              <input
+                type="text"
+                value={newDeviceIP}
+                onChange={(e) => {
+                  setNewDeviceIP(e.target.value);
+                  setIpError('');
+                }}
+                placeholder="192.168.1.50"
+                className={`w-full px-3 py-2 bg-gray-700 border ${
+                  ipError ? 'border-red-500' : 'border-gray-600'
+                } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500`}
+              />
+              {ipError && <p className="text-sm text-red-500 mt-1">{ipError}</p>}
+            </div>
+          </div>
+
+          <div className="flex gap-2 mt-6">
+            <button
+              onClick={() => {
+                setShowAddModal(false);
+                setNewDeviceName('');
+                setNewDeviceIP('');
+                setIpError('');
+              }}
+              className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAddDevice}
+              disabled={!newDeviceIP}
+              className="flex-1 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+            >
+              Add Device
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
   // Empty state
   if (devices.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 bg-gray-800 rounded-xl border border-gray-700">
-        <Wifi className="w-16 h-16 text-gray-600 mb-4" />
-        <h3 className="text-xl font-semibold text-white mb-2">No WLED Devices Connected</h3>
-        <p className="text-gray-400 text-center mb-6 max-w-md">
-          Connect LED strips to visualize audio on physical hardware in real-time
-        </p>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Add Your First WLED Device
-        </button>
-      </div>
+      <>
+        <div className="flex flex-col items-center justify-center p-8 bg-gray-800 rounded-xl border border-gray-700">
+          <Wifi className="w-16 h-16 text-gray-600 mb-4" />
+          <h3 className="text-xl font-semibold text-white mb-2">No WLED Devices Connected</h3>
+          <p className="text-gray-400 text-center mb-6 max-w-md">
+            Connect LED strips to visualize audio on physical hardware in real-time
+          </p>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Add Your First WLED Device
+          </button>
+        </div>
+        {renderModal()}
+      </>
     );
   }
 
@@ -309,70 +399,7 @@ const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
         </button>
       )}
 
-      {/* Add Device Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-xl p-6 max-w-md w-full">
-            <h3 className="text-xl font-semibold text-white mb-4">Add WLED Device</h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Device Name (optional)
-                </label>
-                <input
-                  type="text"
-                  value={newDeviceName}
-                  onChange={(e) => setNewDeviceName(e.target.value)}
-                  placeholder="My LED Strip"
-                  maxLength={30}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  IP Address *
-                </label>
-                <input
-                  type="text"
-                  value={newDeviceIP}
-                  onChange={(e) => {
-                    setNewDeviceIP(e.target.value);
-                    setIpError('');
-                  }}
-                  placeholder="192.168.1.50"
-                  className={`w-full px-3 py-2 bg-gray-700 border ${
-                    ipError ? 'border-red-500' : 'border-gray-600'
-                  } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500`}
-                />
-                {ipError && <p className="text-sm text-red-500 mt-1">{ipError}</p>}
-              </div>
-            </div>
-
-            <div className="flex gap-2 mt-6">
-              <button
-                onClick={() => {
-                  setShowAddModal(false);
-                  setNewDeviceName('');
-                  setNewDeviceIP('');
-                  setIpError('');
-                }}
-                className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddDevice}
-                disabled={!newDeviceIP}
-                className="flex-1 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-              >
-                Add Device
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {renderModal()}
     </div>
   );
 };
