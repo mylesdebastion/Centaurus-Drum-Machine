@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap } from 'lucide-react';
+import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2 } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onStartJam: () => void;
@@ -8,6 +8,7 @@ interface WelcomeScreenProps {
   onIsometricMode: () => void;
   onDJVisualizer: () => void;
   onWLEDExperiment: () => void;
+  onMIDITest: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
@@ -16,7 +17,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onEducationMode,
   onIsometricMode,
   onDJVisualizer,
-  onWLEDExperiment
+  onWLEDExperiment,
+  onMIDITest
 }) => {
   const [joinCode, setJoinCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
@@ -155,6 +157,25 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </p>
 
           <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+            {/* MIDI Input Test */}
+            <button
+              onClick={onMIDITest}
+              className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-blue-500/50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <Music2 className="w-6 h-6 text-blue-400" />
+                <h3 className="font-semibold text-white">MIDI Input Engine</h3>
+                <span className="text-xs bg-blue-600/30 text-blue-300 px-2 py-1 rounded">New</span>
+              </div>
+              <p className="text-sm text-gray-400 mb-4">
+                Test Web MIDI API with live note visualization and keyboard fallback mode
+              </p>
+              <div className="flex items-center gap-2 text-sm text-blue-400 group-hover:text-blue-300">
+                <span>Launch Test</span>
+                <Play className="w-4 h-4" />
+              </div>
+            </button>
+
             {/* WLED Direct Test */}
             <button
               onClick={onWLEDExperiment}

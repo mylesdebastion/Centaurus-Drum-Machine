@@ -6,6 +6,7 @@ import { EducationMode } from './components/Education/EducationMode';
 import { IsometricSequencer } from './components/IsometricSequencer/IsometricSequencer';
 import { LiveAudioVisualizer } from './components/LiveAudioVisualizer/LiveAudioVisualizer';
 import { WLEDDirectTest } from './components/WLEDExperiment/WLEDDirectTest';
+import { MIDITest } from './components/MIDI/MIDITest';
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
@@ -68,6 +69,14 @@ function App() {
     navigate('/');
   };
 
+  const handleMIDITest = () => {
+    navigate('/midi-test');
+  };
+
+  const handleExitMIDITest = () => {
+    navigate('/');
+  };
+
   return (
     <Routes>
       <Route
@@ -80,6 +89,7 @@ function App() {
             onIsometricMode={handleIsometricMode}
             onDJVisualizer={handleDJVisualizer}
             onWLEDExperiment={handleWLEDExperiment}
+            onMIDITest={handleMIDITest}
           />
         }
       />
@@ -121,6 +131,14 @@ function App() {
         element={
           <WLEDDirectTest
             onBack={handleExitWLEDExperiment}
+          />
+        }
+      />
+      <Route
+        path="/midi-test"
+        element={
+          <MIDITest
+            onBack={handleExitMIDITest}
           />
         }
       />
