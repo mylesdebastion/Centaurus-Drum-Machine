@@ -10,6 +10,8 @@ export type SoundEngineType = 'keys' | 'sine' | 'drums' | 'pluck' | 'pad' | 'fm-
  */
 export interface SoundEngine {
   playNote(frequency: number, velocity?: number, duration?: number): void;
+  triggerAttack?(frequency: number, velocity?: number): void;  // For sustaining notes
+  triggerRelease?(frequency: number): void;  // For releasing sustained notes
   dispose(): void;
 }
 
@@ -269,7 +271,7 @@ class PadSoundEngine implements SoundEngine {
       envelope: {
         attack: 0.2,          // Slightly longer attack for smoother onset
         decay: 0.4,           // Slightly longer decay
-        sustain: 0.6,         // Higher sustain for fuller body
+        sustain: 0.7,         // Higher sustain for fuller body and held notes
         release: 1.5          // Extended release from 1.0 to 1.5 for longer tail
       }
     }).toDestination();
@@ -280,6 +282,16 @@ class PadSoundEngine implements SoundEngine {
   playNote(frequency: number, velocity: number = 0.6, duration: number = 1.0): void {
     const note = Tone.Frequency(frequency, 'hz').toNote();
     this.synth.triggerAttackRelease(note, duration, undefined, velocity);
+  }
+
+  triggerAttack(frequency: number, velocity: number = 0.6): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.synth.triggerAttack(note, undefined, velocity);
+  }
+
+  triggerRelease(frequency: number): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.synth.triggerRelease(note);
   }
 
   dispose(): void {
@@ -302,14 +314,14 @@ class FMBellSoundEngine implements SoundEngine {
       envelope: {
         attack: 0.001,       // Very fast attack for bell strike
         decay: 1.2,          // Longer decay for sustained shimmer
-        sustain: 0.05,       // Low sustain for realistic bell decay
+        sustain: 0.2,        // Higher sustain for held notes
         release: 1.5         // Extended release for lingering resonance
       },
       modulation: { type: 'sine' },  // Sine modulation for smoother harmonics
       modulationEnvelope: {
         attack: 0.0005,      // Instant modulation attack
         decay: 0.6,          // Longer decay for evolving timbre
-        sustain: 0.1,
+        sustain: 0.2,
         release: 0.8         // Extended release for complex harmonics
       }
     }).toDestination();
@@ -320,6 +332,16 @@ class FMBellSoundEngine implements SoundEngine {
   playNote(frequency: number, velocity: number = 0.7, duration: number = 1.0): void {
     const note = Tone.Frequency(frequency, 'hz').toNote();
     this.synth.triggerAttackRelease(note, duration, undefined, velocity);
+  }
+
+  triggerAttack(frequency: number, velocity: number = 0.7): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.synth.triggerAttack(note, undefined, velocity);
+  }
+
+  triggerRelease(frequency: number): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.synth.triggerRelease(note);
   }
 
   dispose(): void {
@@ -342,14 +364,14 @@ class RhodesSoundEngine implements SoundEngine {
       envelope: {
         attack: 0.005,       // Quick attack like struck tine
         decay: 0.8,          // Medium decay
-        sustain: 0.15,       // Low sustain for realistic piano decay
+        sustain: 0.4,        // Higher sustain for held notes
         release: 1.2         // Natural release
       },
       modulation: { type: 'sine' },
       modulationEnvelope: {
         attack: 0.002,
         decay: 0.4,
-        sustain: 0.2,
+        sustain: 0.3,
         release: 0.8
       }
     }).toDestination();
@@ -369,6 +391,16 @@ class RhodesSoundEngine implements SoundEngine {
   playNote(frequency: number, velocity: number = 0.7, duration: number = 1.2): void {
     const note = Tone.Frequency(frequency, 'hz').toNote();
     this.synth.triggerAttackRelease(note, duration, undefined, velocity);
+  }
+
+  triggerAttack(frequency: number, velocity: number = 0.7): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.synth.triggerAttack(note, undefined, velocity);
+  }
+
+  triggerRelease(frequency: number): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.synth.triggerRelease(note);
   }
 
   dispose(): void {
