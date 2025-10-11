@@ -153,19 +153,28 @@ export function useMIDIInput(options: UseMIDIInputOptions = {}): UseMIDIInputRes
         refreshDevices();
 
         // Auto-select first device if requested
+        let deviceConnected = false;
         if (autoSelectFirst && midiInputManager.isReady()) {
           const deviceList = midiInputManager.getDevices();
           if (deviceList.length > 0) {
             selectDevice(deviceList[0].id);
+            deviceConnected = true;
+            console.log('[useMIDIInput] Auto-connected to first MIDI device:', deviceList[0].name);
           }
         }
 
-        // Enable keyboard fallback if requested
-        if (keyboardFallback) {
+        // Enable keyboard fallback only if no device connected and fallback is enabled
+        if (keyboardFallback && !deviceConnected) {
           enableKeyboardMode();
+          console.log('[useMIDIInput] No MIDI devices found, enabling keyboard fallback');
         }
       } catch (error) {
         console.error('[useMIDIInput] Failed to initialize MIDI:', error);
+        // If MIDI initialization fails and keyboard fallback is enabled, use keyboard
+        if (keyboardFallback) {
+          enableKeyboardMode();
+          console.log('[useMIDIInput] MIDI initialization failed, enabling keyboard fallback');
+        }
       }
     };
 

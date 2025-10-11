@@ -131,7 +131,8 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
 
   const { activeNotes, isKeyboardMode } = useMIDIInput({
     autoInitialize: true,
-    keyboardFallback: true, // Enable keyboard fallback by default
+    autoSelectFirst: true, // Auto-connect to first available MIDI device
+    keyboardFallback: true, // Fallback to keyboard if no MIDI device available
     onNoteOn: async (note, velocity) => {
       // Ensure audio is initialized on first interaction
       await initializeAudio();

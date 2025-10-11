@@ -29,7 +29,8 @@ function getNoteNameWithOctave(midiNote: number): string {
 export const MIDITest: React.FC<MIDITestProps> = ({ onBack }) => {
   const { activeNotes, isKeyboardMode } = useMIDIInput({
     autoInitialize: true,
-    keyboardFallback: false, // User controls this via MIDIDeviceSelector
+    autoSelectFirst: true, // Auto-connect to first available MIDI device
+    keyboardFallback: true, // Fallback to keyboard if no MIDI device available
   });
 
   // Initialize audio engine on mount
