@@ -1,11 +1,13 @@
 import * as Tone from 'tone';
 
-// Audio engine for handling drum playback
+// Audio engine for handling drum and melodic instrument playback
 export class AudioEngine {
   private static instance: AudioEngine;
   private isInitialized = false;
   private isInitializing = false;
   private drumSamples: { [key: string]: Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth } = {};
+  private pianoSynth: Tone.PolySynth | null = null;
+  private guitarSynth: Tone.PolySynth | null = null;
   private masterVolume: Tone.Volume;
 
   private constructor() {
@@ -104,10 +106,40 @@ export class AudioEngine {
         }).connect(this.masterVolume)
       };
 
+      console.log('[AudioEngine] Creating melodic instruments...');
+      // Create Piano PolySynth (bright, clear tone)
+      this.pianoSynth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: {
+          type: 'triangle'
+        },
+        envelope: {
+          attack: 0.005,
+          decay: 0.3,
+          sustain: 0.4,
+          release: 1.2
+        }
+      }).connect(this.masterVolume);
+      this.pianoSynth.volume.value = -8; // Slightly quieter than drums
+
+      // Create Guitar PolySynth (warmer, softer tone)
+      this.guitarSynth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: {
+          type: 'sawtooth'
+        },
+        envelope: {
+          attack: 0.008,
+          decay: 0.5,
+          sustain: 0.5,
+          release: 2.0
+        }
+      }).connect(this.masterVolume);
+      this.guitarSynth.volume.value = -10; // Quieter, more mellow
+
       this.isInitialized = true;
       this.isInitializing = false;
       console.log('[AudioEngine] ✅ Audio engine initialized successfully, isInitialized:', this.isInitialized);
       console.log('[AudioEngine] Drum samples created:', Object.keys(this.drumSamples));
+      console.log('[AudioEngine] Piano and Guitar synths created');
     } catch (error) {
       console.error('[AudioEngine] ❌ Failed to initialize audio engine:', error);
       this.isInitialized = false;
@@ -203,18 +235,148 @@ export class AudioEngine {
     }
   }
 
+  /**
+   * Play a MIDI note on piano synth
+   * @param note - MIDI note number (0-127)
+   * @param velocity - Note velocity (0-1)
+   * @param duration - Note duration (default: '8n')
+   */
+  public playPianoNote(note: number, velocity: number = 0.8, duration: string = '8n'): void {
+    if (!this.isInitialized || !this.pianoSynth) {
+      console.error('[AudioEngine] Piano synth not initialized');
+      return;
+    }
+
+    try {
+      const noteName = Tone.Frequency(note, 'midi').toNote();
+      const volume = this.velocityToDb(velocity);
+
+      this.pianoSynth.volume.value = volume - 8; // Apply velocity + base volume
+      this.pianoSynth.triggerAttackRelease(noteName, duration);
+
+      console.log(`[AudioEngine] Piano note: ${noteName} (MIDI ${note}), velocity: ${velocity}`);
+    } catch (error) {
+      console.error(`Error playing piano note ${note}:`, error);
+    }
+  }
+
+  /**
+   * Trigger piano note on (for sustained notes)
+   */
+  public triggerPianoNoteOn(note: number, velocity: number = 0.8): void {
+    if (!this.isInitialized || !this.pianoSynth) {
+      console.error('[AudioEngine] Piano synth not initialized');
+      return;
+    }
+
+    try {
+      const noteName = Tone.Frequency(note, 'midi').toNote();
+      const volume = this.velocityToDb(velocity);
+
+      this.pianoSynth.volume.value = volume - 8;
+      this.pianoSynth.triggerAttack(noteName);
+    } catch (error) {
+      console.error(`Error triggering piano note on ${note}:`, error);
+    }
+  }
+
+  /**
+   * Trigger piano note off (for sustained notes)
+   */
+  public triggerPianoNoteOff(note: number): void {
+    if (!this.isInitialized || !this.pianoSynth) {
+      return;
+    }
+
+    try {
+      const noteName = Tone.Frequency(note, 'midi').toNote();
+      this.pianoSynth.triggerRelease(noteName);
+    } catch (error) {
+      console.error(`Error triggering piano note off ${note}:`, error);
+    }
+  }
+
+  /**
+   * Play a MIDI note on guitar synth
+   */
+  public playGuitarNote(note: number, velocity: number = 0.8, duration: string = '4n'): void {
+    if (!this.isInitialized || !this.guitarSynth) {
+      console.error('[AudioEngine] Guitar synth not initialized');
+      return;
+    }
+
+    try {
+      const noteName = Tone.Frequency(note, 'midi').toNote();
+      const volume = this.velocityToDb(velocity);
+
+      this.guitarSynth.volume.value = volume - 10;
+      this.guitarSynth.triggerAttackRelease(noteName, duration);
+
+      console.log(`[AudioEngine] Guitar note: ${noteName} (MIDI ${note}), velocity: ${velocity}`);
+    } catch (error) {
+      console.error(`Error playing guitar note ${note}:`, error);
+    }
+  }
+
+  /**
+   * Trigger guitar note on (for sustained notes)
+   */
+  public triggerGuitarNoteOn(note: number, velocity: number = 0.8): void {
+    if (!this.isInitialized || !this.guitarSynth) {
+      console.error('[AudioEngine] Guitar synth not initialized');
+      return;
+    }
+
+    try {
+      const noteName = Tone.Frequency(note, 'midi').toNote();
+      const volume = this.velocityToDb(velocity);
+
+      this.guitarSynth.volume.value = volume - 10;
+      this.guitarSynth.triggerAttack(noteName);
+    } catch (error) {
+      console.error(`Error triggering guitar note on ${note}:`, error);
+    }
+  }
+
+  /**
+   * Trigger guitar note off (for sustained notes)
+   */
+  public triggerGuitarNoteOff(note: number): void {
+    if (!this.isInitialized || !this.guitarSynth) {
+      return;
+    }
+
+    try {
+      const noteName = Tone.Frequency(note, 'midi').toNote();
+      this.guitarSynth.triggerRelease(noteName);
+    } catch (error) {
+      console.error(`Error triggering guitar note off ${note}:`, error);
+    }
+  }
+
   public async dispose(): Promise<void> {
     if (!this.isInitialized) return;
 
     try {
-      // Dispose of all samples
+      // Dispose of all drum samples
       Object.values(this.drumSamples).forEach(sample => {
         sample.dispose();
       });
-      
+
+      // Dispose of melodic synths
+      if (this.pianoSynth) {
+        this.pianoSynth.dispose();
+        this.pianoSynth = null;
+      }
+
+      if (this.guitarSynth) {
+        this.guitarSynth.dispose();
+        this.guitarSynth = null;
+      }
+
       this.drumSamples = {};
       this.isInitialized = false;
-      
+
       console.log('Audio engine disposed');
     } catch (error) {
       console.error('Error disposing audio engine:', error);

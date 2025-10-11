@@ -406,8 +406,312 @@ This document should be updated when:
 **Version**: 1.2 (Added anti-modal design philosophy and UI interaction patterns)
 **Applies to**: All UI components in Audiolux Jam Session
 
+## View Templates
+
+### ViewTemplate Component
+
+For consistent experiment and module views, use the `ViewTemplate` component located at `/src/components/Layout/ViewTemplate.tsx`.
+
+**When to use ViewTemplate:**
+- Experiment views (/midi-test, /piano, /wled-test)
+- Module views (/dj-visualizer as full-screen)
+- Simple feature demonstrations
+- Views that don't require collaborative features (session code, user list)
+
+**When NOT to use ViewTemplate:**
+- Collaborative sessions (use `ResponsiveContainer` + `Header` + `MobileNavigation` instead)
+- Complex multi-layout views with tab navigation
+- Home/landing pages
+
+### Template Variants
+
+#### 1. Simple/Centered Layout (Default)
+
+Best for: Simple experiments, settings pages, info views
+
+```tsx
+import { ViewTemplate, ViewCard } from '@/components/Layout/ViewTemplate';
+
+<ViewTemplate
+  title="MIDI Input Engine Test"
+  subtitle="Connect a MIDI device or use keyboard fallback"
+  onBack={() => navigate('/')}
+  variant="centered"  // or "simple"
+  maxWidth="4xl"
+  badge="Beta"
+  badgeVariant="orange"
+>
+  <ViewCard title="MIDI Setup">
+    <MIDIDeviceSelector />
+  </ViewCard>
+
+  <ViewCard title="Active Notes">
+    {/* Content */}
+  </ViewCard>
+</ViewTemplate>
+```
+
+**Pattern characteristics:**
+- Back button above title
+- Centered content with max-width constraint
+- Gradient background (from-gray-900 via-gray-800 to-gray-900)
+- Cards with consistent spacing
+
+**Example views:** MIDITest
+
+#### 2. Full-Width Layout
+
+Best for: Visualizers, canvas-based tools, immersive experiences
+
+```tsx
+<ViewTemplate
+  title="Piano Roll Visualizer"
+  subtitle="Interactive 88-key piano with MIDI input"
+  onBack={() => navigate('/')}
+  variant="full-width"
+  maxWidth="7xl"
+  badge="Beta"
+  badgeVariant="orange"
+  headerActions={
+    <button className="p-2 hover:bg-gray-700 rounded-lg transition-colors">
+      <Settings className="w-5 h-5" />
+    </button>
+  }
+>
+  <ViewCard title="Piano Canvas" large>
+    <PianoCanvas />
+  </ViewCard>
+
+  <CollapsiblePanel title="Settings" defaultOpen={false}>
+    {/* Settings content */}
+  </CollapsiblePanel>
+</ViewTemplate>
+```
+
+**Pattern characteristics:**
+- Header bar with back button (left), title (center), actions (right)
+- Full-width content area with flex-column layout
+- Larger max-width (7xl) for canvas/visualization content
+- Optional header actions slot
+
+**Example views:** PianoRoll, LiveAudioVisualizer (full-screen mode)
+
+### Inline Settings Pattern
+
+For modular components and visualizers, use a consistent settings icon within the component container that toggles inline settings below the main content.
+
+**Implementation pattern:**
+
+```tsx
+// 1. Add showSettings state
+const [showSettings, setShowSettings] = useState(false);
+
+// 2. Create container with header and settings icon
+<div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+  {/* Container Header with Settings Icon */}
+  <div className="flex items-center justify-between mb-4">
+    <h2 className="text-lg font-semibold text-white">Piano Roll</h2>
+    <button
+      onClick={() => setShowSettings(!showSettings)}
+      className="p-2 hover:bg-gray-700 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+      aria-label="Toggle settings"
+    >
+      <Settings className="w-5 h-5" />
+    </button>
+  </div>
+
+  {/* Main content */}
+  <div className="h-64 sm:h-80 md:h-96">
+    {/* Canvas or visualizer */}
+  </div>
+
+  {/* Optional active state display */}
+  {activeState && (
+    <div className="mt-4 pt-4 border-t border-gray-700">
+      {/* Active notes, status, etc. */}
+    </div>
+  )}
+
+  {/* 3. Inline settings panel - expands within the same container */}
+  {showSettings && (
+    <div className="mt-4 pt-4 border-t border-gray-700 space-y-4">
+      {/* Settings controls inline */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Setting Name
+        </label>
+        {/* Control */}
+      </div>
+    </div>
+  )}
+</div>
+```
+
+**Pattern characteristics:**
+- Settings cog icon positioned in upper right of **container header** (not page header)
+- Icon button with 44px touch target (`min-w-[44px] min-h-[44px]`)
+- Smooth hover transition (`hover:bg-gray-700 transition-colors`)
+- Settings expand **inline within the same card**, maintaining context
+- Settings use divider (`border-t border-gray-700`) to visually separate from content
+- Settings hidden by default, revealed on click
+- No modal overlays or separate panels
+
+**Visual consistency:**
+- Matches Live Audio Visualizer settings pattern (embedded mode)
+- Matches Piano Roll Visualizer settings pattern
+- Consistent with anti-modal philosophy (inline, non-blocking)
+
+**Where to use:**
+- Visualizers with configurable parameters (Piano Roll, Audio Visualizer)
+- Canvas-based components with settings
+- Modular components where settings should stay in context
+- Any component where users benefit from seeing settings + content simultaneously
+
+**Where NOT to use:**
+- Global application settings (use separate settings page)
+- Simple components with 1-2 controls (show controls directly)
+- Multi-step configuration wizards (use inline expandable sections)
+
+**Example implementations:**
+- `PianoRoll.tsx:206-215` - Settings button in container header
+- `PianoRoll.tsx:247-416` - Inline settings panel within card
+- `LiveAudioVisualizer.tsx:321-327` - Settings button (embedded mode)
+
+**Benefits:**
+- Users can see their changes reflected in the visualizer immediately
+- No context switching or modal interruption
+- Settings are clearly associated with their component
+- Mobile-friendly (no overlay z-index issues)
+
+### ViewCard Component
+
+Standard card wrapper for content sections. Automatically follows design system standards.
+
+```tsx
+import { ViewCard } from '@/components/Layout/ViewTemplate';
+
+// Standard card
+<ViewCard title="Section Title">
+  {/* Content */}
+</ViewCard>
+
+// Large card (rounded-xl, more padding)
+<ViewCard title="Main Feature" large>
+  {/* Content */}
+</ViewCard>
+
+// Card without title
+<ViewCard>
+  {/* Content */}
+</ViewCard>
+```
+
+**Card specifications:**
+- Background: `bg-gray-800`
+- Border: `border border-gray-700`
+- Border radius: `rounded-lg` (default) or `rounded-xl` (large)
+- Padding: `p-4 sm:p-6` (default) or `p-6` (large)
+
+### Responsive Behavior
+
+ViewTemplate automatically handles responsive design following /jam patterns:
+
+**Padding:**
+- Mobile: `p-4`
+- Desktop: `p-6`
+
+**Text sizes:**
+- Titles: `text-2xl sm:text-3xl` (simple), `text-xl sm:text-2xl` (full-width)
+- Subtitles: `text-sm sm:text-base`
+
+**Touch targets:**
+- All interactive elements: minimum 44px height
+- Back button: `min-h-[44px]`
+
+### Max Width Guidelines
+
+Choose max-width based on content type:
+
+| Max Width | Use Case | Example Views |
+|-----------|----------|---------------|
+| `4xl` | Simple experiments, forms, settings | MIDITest, settings pages |
+| `7xl` | Visualizers, canvas tools, feature-rich UIs | PianoRoll, LiveAudioVisualizer |
+| `2xl` | Narrow content, documentation, info pages | About pages, help screens |
+
+### Badge Variants
+
+Use badges to indicate view status/type:
+
+```tsx
+badge="Beta"          badgeVariant="orange"   // Experimental features
+badge="Experiment"    badgeVariant="blue"     // Prototype views
+badge="Live"          badgeVariant="green"    // Production features
+badge="New"           badgeVariant="primary"  // Recently added
+```
+
+### Anti-Pattern: Custom Headers
+
+**❌ DON'T create custom header layouts:**
+```tsx
+// BAD - Inconsistent header
+<div className="p-4 border-b border-gray-700">
+  <div className="flex items-center justify-between">
+    <button onClick={onBack}><ArrowLeft /></button>
+    <h1>My View</h1>
+  </div>
+</div>
+```
+
+**✅ DO use ViewTemplate:**
+```tsx
+// GOOD - Consistent header via template
+<ViewTemplate title="My View" onBack={onBack}>
+  {/* Content */}
+</ViewTemplate>
+```
+
+### Migration Path
+
+Existing views can be gradually migrated to ViewTemplate:
+
+1. **Identify candidate views** - Simple views without collaborative features
+2. **Choose variant** - `centered` or `full-width`
+3. **Wrap content** - Replace custom layout with ViewTemplate
+4. **Replace cards** - Use ViewCard for consistent section styling
+5. **Test responsive** - Verify mobile/tablet/desktop breakpoints
+
+**Example migration:**
+
+```tsx
+// BEFORE (MIDITest-style custom layout)
+<div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
+  <div className="max-w-4xl mx-auto">
+    <button onClick={onBack}>
+      <ArrowLeft /> Back
+    </button>
+    <h1>MIDI Test</h1>
+    <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+      {/* Content */}
+    </div>
+  </div>
+</div>
+
+// AFTER (ViewTemplate + ViewCard)
+<ViewTemplate
+  title="MIDI Test"
+  onBack={onBack}
+  variant="centered"
+  maxWidth="4xl"
+>
+  <ViewCard>
+    {/* Content */}
+  </ViewCard>
+</ViewTemplate>
+```
+
 ## Related Documentation
 - **CLAUDE.md** - Complete development guidelines for Claude Code
 - **tailwind.config.js** - Custom design tokens and color scales
 - **src/index.css** - Tailwind component classes (@layer components)
 - **docs/architecture/component-architecture.md** - Technical component specifications
+- **src/components/Layout/ViewTemplate.tsx** - View template implementation
