@@ -10,6 +10,8 @@ import { getNoteColor, type ColorMode } from '../../utils/colorMapping';
 import { PIANO_CONSTANTS, LED_STRIP, getNoteNameWithOctave } from './constants';
 import { CHORD_PROGRESSIONS } from '../GuitarFretboard/chordProgressions';
 import { getMIDINoteFromFret } from '../GuitarFretboard/constants';
+import { lumiController } from '../../utils/lumiController';
+import { midiOutputManager } from '../../utils/midiOutputManager';
 
 interface PianoRollProps {
   onBack: () => void;
@@ -34,6 +36,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
   const [startOctave, setStartOctave] = useState(3);
   const [wledEnabled, setWledEnabled] = useState(false);
   const [wledIP, setWledIP] = useState('192.168.8.106');
+  const [lumiEnabled, setLumiEnabled] = useState(false);
+  const [midiOutputDevices, setMidiOutputDevices] = useState<any[]>([]);
+  const [selectedOutputId, setSelectedOutputId] = useState<string | null>(null);
   const [selectedRoot, setSelectedRoot] = useState('C');
   const [selectedScale, setSelectedScale] = useState('major');
   const [showKeyMenu, setShowKeyMenu] = useState(false);
@@ -55,6 +60,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
   const masterGainRef = useRef<GainNode>();
   const soundEngineRef = useRef<SoundEngine | null>(null);
   const noteReleaseTimeoutsRef = useRef<Set<NodeJS.Timeout>>(new Set());
+  const previousLumiNotesRef = useRef<Set<number>>(new Set());
 
   // Root note positions (chromatic scale)
   const rootPositions: Record<string, number> = {
@@ -185,6 +191,30 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     // Also initialize the old audioEngine for backwards compatibility
     audioEngine.initialize().catch(console.error);
 
+    // Initialize MIDI output for LUMI
+    midiOutputManager.initialize().then(() => {
+      const devices = midiOutputManager.getDevices();
+      setMidiOutputDevices(devices);
+
+      // Auto-select first LUMI device or first available device
+      if (devices.length > 0) {
+        const lumiDevice = devices.find(d =>
+          d.name.toLowerCase().includes('lumi') ||
+          d.name.toLowerCase().includes('piano m') ||
+          d.name.toLowerCase().includes('roli')
+        );
+        const deviceToSelect = lumiDevice || devices[0];
+        setSelectedOutputId(deviceToSelect.id);
+        const output = midiOutputManager.selectDevice(deviceToSelect.id);
+        if (output) {
+          lumiController.connect(output);
+          console.log('[PianoVisualizer] Auto-connected to MIDI output:', deviceToSelect.name);
+        }
+      }
+    }).catch(error => {
+      console.warn('[PianoVisualizer] MIDI output not available:', error);
+    });
+
     return () => {
       // Clear all pending note release timeouts
       noteReleaseTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
@@ -197,6 +227,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
       if (audioContextRef.current?.state !== 'closed') {
         audioContextRef.current?.close();
       }
+
+      // Disconnect LUMI
+      lumiController.disconnect();
     };
   }, []);
 
@@ -388,6 +421,35 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     const interval = setInterval(sendToWLED, 1000 / 30);
     return () => clearInterval(interval);
   }, [wledEnabled, wledIP, generateLEDData]);
+
+  /**
+   * Sync active notes with LUMI lights
+   * PROOF OF CONCEPT - Using reverse-engineered SysEx protocol
+   */
+  useEffect(() => {
+    lumiController.setEnabled(lumiEnabled);
+  }, [lumiEnabled]);
+
+  useEffect(() => {
+    if (!lumiEnabled) return;
+
+    const currentNotes = new Set(activeNotes);
+
+    // Turn off notes that are no longer active
+    previousLumiNotesRef.current.forEach(note => {
+      if (!currentNotes.has(note)) {
+        lumiController.turnOffNote(note);
+      }
+    });
+
+    // Light up all currently active notes
+    currentNotes.forEach(note => {
+      lumiController.lightUpNote(note, 127);
+    });
+
+    // Update previous notes for next comparison
+    previousLumiNotesRef.current = currentNotes;
+  }, [activeNotes, lumiEnabled]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">
@@ -765,6 +827,54 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                         )}
                         <p className="text-xs text-gray-500 mt-2">
                           Sends real-time color data to WLED LED strip controller
+                        </p>
+                      </div>
+
+                      {/* LUMI/Piano M Output - PROOF OF CONCEPT */}
+                      <div className="pt-2 border-t border-gray-700">
+                        <div className="flex items-center justify-between mb-2">
+                          <label htmlFor="lumi-enabled" className="text-sm font-medium text-gray-300">
+                            ROLI Piano M / LUMI Keys
+                          </label>
+                          <input
+                            type="checkbox"
+                            id="lumi-enabled"
+                            checked={lumiEnabled}
+                            onChange={(e) => setLumiEnabled(e.target.checked)}
+                            className="w-5 h-5 text-primary-600 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-primary-500"
+                          />
+                        </div>
+
+                        {/* MIDI Output Device Selector */}
+                        {midiOutputDevices.length > 0 && (
+                          <div className="mt-2">
+                            <label className="block text-xs font-medium text-gray-400 mb-1">
+                              MIDI Output Device
+                            </label>
+                            <select
+                              value={selectedOutputId || ''}
+                              onChange={(e) => {
+                                const deviceId = e.target.value;
+                                setSelectedOutputId(deviceId);
+                                const output = midiOutputManager.selectDevice(deviceId);
+                                if (output) {
+                                  lumiController.connect(output);
+                                  console.log('[PianoVisualizer] Switched to MIDI output:', deviceId);
+                                }
+                              }}
+                              className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            >
+                              {midiOutputDevices.map((device) => (
+                                <option key={device.id} value={device.id}>
+                                  {device.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        <p className="text-xs text-gray-500 mt-2">
+                          <strong className="text-orange-400">PROOF OF CONCEPT:</strong> Controls LUMI lights via reverse-engineered SysEx. Requires LUMI device connected via WebMIDI.
                         </p>
                       </div>
                     </div>
