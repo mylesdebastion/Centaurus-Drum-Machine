@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, Music, Settings, Volume2 } from 'lucide-react';
+import { ArrowLeft, Music, Settings, Volume2, Play, Square } from 'lucide-react';
 import { PianoCanvas } from './PianoCanvas';
 import { MIDIDeviceSelector } from '../MIDI/MIDIDeviceSelector';
 import { CollapsiblePanel } from '../Layout/CollapsiblePanel';
@@ -8,17 +8,21 @@ import { audioEngine } from '../../utils/audioEngine';
 import { createSoundEngine, SoundEngine, SoundEngineType, soundEngineNames } from '../../utils/soundEngines';
 import { getNoteColor, type ColorMode } from '../../utils/colorMapping';
 import { PIANO_CONSTANTS, LED_STRIP, getNoteNameWithOctave } from './constants';
+import { CHORD_PROGRESSIONS } from '../GuitarFretboard/chordProgressions';
+import { getMIDINoteFromFret } from '../GuitarFretboard/constants';
 
 interface PianoRollProps {
   onBack: () => void;
 }
 
 /**
- * Piano Roll Visualizer
+ * Piano Visualizer
  *
  * Features:
  * - 88-key interactive piano keyboard
- * - MIDI input integration
+ * - MIDI input with auto-connect and keyboard fallback
+ * - Chord progression playback (13 progressions from Guitar Fretboard)
+ * - Multiple sound engines (Keys, Synth, Electric, Bass)
  * - Chromatic/Harmonic color modes
  * - WLED LED strip output (144 LEDs)
  * - Click-to-play functionality
@@ -37,12 +41,20 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [isAudioReady, setIsAudioReady] = useState(false);
 
+  // Chord progression state
+  const [selectedProgressionIndex, setSelectedProgressionIndex] = useState(0);
+  const [selectedChordIndex, setSelectedChordIndex] = useState(0);
+  const [showProgressionMenu, setShowProgressionMenu] = useState(false);
+  const [chordProgressionEnabled, setChordProgressionEnabled] = useState(false);
+  const [isPlayingChords, setIsPlayingChords] = useState(false);
+
   // Sound engine state
   const [selectedSoundEngine, setSelectedSoundEngine] = useState<SoundEngineType>('keys');
   const [showSoundMenu, setShowSoundMenu] = useState(false);
   const audioContextRef = useRef<AudioContext>();
   const masterGainRef = useRef<GainNode>();
   const soundEngineRef = useRef<SoundEngine | null>(null);
+  const noteReleaseTimeoutsRef = useRef<Set<NodeJS.Timeout>>(new Set());
 
   // Root note positions (chromatic scale)
   const rootPositions: Record<string, number> = {
@@ -74,6 +86,88 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     return pattern.map(interval => (rootPos + interval) % 12);
   }, [selectedRoot, selectedScale]);
 
+  // Get chord notes as MIDI numbers (convert from guitar string/fret positions)
+  const getChordMIDINotes = useCallback(() => {
+    if (!chordProgressionEnabled) return new Set<number>();
+
+    const progression = CHORD_PROGRESSIONS[selectedProgressionIndex];
+    const chord = progression.chords[selectedChordIndex];
+    const midiNotes = new Set<number>();
+
+    // Convert guitar positions to MIDI notes
+    // Guitar strings are numbered 1-6 (1=high E, 6=low E)
+    // getMIDINoteFromFret expects 0-5 (0=low E, 5=high E)
+    chord.notes.forEach((note) => {
+      // Convert guitar string numbering (1-6) to array index (0-5)
+      const stringIndex = 6 - note.string; // Reverse: string 6 -> index 0, string 1 -> index 5
+      const midiNote = getMIDINoteFromFret(stringIndex, note.fret);
+      midiNotes.add(midiNote);
+    });
+
+    return midiNotes;
+  }, [chordProgressionEnabled, selectedProgressionIndex, selectedChordIndex]);
+
+  // Play chord notes (all notes at once)
+  const playCurrentChord = useCallback(() => {
+    if (!soundEngineRef.current) return;
+
+    const chordNotes = Array.from(getChordMIDINotes());
+
+    // Trigger chord attack with error handling
+    chordNotes.forEach((midiNote) => {
+      const frequency = 440 * Math.pow(2, (midiNote - 69) / 12);
+      try {
+        if (soundEngineRef.current?.triggerAttack) {
+          soundEngineRef.current.triggerAttack(frequency, 0.7);
+        } else {
+          soundEngineRef.current?.playNote(frequency, 0.7, 1.0);
+        }
+      } catch (error) {
+        // Silently catch disposed engine errors
+        console.warn('[PianoVisualizer] Sound engine error (may be disposed):', error);
+      }
+    });
+
+    // Release notes after 1 second
+    const releaseTimeout = setTimeout(() => {
+      if (soundEngineRef.current?.triggerRelease) {
+        chordNotes.forEach((midiNote) => {
+          const frequency = 440 * Math.pow(2, (midiNote - 69) / 12);
+          try {
+            soundEngineRef.current?.triggerRelease?.(frequency);
+          } catch (error) {
+            // Silently catch disposed engine errors
+            console.warn('[PianoVisualizer] Sound engine error (may be disposed):', error);
+          }
+        });
+      }
+      // Remove this timeout from tracking set
+      noteReleaseTimeoutsRef.current.delete(releaseTimeout);
+    }, 1000);
+
+    // Track this timeout so we can clear it if needed
+    noteReleaseTimeoutsRef.current.add(releaseTimeout);
+  }, [getChordMIDINotes]);
+
+  // Auto-advance chords when playing
+  useEffect(() => {
+    if (!isPlayingChords || !chordProgressionEnabled) return;
+
+    // Play current chord immediately
+    playCurrentChord();
+
+    // Set interval to advance chords
+    const interval = setInterval(() => {
+      const progression = CHORD_PROGRESSIONS[selectedProgressionIndex];
+      setSelectedChordIndex((prev) => {
+        const nextIndex = (prev + 1) % progression.chords.length;
+        return nextIndex;
+      });
+    }, 2000); // Change chord every 2 seconds
+
+    return () => clearInterval(interval);
+  }, [isPlayingChords, chordProgressionEnabled, selectedProgressionIndex, playCurrentChord, selectedChordIndex]);
+
   // Initialize audio context and sound engine
   useEffect(() => {
     audioContextRef.current = new AudioContext();
@@ -85,14 +179,21 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     if (audioContextRef.current && masterGainRef.current) {
       soundEngineRef.current = createSoundEngine(selectedSoundEngine, audioContextRef.current, masterGainRef.current);
       setIsAudioReady(true);
-      console.log('[PianoRoll] Sound engine initialized:', selectedSoundEngine);
+      console.log('[PianoVisualizer] Sound engine initialized:', selectedSoundEngine);
     }
 
     // Also initialize the old audioEngine for backwards compatibility
     audioEngine.initialize().catch(console.error);
 
     return () => {
+      // Clear all pending note release timeouts
+      noteReleaseTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+      noteReleaseTimeoutsRef.current.clear();
+
+      // Dispose sound engine
       soundEngineRef.current?.dispose();
+
+      // Close audio context
       if (audioContextRef.current?.state !== 'closed') {
         audioContextRef.current?.close();
       }
@@ -103,12 +204,19 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
   useEffect(() => {
     if (!audioContextRef.current || !masterGainRef.current) return;
 
+    // Stop chord playback to prevent using disposed engine
+    setIsPlayingChords(false);
+
+    // Clear all pending note release timeouts
+    noteReleaseTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+    noteReleaseTimeoutsRef.current.clear();
+
     // Dispose old engine
     soundEngineRef.current?.dispose();
 
     // Create new engine
     soundEngineRef.current = createSoundEngine(selectedSoundEngine, audioContextRef.current, masterGainRef.current);
-    console.log('[PianoRoll] Switched to sound engine:', selectedSoundEngine);
+    console.log('[PianoVisualizer] Switched to sound engine:', selectedSoundEngine);
   }, [selectedSoundEngine]);
 
   // Initialize audio engine and ensure it's ready before allowing playback
@@ -118,9 +226,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     try {
       // Audio is already initialized in the useEffect above
       setIsAudioReady(true);
-      console.log('[PianoRoll] Audio ready');
+      console.log('[PianoVisualizer] Audio ready');
     } catch (error) {
-      console.error('[PianoRoll] Failed to initialize audio:', error);
+      console.error('[PianoVisualizer] Failed to initialize audio:', error);
     }
   }, [isAudioReady]);
 
@@ -139,11 +247,15 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
       // Trigger audio playback using sound engine
       if (soundEngineRef.current) {
         const frequency = midiToFrequency(note);
-        // Use triggerAttack if available (for sustaining synths), otherwise use playNote
-        if (soundEngineRef.current.triggerAttack) {
-          soundEngineRef.current.triggerAttack(frequency, velocity / 127);
-        } else {
-          soundEngineRef.current.playNote(frequency, velocity / 127, 0.5);
+        try {
+          // Use triggerAttack if available (for sustaining synths), otherwise use playNote
+          if (soundEngineRef.current.triggerAttack) {
+            soundEngineRef.current.triggerAttack(frequency, velocity / 127);
+          } else {
+            soundEngineRef.current.playNote(frequency, velocity / 127, 0.5);
+          }
+        } catch (error) {
+          console.warn('[PianoVisualizer] Sound engine error on note on:', error);
         }
       }
     },
@@ -151,7 +263,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
       // Trigger release for sustained notes
       if (soundEngineRef.current?.triggerRelease) {
         const frequency = midiToFrequency(note);
-        soundEngineRef.current.triggerRelease(frequency);
+        try {
+          soundEngineRef.current.triggerRelease(frequency);
+        } catch (error) {
+          console.warn('[PianoVisualizer] Sound engine error on note off:', error);
+        }
       }
       // Keep audioEngine for backwards compatibility
       audioEngine.triggerPianoNoteOff(note);
@@ -171,11 +287,15 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     await initializeAudio();
     if (soundEngineRef.current) {
       const frequency = midiToFrequency(midiNote);
-      // Use triggerAttack if available for sustaining notes
-      if (soundEngineRef.current.triggerAttack) {
-        soundEngineRef.current.triggerAttack(frequency, 0.8);
-      } else {
-        soundEngineRef.current.playNote(frequency, 0.8, 0.5);
+      try {
+        // Use triggerAttack if available for sustaining notes
+        if (soundEngineRef.current.triggerAttack) {
+          soundEngineRef.current.triggerAttack(frequency, 0.8);
+        } else {
+          soundEngineRef.current.playNote(frequency, 0.8, 0.5);
+        }
+      } catch (error) {
+        console.warn('[PianoVisualizer] Sound engine error on key click:', error);
       }
     }
   }, [initializeAudio, midiToFrequency]);
@@ -187,7 +307,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     // Release sustained notes
     if (soundEngineRef.current?.triggerRelease) {
       const frequency = midiToFrequency(midiNote);
-      soundEngineRef.current.triggerRelease(frequency);
+      try {
+        soundEngineRef.current.triggerRelease(frequency);
+      } catch (error) {
+        console.warn('[PianoVisualizer] Sound engine error on key release:', error);
+      }
     }
     // Keep audioEngine for backwards compatibility
     audioEngine.triggerPianoNoteOff(midiNote);
@@ -254,9 +378,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
 
         // Send via WebSocket bridge (if available)
         // In production, this would use the WLED WebSocket bridge
-        console.log('[PianoRoll] Would send LED data to WLED:', wledIP);
+        console.log('[PianoVisualizer] Would send LED data to WLED:', wledIP);
       } catch (error) {
-        console.error('[PianoRoll] Error sending to WLED:', error);
+        console.error('[PianoVisualizer] Error sending to WLED:', error);
       }
     };
 
@@ -281,7 +405,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
           <div className="flex items-center gap-3">
             <Music className="w-6 h-6 text-primary-400" />
             <h1 className="text-xl sm:text-2xl font-bold text-white">
-              Piano Roll Visualizer
+              Piano Visualizer
             </h1>
             <div className="flex items-center gap-2">
               {isKeyboardMode && (
@@ -310,149 +434,248 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
       {/* Main Content */}
       <div className="flex-1 p-4 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-4">
-          {/* Control Bar */}
-          <div className="flex flex-wrap gap-3 items-center justify-center p-4 bg-gray-900/50 rounded-lg border border-gray-700">
-            {/* Key selector */}
-            <div className="relative flex">
-              <button
-                onClick={() => {
-                  setShowKeyMenu(!showKeyMenu);
-                  setShowScaleMenu(false);
-                  setShowSoundMenu(false);
-                }}
-                className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 rounded-l-lg transition-all transform hover:scale-105 font-semibold"
-              >
-                <Music className="w-5 h-5" />
-                {selectedRoot}
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowKeyMenu(!showKeyMenu);
-                  setShowScaleMenu(false);
-                  setShowSoundMenu(false);
-                }}
-                className="flex items-center gap-1 px-2 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 rounded-r-lg transition-all transform hover:scale-105 font-semibold border-l border-blue-700"
-              >
-                ▼
-              </button>
-
-              {showKeyMenu && (
-                <div className="absolute top-full mt-2 left-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-64 overflow-y-auto">
-                  {Object.keys(rootPositions).map((root) => (
-                    <button
-                      key={root}
-                      onClick={() => {
-                        setSelectedRoot(root);
-                        setShowKeyMenu(false);
-                      }}
-                      className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors ${
-                        selectedRoot === root ? 'bg-blue-900 text-blue-400' : 'text-white'
-                      }`}
-                    >
-                      {root}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Scale selector */}
-            <div className="relative flex">
-              <button
-                onClick={() => {
-                  setShowScaleMenu(!showScaleMenu);
-                  setShowKeyMenu(false);
-                  setShowSoundMenu(false);
-                }}
-                className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 rounded-l-lg transition-all transform hover:scale-105 font-semibold"
-              >
-                <Music className="w-5 h-5" />
-                {selectedScale.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowScaleMenu(!showScaleMenu);
-                  setShowKeyMenu(false);
-                  setShowSoundMenu(false);
-                }}
-                className="flex items-center gap-1 px-2 py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 rounded-r-lg transition-all transform hover:scale-105 font-semibold border-l border-indigo-700"
-              >
-                ▼
-              </button>
-
-              {showScaleMenu && (
-                <div className="absolute top-full mt-2 left-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-64 overflow-y-auto">
-                  {Object.keys(scalePatterns).map((scale) => (
-                    <button
-                      key={scale}
-                      onClick={() => {
-                        setSelectedScale(scale);
-                        setShowScaleMenu(false);
-                      }}
-                      className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors ${
-                        selectedScale === scale ? 'bg-indigo-900 text-indigo-400' : 'text-white'
-                      }`}
-                    >
-                      {scale.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Sound Engine selector */}
-            <div className="relative flex">
-              <button
-                onClick={() => {
-                  setShowSoundMenu(!showSoundMenu);
-                  setShowKeyMenu(false);
-                  setShowScaleMenu(false);
-                }}
-                className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-700 hover:to-cyan-600 rounded-l-lg transition-all transform hover:scale-105 font-semibold"
-              >
-                <Volume2 className="w-5 h-5" />
-                {soundEngineNames[selectedSoundEngine]}
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowSoundMenu(!showSoundMenu);
-                  setShowKeyMenu(false);
-                  setShowScaleMenu(false);
-                }}
-                className="flex items-center gap-1 px-2 py-3 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-700 hover:to-cyan-600 rounded-r-lg transition-all transform hover:scale-105 font-semibold border-l border-cyan-700"
-              >
-                ▼
-              </button>
-
-              {showSoundMenu && (
-                <div className="absolute top-full mt-2 left-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50">
-                  {(Object.keys(soundEngineNames) as SoundEngineType[]).map((engineType) => (
-                    <button
-                      key={engineType}
-                      onClick={() => {
-                        setSelectedSoundEngine(engineType);
-                        setShowSoundMenu(false);
-                      }}
-                      className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors ${
-                        selectedSoundEngine === engineType ? 'bg-cyan-900 text-cyan-400' : 'text-white'
-                      }`}
-                    >
-                      {soundEngineNames[engineType]}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Piano Canvas */}
+          {/* Piano Visualizer Container */}
           <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-            {/* Canvas Header with Settings */}
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white">Piano Roll</h2>
+            {/* Canvas Header with Controls */}
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+              <h2 className="text-lg font-semibold text-white">Piano Visualizer</h2>
+
+              {/* Main Controls */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Key Selector */}
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      setShowKeyMenu(!showKeyMenu);
+                      setShowScaleMenu(false);
+                      setShowProgressionMenu(false);
+                      setShowSoundMenu(false);
+                    }}
+                    className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm font-semibold"
+                  >
+                    Key: {selectedRoot}
+                    <span className="text-xs ml-1">▼</span>
+                  </button>
+
+                  {showKeyMenu && (
+                    <div className="absolute top-full mt-2 right-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 grid grid-cols-3 gap-1 p-2 min-w-[200px]">
+                      {Object.keys(rootPositions).map((root) => (
+                        <button
+                          key={root}
+                          onClick={() => {
+                            setSelectedRoot(root);
+                            setShowKeyMenu(false);
+                          }}
+                          className={`px-3 py-2 rounded text-sm hover:bg-gray-700 transition-colors ${
+                            selectedRoot === root ? 'bg-primary-900 text-primary-400' : 'text-white'
+                          }`}
+                        >
+                          {root}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Scale Selector */}
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      setShowScaleMenu(!showScaleMenu);
+                      setShowKeyMenu(false);
+                      setShowProgressionMenu(false);
+                      setShowSoundMenu(false);
+                    }}
+                    className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm font-semibold capitalize"
+                  >
+                    {selectedScale.replace('_', ' ')}
+                    <span className="text-xs ml-1">▼</span>
+                  </button>
+
+                  {showScaleMenu && (
+                    <div className="absolute top-full mt-2 right-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-64 overflow-y-auto min-w-[200px]">
+                      {Object.keys(scalePatterns).map((scale) => (
+                        <button
+                          key={scale}
+                          onClick={() => {
+                            setSelectedScale(scale);
+                            setShowScaleMenu(false);
+                          }}
+                          className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 transition-colors capitalize ${
+                            selectedScale === scale ? 'bg-primary-900 text-primary-400' : 'text-white'
+                          }`}
+                        >
+                          {scale.replace('_', ' ')}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Chromatic/Harmonic Mode Toggle */}
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setColorMode('chromatic')}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      colorMode === 'chromatic'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    Chromatic
+                  </button>
+                  <button
+                    onClick={() => setColorMode('harmonic')}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      colorMode === 'harmonic'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    Harmonic
+                  </button>
+                </div>
+
+                {/* Divider */}
+                <div className="w-px h-8 bg-gray-600"></div>
+
+                {/* Chord Progression Controls */}
+                {/* Play/Stop Button */}
+                <button
+                  onClick={() => {
+                    const newPlayingState = !isPlayingChords;
+                    setIsPlayingChords(newPlayingState);
+                    // Enable chords when play is clicked
+                    if (newPlayingState) {
+                      setChordProgressionEnabled(true);
+                    }
+                  }}
+                  className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-all text-sm font-semibold ${
+                    isPlayingChords
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                >
+                  {isPlayingChords ? (
+                    <>
+                      <Square className="w-4 h-4" />
+                      Stop Chords
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4" />
+                      Play Chords
+                    </>
+                  )}
+                </button>
+
+                {/* Chord Progression Selector */}
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      setShowProgressionMenu(!showProgressionMenu);
+                      setShowSoundMenu(false);
+                      setShowKeyMenu(false);
+                      setShowScaleMenu(false);
+                    }}
+                    className="flex items-center gap-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-all text-sm font-semibold"
+                  >
+                    <Music className="w-4 h-4" />
+                    Progression: {CHORD_PROGRESSIONS[selectedProgressionIndex].name}
+                    <span className="text-xs">▼</span>
+                  </button>
+
+                  {showProgressionMenu && (
+                    <div className="absolute top-full mt-2 right-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-64 overflow-y-auto min-w-[250px]">
+                      {CHORD_PROGRESSIONS.map((progression, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setSelectedProgressionIndex(index);
+                            setSelectedChordIndex(0);
+                            setShowProgressionMenu(false);
+                          }}
+                          className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 transition-colors ${
+                            selectedProgressionIndex === index ? 'bg-purple-900 text-purple-400' : 'text-white'
+                          }`}
+                        >
+                          {progression.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Current Chord Display + Navigation */}
+                {chordProgressionEnabled && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        const progression = CHORD_PROGRESSIONS[selectedProgressionIndex];
+                        setSelectedChordIndex((prev) =>
+                          prev > 0 ? prev - 1 : progression.chords.length - 1
+                        );
+                      }}
+                      className="px-2 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors text-sm"
+                    >
+                      ◄
+                    </button>
+                    <div className="px-3 py-2 bg-gray-700 rounded-lg text-sm font-medium min-w-[60px] text-center">
+                      {CHORD_PROGRESSIONS[selectedProgressionIndex].chords[selectedChordIndex].name}
+                    </div>
+                    <button
+                      onClick={() => {
+                        const progression = CHORD_PROGRESSIONS[selectedProgressionIndex];
+                        setSelectedChordIndex((prev) =>
+                          prev < progression.chords.length - 1 ? prev + 1 : 0
+                        );
+                      }}
+                      className="px-2 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors text-sm"
+                    >
+                      ►
+                    </button>
+                  </div>
+                )}
+
+                {/* Divider */}
+                <div className="w-px h-8 bg-gray-600"></div>
+
+                {/* Sound Engine selector */}
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      setShowSoundMenu(!showSoundMenu);
+                      setShowProgressionMenu(false);
+                      setShowKeyMenu(false);
+                      setShowScaleMenu(false);
+                    }}
+                    className="flex items-center gap-1 px-3 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-all text-sm font-semibold"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    {soundEngineNames[selectedSoundEngine]}
+                    <span className="text-xs">▼</span>
+                  </button>
+
+                  {showSoundMenu && (
+                    <div className="absolute top-full mt-2 right-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50">
+                      {(Object.keys(soundEngineNames) as SoundEngineType[]).map((engineType) => (
+                        <button
+                          key={engineType}
+                          onClick={() => {
+                            setSelectedSoundEngine(engineType);
+                            setShowSoundMenu(false);
+                          }}
+                          className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 transition-colors ${
+                            selectedSoundEngine === engineType ? 'bg-cyan-900 text-cyan-400' : 'text-white'
+                          }`}
+                        >
+                          {soundEngineNames[engineType]}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {/* Settings Menu */}
               <div className="relative">
@@ -471,40 +694,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                     <div className="p-4 border-b border-gray-700 bg-gray-900">
                       <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                         <Settings className="w-4 h-4" />
-                        Piano Roll Settings
+                        Visualizer Settings
                       </h3>
                     </div>
 
                     <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
-                      {/* Color Mode */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Color Mode
-                        </label>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setColorMode('chromatic')}
-                            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                              colorMode === 'chromatic'
-                                ? 'bg-primary-600 text-white'
-                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            }`}
-                          >
-                            Chromatic
-                          </button>
-                          <button
-                            onClick={() => setColorMode('harmonic')}
-                            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                              colorMode === 'harmonic'
-                                ? 'bg-primary-600 text-white'
-                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            }`}
-                          >
-                            Harmonic
-                          </button>
-                        </div>
-                      </div>
-
                       {/* Visible Octaves */}
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -587,7 +781,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                 onKeyRelease={handleKeyRelease}
                 visibleOctaves={visibleOctaves}
                 startOctave={startOctave}
-                scaleNotes={getCurrentScale()}
+                scaleNotes={
+                  chordProgressionEnabled
+                    ? Array.from(getChordMIDINotes()).map(note => note % 12)
+                    : getCurrentScale()
+                }
               />
             </div>
 
@@ -623,14 +821,15 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
             </div>
             <div className="text-xs text-gray-400 space-y-2">
               <p>
-                <strong className="text-gray-300">Story 9.2:</strong> Piano Roll Visualizer with LED Strip Output
+                <strong className="text-gray-300">Story 9.2:</strong> Piano Visualizer with LED Strip Output & Chord Progressions
               </p>
               <ul className="list-disc list-inside space-y-1 ml-2">
-                <li>88-key piano keyboard (A0 to C8)</li>
-                <li>Real-time MIDI input highlighting</li>
-                <li>Click or touch keys to play</li>
+                <li>88-key interactive piano keyboard (A0 to C8)</li>
+                <li>Real-time MIDI input with auto-connect</li>
+                <li>Chord progression playback (13 progressions)</li>
+                <li>Multiple sound engines (Keys, Synth, Electric, Bass)</li>
                 <li>Chromatic and Harmonic color modes</li>
-                <li>WLED LED strip output (144 LEDs, one per key)</li>
+                <li>WLED LED strip output (144 LEDs)</li>
                 <li>Adjustable octave view (1-7 octaves)</li>
               </ul>
             </div>

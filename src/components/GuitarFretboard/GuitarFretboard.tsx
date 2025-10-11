@@ -8,7 +8,10 @@ import { FretboardCanvas } from './FretboardCanvas';
 import { MIDIDeviceSelector } from '../MIDI/MIDIDeviceSelector';
 import WLEDDeviceManager from '../WLED/WLEDDeviceManager';
 import { ColorMode, getNoteColor } from '../../utils/colorMapping';
-import { CHORD_PROGRESSIONS } from './chordProgressions';
+import {
+  ROMAN_NUMERAL_PROGRESSIONS,
+  resolveProgression
+} from './chordProgressions';
 import { createFretboardMatrix, getMIDINoteFromFret, fretboardToLEDIndex } from './constants';
 import { useMIDIInput } from '../../hooks/useMIDIInput';
 import { useMusicalScale } from '../../hooks/useMusicalScale';
@@ -23,7 +26,7 @@ interface GuitarFretboardProps {
 }
 
 export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
-  const [currentProgression, setCurrentProgression] = useState(0);
+  const [currentProgressionIndex, setCurrentProgressionIndex] = useState(0);
   const [currentChord, setCurrentChord] = useState(0);
   const [colorMode, setColorMode] = useState<ColorMode>('chromatic');
   const [guitarSynth, setGuitarSynth] = useState<Tone.PolySynth | null>(null);
@@ -48,7 +51,10 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
   // Get current tuning MIDI notes
   const currentTuningMIDI = getTuningMIDINotes(selectedTuning);
   const fretboardMatrix = createFretboardMatrix(currentTuningMIDI);
-  const progression = CHORD_PROGRESSIONS[currentProgression];
+
+  // Resolve Roman numeral progression to actual chords based on selected key
+  const selectedRomanProgression = ROMAN_NUMERAL_PROGRESSIONS[currentProgressionIndex];
+  const progression = resolveProgression(selectedRomanProgression, selectedRoot);
   const chord = progression.chords[currentChord];
 
   // Use the MIDI input hook with auto-connect and keyboard fallback
@@ -178,7 +184,7 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
       if (e.key === 'c' || e.key === 'C') {
         setColorMode(prev => prev === 'chromatic' ? 'harmonic' : 'chromatic');
       } else if (e.key === 'n' || e.key === 'N') {
-        setCurrentProgression(prev => (prev + 1) % CHORD_PROGRESSIONS.length);
+        setCurrentProgressionIndex(prev => (prev + 1) % ROMAN_NUMERAL_PROGRESSIONS.length);
         setCurrentChord(0);
       } else if (e.key === ' ') {
         e.preventDefault();
@@ -329,28 +335,35 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
                   onClick={() => setShowProgressionMenu(!showProgressionMenu)}
                   className="w-full flex items-center justify-between px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors min-h-[44px] text-sm"
                 >
-                  <span className="font-medium">{progression.name}</span>
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium">{selectedRomanProgression.name}</span>
+                    <span className="text-xs text-gray-400">{selectedRomanProgression.romanNumerals.join(' - ')}</span>
+                  </div>
                   <span className="text-xs ml-2">▼</span>
                 </button>
 
                 {showProgressionMenu && (
                   <div className="absolute top-full mt-2 left-0 right-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-96 overflow-y-auto">
-                    {CHORD_PROGRESSIONS.map((prog, index) => (
+                    {ROMAN_NUMERAL_PROGRESSIONS.map((prog, index) => (
                       <button
                         key={index}
                         onClick={() => {
-                          setCurrentProgression(index);
+                          setCurrentProgressionIndex(index);
                           setCurrentChord(0);
                           setShowProgressionMenu(false);
                           setIsPlaying(false); // Stop playing when changing progression
                         }}
-                        className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors min-h-[44px] text-sm ${
-                          currentProgression === index
-                            ? 'bg-primary-900 text-primary-400 font-medium'
+                        className={`w-full px-4 py-3 text-left hover:bg-gray-700 transition-colors min-h-[44px] border-b border-gray-700 last:border-b-0 ${
+                          currentProgressionIndex === index
+                            ? 'bg-primary-900 text-primary-400'
                             : 'text-white'
                         }`}
                       >
-                        {prog.name}
+                        <div className="flex flex-col">
+                          <span className="font-medium text-sm">{prog.name}</span>
+                          <span className="text-xs text-gray-400">{prog.romanNumerals.join(' - ')}</span>
+                          <span className="text-xs text-gray-500 mt-1">{prog.genre} • {prog.description}</span>
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -370,7 +383,10 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
                         : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                     }`}
                   >
-                    {c.name}
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{c.name}</span>
+                      <span className="text-xs opacity-75">{selectedRomanProgression.romanNumerals[i]}</span>
+                    </div>
                   </button>
                 ))}
               </div>
