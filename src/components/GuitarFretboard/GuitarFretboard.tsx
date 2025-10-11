@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import * as Tone from 'tone';
-import { Guitar, Settings } from 'lucide-react';
+import { Guitar, Settings, Play, Pause } from 'lucide-react';
 import { FretboardCanvas } from './FretboardCanvas';
 import { MIDIDeviceSelector } from '../MIDI/MIDIDeviceSelector';
 import WLEDDeviceManager from '../WLED/WLEDDeviceManager';
@@ -11,6 +11,9 @@ import { ColorMode, getNoteColor } from '../../utils/colorMapping';
 import { CHORD_PROGRESSIONS } from './chordProgressions';
 import { createFretboardMatrix, getMIDINoteFromFret, fretboardToLEDIndex } from './constants';
 import { useMIDIInput } from '../../hooks/useMIDIInput';
+import { useMusicalScale } from '../../hooks/useMusicalScale';
+import { ScaleSelector } from '../Music/ScaleSelector';
+import { GUITAR_TUNINGS, getTuningMIDINotes, type GuitarTuning } from './tunings';
 
 interface GuitarFretboardProps {
   /**
@@ -25,8 +28,26 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
   const [colorMode, setColorMode] = useState<ColorMode>('chromatic');
   const [guitarSynth, setGuitarSynth] = useState<Tone.PolySynth | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [showProgressionMenu, setShowProgressionMenu] = useState(false);
+  const [selectedTuning, setSelectedTuning] = useState<GuitarTuning>(GUITAR_TUNINGS[0]); // Standard tuning
+  const [showTuningMenu, setShowTuningMenu] = useState(false);
 
-  const fretboardMatrix = createFretboardMatrix();
+  // Musical scale hook
+  const {
+    selectedRoot,
+    selectedScale,
+    setSelectedRoot,
+    setSelectedScale,
+    getCurrentScale,
+    getKeySignature,
+    rootNotes,
+    scaleNames
+  } = useMusicalScale({ initialRoot: 'C', initialScale: 'major' });
+
+  // Get current tuning MIDI notes
+  const currentTuningMIDI = getTuningMIDINotes(selectedTuning);
+  const fretboardMatrix = createFretboardMatrix(currentTuningMIDI);
   const progression = CHORD_PROGRESSIONS[currentProgression];
   const chord = progression.chords[currentChord];
 
@@ -91,24 +112,65 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
     };
   }, []);
 
-  // Auto-advance chords every 5 seconds
+  // Auto-advance chords every 5 seconds (only when playing)
   useEffect(() => {
+    if (!isPlaying) return;
+
     const interval = setInterval(() => {
       setCurrentChord(prev => (prev + 1) % progression.chords.length);
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [progression]);
+  }, [progression, isPlaying]);
+
+  /**
+   * Play the current chord notes
+   */
+  const playChord = useCallback((chordNotes: typeof chord.notes) => {
+    if (!guitarSynth) return;
+
+    const frequencies = chordNotes.map(cn => {
+      const midiNote = getMIDINoteFromFret(cn.string - 1, cn.fret, currentTuningMIDI);
+      return Tone.Frequency(midiNote, 'midi').toFrequency();
+    });
+
+    // Strum effect: play notes slightly offset
+    frequencies.forEach((freq, i) => {
+      setTimeout(() => {
+        guitarSynth.triggerAttackRelease(freq, '2');
+      }, i * 50); // 50ms strum delay between notes
+    });
+  }, [guitarSynth, currentTuningMIDI]);
+
+  /**
+   * Play current chord when it changes (if playing mode is active)
+   */
+  useEffect(() => {
+    if (isPlaying && guitarSynth) {
+      playChord(chord.notes);
+    }
+  }, [currentChord, isPlaying, guitarSynth, playChord, chord.notes]);
+
+  /**
+   * Toggle play/pause for chord progression
+   */
+  const togglePlayPause = useCallback(() => {
+    setIsPlaying(prev => !prev);
+    // Play chord immediately when starting
+    if (!isPlaying && guitarSynth) {
+      playChord(chord.notes);
+    }
+  }, [isPlaying, guitarSynth, playChord, chord.notes]);
 
   // Handle fret clicks
   const handleFretClick = useCallback((string: number, fret: number) => {
     if (!guitarSynth) return;
 
-    const midiNote = getMIDINoteFromFret(string, fret);
+    const midiNote = getMIDINoteFromFret(string, fret, currentTuningMIDI);
     const freq = Tone.Frequency(midiNote, 'midi').toFrequency();
     // PluckSynth has natural decay, use shorter duration
     guitarSynth.triggerAttackRelease(freq, '2');
-  }, [guitarSynth]);
+  }, [guitarSynth, currentTuningMIDI]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -118,23 +180,39 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
       } else if (e.key === 'n' || e.key === 'N') {
         setCurrentProgression(prev => (prev + 1) % CHORD_PROGRESSIONS.length);
         setCurrentChord(0);
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        togglePlayPause();
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, []);
+  }, [togglePlayPause]);
 
   // Generate LED matrix data (convert to hex strings for WLED)
   const generateLEDData = useCallback(() => {
     const ledData: string[] = Array(150).fill('000000');
+    const currentScaleNotes = getCurrentScale();
 
     for (let string = 0; string < 6; string++) {
       for (let fret = 0; fret < 25; fret++) {
         const noteClass = fretboardMatrix[string][fret];
         const isActive = chord.notes.some(cn => cn.string - 1 === string && cn.fret === fret);
         const color = getNoteColor(noteClass, colorMode);
-        const brightness = isActive ? 1.0 : 0.1;
+
+        // 3-tier brightness system:
+        // - Triggered: 1.0 (full brightness)
+        // - In-scale (not triggered): 0.65 (bright)
+        // - Out-of-scale: 0.2 (dim but colored)
+        let brightness = 0.2; // Default: out-of-scale
+        const isInScale = currentScaleNotes.includes(noteClass);
+
+        if (isActive) {
+          brightness = 1.0; // Triggered
+        } else if (isInScale) {
+          brightness = 0.65; // In-scale but not triggered
+        }
 
         const ledIndex = fretboardToLEDIndex(string, fret);
         const r = Math.round(color.r * brightness).toString(16).padStart(2, '0');
@@ -145,7 +223,7 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
     }
 
     return ledData;
-  }, [chord, colorMode, fretboardMatrix]);
+  }, [chord, colorMode, fretboardMatrix, getCurrentScale]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
@@ -165,7 +243,9 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
             <Guitar className="w-6 h-6 text-primary-500" />
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-white">Guitar Fretboard</h1>
-              <p className="text-sm text-gray-400">{progression.name} - {chord.name}</p>
+              <p className="text-sm text-gray-400">
+                {progression.name} - {chord.name} | {getKeySignature()}
+              </p>
             </div>
             <span className="px-2 py-1 bg-amber-500/20 text-amber-400 text-xs font-medium rounded-lg">
               Beta
@@ -176,7 +256,20 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Scale/Key Selector */}
+            <ScaleSelector
+              selectedRoot={selectedRoot}
+              selectedScale={selectedScale}
+              rootNotes={rootNotes}
+              scaleNames={scaleNames}
+              onRootChange={setSelectedRoot}
+              onScaleChange={setSelectedScale}
+              rootColor="blue"
+              scaleColor="indigo"
+              showIcon={false}
+            />
+
             <button
               onClick={() => setColorMode(prev => prev === 'chromatic' ? 'harmonic' : 'chromatic')}
               className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors min-h-[44px] text-sm"
@@ -203,9 +296,10 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
                 activeMIDINotes={activeMIDINotes}
                 colorMode={colorMode}
                 onFretClick={handleFretClick}
+                scaleNotes={getCurrentScale()}
               />
               <p className="text-sm text-gray-400 mt-2 text-center">
-                Click frets to play notes | Press 'C' for color mode | Press 'N' for next progression
+                Click frets to play notes | Press 'C' for color mode | Press 'N' for next progression | Press 'Space' to play/pause
               </p>
             </div>
           </div>
@@ -214,19 +308,70 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
           <div className="space-y-4">
             {/* Progression Info */}
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-              <h3 className="text-sm font-medium text-gray-300 mb-2">Chord Progression</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-gray-300">Chord Progression</h3>
+                <button
+                  onClick={togglePlayPause}
+                  className={`p-2 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${
+                    isPlaying
+                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
+                  aria-label={isPlaying ? 'Pause' : 'Play'}
+                >
+                  {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                </button>
+              </div>
+
+              {/* Progression Style Selector */}
+              <div className="relative mb-3">
+                <button
+                  onClick={() => setShowProgressionMenu(!showProgressionMenu)}
+                  className="w-full flex items-center justify-between px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors min-h-[44px] text-sm"
+                >
+                  <span className="font-medium">{progression.name}</span>
+                  <span className="text-xs ml-2">▼</span>
+                </button>
+
+                {showProgressionMenu && (
+                  <div className="absolute top-full mt-2 left-0 right-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-96 overflow-y-auto">
+                    {CHORD_PROGRESSIONS.map((prog, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          setCurrentProgression(index);
+                          setCurrentChord(0);
+                          setShowProgressionMenu(false);
+                          setIsPlaying(false); // Stop playing when changing progression
+                        }}
+                        className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors min-h-[44px] text-sm ${
+                          currentProgression === index
+                            ? 'bg-primary-900 text-primary-400 font-medium'
+                            : 'text-white'
+                        }`}
+                      >
+                        {prog.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="space-y-2">
                 {progression.chords.map((c, i) => (
-                  <div
+                  <button
                     key={i}
-                    className={`p-2 rounded-lg transition-colors ${
+                    onClick={() => {
+                      setCurrentChord(i);
+                      if (guitarSynth) playChord(c.notes);
+                    }}
+                    className={`w-full p-2 rounded-lg transition-colors text-left min-h-[44px] ${
                       i === currentChord
                         ? 'bg-primary-600 text-white'
-                        : 'bg-gray-700 text-gray-300'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                     }`}
                   >
                     {c.name}
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -234,6 +379,54 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
             {/* Settings Panels */}
             {showSettings && (
               <>
+                {/* Tuning Selector */}
+                <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+                  <h3 className="text-sm font-medium text-gray-300 mb-3">Guitar Tuning</h3>
+
+                  <div className="relative mb-3">
+                    <button
+                      onClick={() => setShowTuningMenu(!showTuningMenu)}
+                      className="w-full flex items-center justify-between px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors min-h-[44px] text-sm"
+                    >
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">{selectedTuning.name}</span>
+                        <span className="text-xs text-gray-400">{selectedTuning.strings.join(' ')}</span>
+                      </div>
+                      <span className="text-xs ml-2">▼</span>
+                    </button>
+
+                    {showTuningMenu && (
+                      <div className="absolute top-full mt-2 left-0 right-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-96 overflow-y-auto">
+                        {GUITAR_TUNINGS.map((tuning, index) => (
+                          <button
+                            key={index}
+                            onClick={() => {
+                              setSelectedTuning(tuning);
+                              setShowTuningMenu(false);
+                            }}
+                            className={`w-full px-4 py-3 text-left hover:bg-gray-700 transition-colors min-h-[44px] border-b border-gray-700 last:border-b-0 ${
+                              selectedTuning.name === tuning.name
+                                ? 'bg-primary-900 text-primary-400'
+                                : 'text-white'
+                            }`}
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium text-sm">{tuning.name}</span>
+                              <span className="text-xs text-gray-400">{tuning.strings.join(' ')}</span>
+                              <span className="text-xs text-gray-500 mt-1">{tuning.description}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-xs text-gray-500">
+                    <p className="mb-1">Category: <span className="text-gray-400 capitalize">{selectedTuning.category}</span></p>
+                    <p>{selectedTuning.description}</p>
+                  </div>
+                </div>
+
                 {/* MIDI Device Selector */}
                 <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
                   <h3 className="text-sm font-medium text-gray-300 mb-3">MIDI Input</h3>

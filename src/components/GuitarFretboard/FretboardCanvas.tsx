@@ -11,13 +11,15 @@ interface FretboardCanvasProps {
   activeMIDINotes: Set<number>;  // MIDI note numbers
   colorMode: ColorMode;
   onFretClick: (string: number, fret: number) => void;
+  scaleNotes?: number[];  // Optional: scale notes for highlighting (0-11)
 }
 
 export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
   activeChord,
   activeMIDINotes,
   colorMode,
-  onFretClick
+  onFretClick,
+  scaleNotes = []
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fretboardMatrix = createFretboardMatrix();
@@ -53,7 +55,19 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
         const isMIDIActive = activeMIDINotes.has(midiNote);
 
         const color = getNoteColor(noteClass, colorMode);
-        const brightness = (isChordNote || isMIDIActive) ? 1.0 : 0.1;
+
+        // 3-tier brightness system:
+        // - Triggered (chord/MIDI): 1.0 (full brightness)
+        // - In-scale (not triggered): 0.65 (bright)
+        // - Out-of-scale: 0.2 (dim but colored)
+        let brightness = 0.2; // Default: out-of-scale
+        const isInScale = scaleNotes.length === 0 || scaleNotes.includes(noteClass);
+
+        if (isChordNote || isMIDIActive) {
+          brightness = 1.0; // Triggered
+        } else if (isInScale) {
+          brightness = 0.65; // In-scale but not triggered
+        }
 
         const x = fret * fretWidth + fretWidth / 2;
         const y = (string + 1) * stringHeight;
@@ -127,7 +141,7 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
       ctx.fillText(STRING_NAMES[string], 30, (string + 1) * stringHeight + 5);
     }
 
-  }, [activeChord, activeMIDINotes, colorMode, fretboardMatrix]);
+  }, [activeChord, activeMIDINotes, colorMode, fretboardMatrix, scaleNotes]);
 
   // Handle fret clicks
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {

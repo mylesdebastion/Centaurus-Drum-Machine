@@ -1,33 +1,35 @@
 // Guitar Fretboard Constants and Helper Functions
 // Story 9.3: Guitar Fretboard Visualizer with LED Matrix Output
 
+import { getTuningMIDINotes, GUITAR_TUNINGS } from './tunings';
+
 export const GUITAR_CONSTANTS = {
   STRINGS: 6,
   FRETS: 25,
   TOTAL_POSITIONS: 150  // 6 × 25
 };
 
-// Standard tuning (MIDI note offsets from C)
-export const STANDARD_TUNING = [
-  4,  // String 6 (Low E)
-  9,  // String 5 (A)
-  2,  // String 4 (D)
-  7,  // String 3 (G)
-  11, // String 2 (B)
-  4   // String 1 (High E)
-];
+// Get tuning arrays (default to Standard E)
+const standardTuning = GUITAR_TUNINGS[0]; // "Standard (E)"
+export const STANDARD_TUNING_MIDI = getTuningMIDINotes(standardTuning);
 
-export const STRING_NAMES = ['E', 'A', 'D', 'G', 'B', 'E'];
+// Standard tuning (note classes 0-11, for color mapping)
+export const STANDARD_TUNING = STANDARD_TUNING_MIDI.map(midi => midi % 12);
+
+// String names from tuning
+export const STRING_NAMES = standardTuning.strings.map(note => note.replace(/[0-9]/g, ''));
 
 export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
 /**
  * Create fretboard matrix (6 strings × 25 frets)
  * Each cell contains the note class (0-11) for that position
+ * @param tuningMIDINotes - Optional array of MIDI notes for custom tuning
  */
-export function createFretboardMatrix(): number[][] {
-  return STANDARD_TUNING.map(openNote =>
-    Array.from({ length: GUITAR_CONSTANTS.FRETS }, (_, fret) => (openNote + fret) % 12)
+export function createFretboardMatrix(tuningMIDINotes?: number[]): number[][] {
+  const tuning = tuningMIDINotes || STANDARD_TUNING_MIDI;
+  return tuning.map(openMIDI =>
+    Array.from({ length: GUITAR_CONSTANTS.FRETS }, (_, fret) => (openMIDI + fret) % 12)
   );
 }
 
@@ -53,11 +55,10 @@ export function fretboardToLEDIndex(string: number, fret: number): number {
  * Get MIDI note number for fret position
  * @param string - String number (0-5, where 0 = low E)
  * @param fret - Fret number (0-24)
+ * @param tuningMIDINotes - Optional array of MIDI notes for custom tuning
  * @returns MIDI note number
  */
-export function getMIDINoteFromFret(string: number, fret: number): number {
-  const baseNote = STANDARD_TUNING[string];
-  const octave = 3 + Math.floor((baseNote + fret) / 12);
-  const noteClass = (baseNote + fret) % 12;
-  return octave * 12 + noteClass + 12;  // Adjust for MIDI numbering
+export function getMIDINoteFromFret(string: number, fret: number, tuningMIDINotes?: number[]): number {
+  const tuning = tuningMIDINotes || STANDARD_TUNING_MIDI;
+  return tuning[string] + fret;
 }
