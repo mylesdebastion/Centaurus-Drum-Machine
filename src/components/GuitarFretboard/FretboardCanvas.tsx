@@ -156,10 +156,29 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
     const stringHeight = canvas.height / (GUITAR_CONSTANTS.STRINGS + 1);
 
     const fret = Math.floor(x / fretWidth);
-    const string = Math.floor(y / stringHeight) - 1;
+    // Use Math.round instead of Math.floor to find the nearest string
+    // Strings are drawn at (string + 1) * stringHeight, so we need to round to nearest
+    const string = Math.round(y / stringHeight) - 1;
+
+    // Debug: Log ALL clicks to see what's being calculated
+    console.group('🖱️ Canvas Click Debug');
+    console.log(`Click position: x=${x.toFixed(1)}, y=${y.toFixed(1)}`);
+    console.log(`Canvas size: ${canvas.width} x ${canvas.height}`);
+    console.log(`Fret width: ${fretWidth.toFixed(1)}, String height: ${stringHeight.toFixed(1)}`);
+    console.log(`Calculated: String ${string}, Fret ${fret}`);
+    console.log(`Valid range: String 0-${GUITAR_CONSTANTS.STRINGS - 1}, Fret 0-${GUITAR_CONSTANTS.FRETS - 1}`);
 
     if (string >= 0 && string < GUITAR_CONSTANTS.STRINGS && fret >= 0 && fret < GUITAR_CONSTANTS.FRETS) {
+      console.log('✅ Click accepted - calling onFretClick');
+      console.groupEnd();
       onFretClick(string, fret);
+    } else {
+      console.log('❌ Click rejected - out of bounds');
+      if (string < 0) console.log(`   → String ${string} is below 0 (clicking in top padding?)`);
+      if (string >= GUITAR_CONSTANTS.STRINGS) console.log(`   → String ${string} is above max`);
+      if (fret < 0) console.log(`   → Fret ${fret} is below 0`);
+      if (fret >= GUITAR_CONSTANTS.FRETS) console.log(`   → Fret ${fret} is above max`);
+      console.groupEnd();
     }
   };
 

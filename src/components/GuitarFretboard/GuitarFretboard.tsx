@@ -57,6 +57,16 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
   const progression = resolveProgression(selectedRomanProgression, selectedRoot);
   const chord = progression.chords[currentChord];
 
+  // Log when tuning changes
+  useEffect(() => {
+    console.group(`🎸 Tuning Changed: ${selectedTuning.name}`);
+    console.log(`📝 Category: ${selectedTuning.category}`);
+    console.log(`🎵 Strings (low to high): ${selectedTuning.strings.join(' - ')}`);
+    console.log(`🎹 MIDI Notes: [${currentTuningMIDI.join(', ')}]`);
+    console.log(`💬 Description: ${selectedTuning.description}`);
+    console.groupEnd();
+  }, [selectedTuning, currentTuningMIDI]);
+
   // Use the MIDI input hook with auto-connect and keyboard fallback
   const { activeNotes: activeMIDINotes, isKeyboardMode } = useMIDIInput({
     autoInitialize: true,
@@ -172,11 +182,33 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
   const handleFretClick = useCallback((string: number, fret: number) => {
     if (!guitarSynth) return;
 
+    // Calculate MIDI note from fret position
     const midiNote = getMIDINoteFromFret(string, fret, currentTuningMIDI);
     const freq = Tone.Frequency(midiNote, 'midi').toFrequency();
-    // PluckSynth has natural decay, use shorter duration
+
+    // Convert MIDI note to note name
+    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const octave = Math.floor(midiNote / 12) - 1;
+    const noteName = noteNames[midiNote % 12];
+    const fullNoteName = `${noteName}${octave}`;
+
+    // Get string names for context
+    const stringNames = ['E (low)', 'A', 'D', 'G', 'B', 'E (high)'];
+    const openStringNote = selectedTuning.strings[string];
+
+    // Log comprehensive debugging info
+    console.group(`🎸 Fret Click: String ${string + 1}, Fret ${fret}`);
+    console.log(`📍 Position: ${stringNames[string]} string, fret ${fret}`);
+    console.log(`🎚️ Tuning: ${selectedTuning.name}`);
+    console.log(`🎵 Open String: ${openStringNote} (MIDI ${currentTuningMIDI[string]})`);
+    console.log(`🎹 Calculated Note: ${fullNoteName} (MIDI ${midiNote})`);
+    console.log(`🔊 Frequency: ${freq.toFixed(2)} Hz`);
+    console.log(`🎼 Tuning Array: [${selectedTuning.strings.join(', ')}]`);
+    console.groupEnd();
+
+    // Play the note
     guitarSynth.triggerAttackRelease(freq, '2');
-  }, [guitarSynth, currentTuningMIDI]);
+  }, [guitarSynth, currentTuningMIDI, selectedTuning]);
 
   // Keyboard shortcuts
   useEffect(() => {
