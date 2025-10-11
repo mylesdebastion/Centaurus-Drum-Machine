@@ -326,100 +326,32 @@ const [_midiNotes, setMidiNotes] = useState<MIDINote[]>([]); // Reserved for vis
 
 ## Development Server Management
 
-### Port Configuration (`strictPort: true`)
+### Default Workflow Assumption
 
-This project uses **strict port enforcement** in `vite.config.ts`:
-- **Fixed port**: 5173 (always)
-- **strictPort: true** - Vite will **fail** if port 5173 is busy instead of auto-selecting a new port
-- **Why**: Prevents confusion from multiple dev servers running on different ports
+**IMPORTANT**: Assume the development server (`npm run dev`) is **already running** at the beginning of each coding session.
 
-### When Dev Server Fails to Start
+- **Port**: 5173 (fixed via `strictPort: true` in vite.config.ts)
+- **HMR (Hot Module Replacement)**: Code changes are automatically reflected
+- **Testing**: Assume the server is running when testing changes
+- **Only start the server** if you encounter errors indicating it's not running
 
-**IMPORTANT**: `npm run dev` has **no built-in stop command**. There is no `npm stop` or `npm run dev:stop`. The only ways to stop a Vite dev server are:
-- **Interactive**: Press Ctrl+C in the terminal
-- **Programmatic**: Kill the Node.js process via OS commands
+### When to Start/Restart the Server
 
-If you see an error like:
-```
-Port 5173 is already in use
-```
+**Start the server only if:**
+1. You see "Connection refused" or similar errors when testing
+2. You explicitly need to verify the server is running
+3. Configuration files (vite.config.ts, package.json) were modified
 
-**Follow this reliable process:**
+**Preferred approach:**
+- Let Vite's HMR handle updates automatically
+- Avoid unnecessary server restarts
+- Trust that changes will be reflected via HMR
 
-#### Windows (Recommended Method)
-```bash
-# One-liner: Find PID, kill it, wait, then start server
-powershell -Command "Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }" && timeout /t 2 /nobreak >nul && npm run dev
-```
+### Troubleshooting: Port Already in Use
 
-**Or step-by-step:**
-```bash
-# 1. Find and kill process on port 5173
-powershell -Command "Get-NetTCPConnection -LocalPort 5173 | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }"
+If you encounter `Port 5173 is already in use`, this means the server is actually already running. See the [Dev Server Troubleshooting Guide](./docs/dev-server-troubleshooting.md) for advanced restart/kill commands if absolutely necessary.
 
-# 2. Wait 2 seconds
-timeout /t 2 /nobreak
-
-# 3. Start dev server
-npm run dev
-```
-
-#### Linux/Mac
-```bash
-# One-liner: Kill process and start server
-kill -9 $(lsof -ti:5173) 2>/dev/null; sleep 2; npm run dev
-```
-
-**Or step-by-step:**
-```bash
-# 1. Find and kill process
-kill -9 $(lsof -ti:5173)
-
-# 2. Wait 2 seconds
-sleep 2
-
-# 3. Start dev server
-npm run dev
-```
-
-### Development Workflow Guidelines
-
-**CRITICAL**: Before starting a new dev server:
-- **Always check** if a server is already running on port 5173
-- **Never** start multiple dev servers on different ports
-- **Always kill** previous dev server processes before starting a new one
-- **Use the same port** (5173) for consistency across sessions
-
-**Preferred approach when making code changes:**
-- Let Vite's HMR (Hot Module Replacement) handle updates automatically
-- Only restart the server if HMR fails or config changes are made
-- Check running processes before starting a new dev session
-
-**IMPORTANT for Claude Code users:**
-- When using background Bash shells, the shell ID ≠ the actual Node.js/Vite process PID
-- Killing a background shell does NOT kill the underlying dev server process
-- Always kill the process by PORT (5173) not by shell ID
-- Use the PowerShell/lsof commands above to target the actual process
-
-**Best Practice - Restart Script:**
-Create a helper script to make restarts reliable:
-
-```bash
-# restart-dev.bat (Windows)
-@echo off
-echo Killing any process on port 5173...
-powershell -Command "Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }"
-timeout /t 2 /nobreak >nul
-echo Starting dev server...
-npm run dev
-```
-
-```bash
-# restart-dev.sh (Linux/Mac)
-#!/bin/bash
-echo "Killing any process on port 5173..."
-kill -9 $(lsof -ti:5173) 2>/dev/null
-sleep 2
-echo "Starting dev server..."
-npm run dev
-```
+**Quick fix:**
+- Check if the app is already accessible at `http://localhost:5173`
+- If accessible, the "error" indicates the server is running - no action needed
+- Only kill/restart if the running server is unresponsive or stuck

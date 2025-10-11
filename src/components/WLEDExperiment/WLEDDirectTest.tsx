@@ -24,9 +24,11 @@ export const WLEDDirectTest: React.FC<WLEDDirectTestProps> = ({ onBack }) => {
   const [ledColors, setLedColors] = useState<string[]>([]);
 
   // Generate rainbow LED data
+  // Generate enough colors for typical LED strips (up to 150 LEDs)
+  // WLEDDeviceManager will slice to the configured device LED count
   const generateRainbowColors = (hue: number): string[] => {
     const colors: string[] = [];
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 150; i++) {
       const h = (hue + i * 6) % 360;
       const rgb = hslToRgb(h / 360, 1, 0.5);
       const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
@@ -160,7 +162,7 @@ export const WLEDDirectTest: React.FC<WLEDDirectTestProps> = ({ onBack }) => {
               <div>
                 <h3 className="font-semibold text-white">Rainbow Animation</h3>
                 <p className="text-sm text-gray-400">
-                  Animated rainbow pattern (60 LEDs)
+                  Animated rainbow pattern (adapts to device LED count)
                 </p>
               </div>
               {testMode === 'rainbow' ? (

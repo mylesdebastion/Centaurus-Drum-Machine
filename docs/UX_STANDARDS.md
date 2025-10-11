@@ -709,8 +709,35 @@ Existing views can be gradually migrated to ViewTemplate:
 </ViewTemplate>
 ```
 
+## Development Workflow
+
+### Dev Server Management
+
+**Default assumption**: The development server (`npm run dev`) is **already running** during coding sessions.
+
+**Key principles:**
+- **Assume it's running**: Don't start the server after every change
+- **Trust HMR**: Vite's Hot Module Replacement handles most updates automatically
+- **Only start if errors occur**: Connection refused, explicit testing needs, or config changes
+- **Avoid unnecessary restarts**: HMR is faster and less disruptive
+
+**When to start/restart:**
+1. Connection refused errors when testing
+2. Config file changes (vite.config.ts, package.json)
+3. Explicit verification needed
+4. Server is unresponsive or stuck
+
+**Port configuration:**
+- Fixed port: 5173 (strictPort: true in vite.config.ts)
+- Multiple servers not allowed on different ports
+- "Port already in use" usually means server is running (check http://localhost:5173)
+
+**Troubleshooting:**
+For advanced port management and kill commands, see [Dev Server Troubleshooting Guide](./dev-server-troubleshooting.md).
+
 ## Related Documentation
 - **CLAUDE.md** - Complete development guidelines for Claude Code
+- **dev-server-troubleshooting.md** - Advanced server management and port troubleshooting
 - **tailwind.config.js** - Custom design tokens and color scales
 - **src/index.css** - Tailwind component classes (@layer components)
 - **docs/architecture/component-architecture.md** - Technical component specifications

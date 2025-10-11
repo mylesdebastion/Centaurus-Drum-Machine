@@ -8,6 +8,7 @@ import { LiveAudioVisualizer } from './components/LiveAudioVisualizer/LiveAudioV
 import { WLEDDirectTest } from './components/WLEDExperiment/WLEDDirectTest';
 import { MIDITest } from './components/MIDI/MIDITest';
 import { PianoRoll } from './components/PianoRoll/PianoRoll';
+import { GuitarFretboard } from './components/GuitarFretboard/GuitarFretboard';
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
@@ -86,6 +87,14 @@ function App() {
     navigate('/');
   };
 
+  const handleGuitarFretboard = () => {
+    navigate('/guitar-fretboard');
+  };
+
+  const handleExitGuitarFretboard = () => {
+    navigate('/');
+  };
+
   return (
     <Routes>
       <Route
@@ -100,6 +109,7 @@ function App() {
             onWLEDExperiment={handleWLEDExperiment}
             onMIDITest={handleMIDITest}
             onPianoRoll={handlePianoRoll}
+            onGuitarFretboard={handleGuitarFretboard}
           />
         }
       />
@@ -157,6 +167,14 @@ function App() {
         element={
           <PianoRoll
             onBack={handleExitPianoRoll}
+          />
+        }
+      />
+      <Route
+        path="/guitar-fretboard"
+        element={
+          <GuitarFretboard
+            onBack={handleExitGuitarFretboard}
           />
         }
       />

@@ -2,7 +2,7 @@
  * WLED Device Manager Component
  * Story 6.1: Multi-Client Shared Sessions - Phase 0
  *
- * Main component managing WLED devices with HTTP JSON API,
+ * Main component managing WLED devices with WebSocket/UDP WARLS protocol,
  * localStorage persistence, and inline row layout (similar to WLED app UI)
  */
 
@@ -10,6 +10,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Wifi, WifiOff, Play, Trash2, Settings } from 'lucide-react';
 import { WLEDDevice, WLEDDeviceManagerProps } from './types';
 import WLEDVirtualPreview from './WLEDVirtualPreview';
+
+// Extend Window interface for wledBridge
+declare global {
+  interface Window {
+    wledBridge?: WebSocket | null;
+  }
+}
 
 const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
   ledData,
@@ -22,10 +29,10 @@ const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
 }) => {
   const [devices, setDevices] = useState<WLEDDevice[]>([]);
   const [expandedSettings, setExpandedSettings] = useState<Set<string>>(new Set());
+  const [bridgeConnected, setBridgeConnected] = useState(false);
 
-  // Connection test timers
+  // FPS counter timers
   const fpsTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
-  const sendTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Load devices from localStorage on mount
   useEffect(() => {
@@ -55,6 +62,119 @@ const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
       }
     });
   }, [devices]);
+
+  // Connect to WLED WebSocket bridge
+  useEffect(() => {
+    // Check if bridge is already connected
+    if (window.wledBridge && window.wledBridge.readyState === WebSocket.OPEN) {
+      console.log('🌉 Using existing WLED WebSocket bridge');
+      setBridgeConnected(true);
+      return;
+    }
+
+    const connectBridge = async () => {
+      // Smart host detection for seamless desktop/mobile support
+      const hosts: string[] = [];
+
+      // 1. Try last successful host from localStorage
+      const lastSuccessfulHost = localStorage.getItem('wledBridgeHost');
+      if (lastSuccessfulHost) {
+        hosts.push(lastSuccessfulHost);
+      }
+
+      // 2. Try localhost (works for desktop browsers)
+      if (!hosts.includes('localhost')) {
+        hosts.push('localhost');
+      }
+
+      // 3. Try window.location.hostname (works for mobile accessing dev server on network)
+      const pageHost = window.location.hostname;
+      if (pageHost !== 'localhost' && pageHost !== '127.0.0.1' && !hosts.includes(pageHost)) {
+        hosts.push(pageHost);
+      }
+
+      // Try to connect to bridge on multiple ports and hosts
+      const ports = [8080, 21325, 21326, 21327, 21328, 21329];
+
+      for (const host of hosts) {
+        for (const port of ports) {
+          try {
+            await tryConnect(host, port);
+            console.log(`🌉 Connected to WLED WebSocket bridge at ${host}:${port}`);
+            localStorage.setItem('wledBridgeHost', host);
+            setBridgeConnected(true);
+            return;
+          } catch (error) {
+            // Silent fail, try next
+          }
+        }
+      }
+
+      console.warn('⚠️ Could not connect to WLED WebSocket bridge');
+      setBridgeConnected(false);
+    };
+
+    const tryConnect = (host: string, port: number): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${host}:${port}`);
+        let connected = false;
+
+        const timeout = setTimeout(() => {
+          if (!connected) {
+            ws.close();
+            reject(new Error(`Timeout`));
+          }
+        }, 500); // Faster timeout for quicker port scanning
+
+        ws.onopen = () => {
+          connected = true;
+          clearTimeout(timeout);
+          window.wledBridge = ws;
+
+          // Set up persistent close handler for successful connection
+          ws.onclose = () => {
+            console.log('🔌 WebSocket bridge disconnected');
+            if (window.wledBridge === ws) {
+              window.wledBridge = null;
+              setBridgeConnected(false);
+            }
+          };
+
+          resolve();
+        };
+
+        ws.onerror = () => {
+          if (!connected) {
+            clearTimeout(timeout);
+            ws.close();
+            reject(new Error(`Failed`));
+          }
+        };
+
+        // For failed connections, don't log disconnect
+        ws.onclose = () => {
+          if (!connected) {
+            // Connection never succeeded, just cleanup
+            clearTimeout(timeout);
+          }
+        };
+      });
+    };
+
+    connectBridge();
+
+    // Monitor bridge status
+    const statusInterval = setInterval(() => {
+      const isConnected = window.wledBridge?.readyState === WebSocket.OPEN;
+      setBridgeConnected(isConnected);
+    }, 2000);
+
+    // Cleanup: don't close global bridge, other components might use it
+    return () => {
+      clearInterval(statusInterval);
+    };
+  }, []); // Empty deps - only run once on mount
 
   // Send LED data to all connected devices
   useEffect(() => {
@@ -120,77 +240,61 @@ const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
     }
   };
 
-  // Send LED data to device via HTTP JSON API
+  // Send LED data to device via WebSocket/UDP WARLS protocol
   const sendLEDData = async (deviceId: string, colors: string[]) => {
     const device = devices.find((d) => d.id === deviceId);
-    if (!device || device.connectionStatus !== 'connected') return;
-
-    // Throttle sends to avoid overwhelming the device
-    const existingTimer = sendTimers.current.get(deviceId);
-    if (existingTimer) {
-      clearTimeout(existingTimer);
+    if (!device || device.connectionStatus !== 'connected') {
+      console.log(`📍 sendLEDData early return: device=${!!device}, connected=${device?.connectionStatus === 'connected'}`);
+      return;
     }
 
-    const timer = setTimeout(async () => {
-      try {
-        // WLED JSON API: convert hex colors to individual LED array
-        const ledArray: number[] = [];
-        colors.slice(0, device.ledCount).forEach((hex) => {
-          const r = parseInt(hex.substring(0, 2), 16);
-          const g = parseInt(hex.substring(2, 4), 16);
-          const b = parseInt(hex.substring(4, 6), 16);
-
-          // Apply brightness
-          const brightness = device.brightness / 255;
-          ledArray.push(
-            Math.round(r * brightness),
-            Math.round(g * brightness),
-            Math.round(b * brightness)
-          );
-        });
-
-        // Apply reverse direction
-        if (device.reverseDirection) {
-          const reversed: number[] = [];
-          for (let i = ledArray.length - 3; i >= 0; i -= 3) {
-            reversed.push(ledArray[i], ledArray[i + 1], ledArray[i + 2]);
-          }
-          ledArray.length = 0;
-          ledArray.push(...reversed);
-        }
-
-        // Send to WLED JSON API
-        const payload = {
-          seg: {
-            i: ledArray, // Individual LED colors [r1,g1,b1,r2,g2,b2,...]
-          },
-        };
-
-        const response = await fetch(`http://${device.ip}:${device.port || 80}/json/state`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(1000), // 1 second timeout
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        updateDevice(deviceId, {
-          dataFlowStatus: 'sending',
-          lastDataSent: Date.now(),
-        });
-
-        // Update FPS counter
-        updateFPS(deviceId);
-      } catch (error) {
-        console.error(`Failed to send LED data to ${device.name}:`, error);
-        // Don't mark as error for send failures (might be temporary)
+    try {
+      // Check if WebSocket bridge is available
+      if (!window.wledBridge || window.wledBridge.readyState !== WebSocket.OPEN) {
+        console.warn(`⚠️ WebSocket bridge not available for ${device.name}. Bridge state: ${window.wledBridge?.readyState}`);
+        return;
       }
-    }, 33); // ~30 FPS throttle
 
-    sendTimers.current.set(deviceId, timer);
+      // Convert hex colors to RGB format for WebSocket
+      const ledData = colors.slice(0, device.ledCount).map((hex) => {
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+
+        // Apply brightness
+        const brightness = device.brightness / 255;
+        return {
+          r: Math.round(r * brightness),
+          g: Math.round(g * brightness),
+          b: Math.round(b * brightness)
+        };
+      });
+
+      // Apply reverse direction
+      if (device.reverseDirection) {
+        ledData.reverse();
+      }
+
+      // Send data through WebSocket bridge
+      const message = {
+        ipAddress: device.ip,
+        ledData: ledData
+      };
+
+      // Send without waiting for response (fire-and-forget for better performance)
+      window.wledBridge.send(JSON.stringify(message));
+
+      updateDevice(deviceId, {
+        dataFlowStatus: 'sending',
+        lastDataSent: Date.now(),
+      });
+
+      // Update FPS counter
+      updateFPS(deviceId);
+    } catch (error) {
+      console.error(`Failed to send LED data to ${device.name}:`, error);
+      // Don't mark as error for send failures (might be temporary)
+    }
   };
 
   // Update FPS counter
@@ -226,7 +330,7 @@ const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
       connectionStatus: 'idle',
       autoReconnect: true,
       deviceType: deviceType === 'auto' ? 'strip' : deviceType,
-      ledCount: 60,
+      ledCount: 90, // Default to 90 LEDs
       enabled: false, // Start disabled so user can configure first
       dataFlowStatus: 'idle',
       fps: 0,
@@ -285,34 +389,28 @@ const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
     });
   };
 
-  // Test device with rainbow pattern
+  // Test device with simple static pattern
   const handleTest = async (deviceId: string) => {
     const device = devices.find((d) => d.id === deviceId);
     if (!device) return;
 
-    console.log(`🌈 Sending rainbow test pattern to ${device.ip} (${device.name})`);
+    console.log(`🔵 Sending static test pattern to ${device.ip} (${device.name})`);
 
     try {
-      // Generate rainbow pattern
-      const testColors = Array(device.ledCount)
-        .fill(0)
-        .map((_, i) => {
-          const hue = (i / device.ledCount) * 360;
-          return hslToHex(hue, 100, 50);
-        });
+      // Generate simple test pattern: solid white for 3 seconds
+      const testColors = Array(device.ledCount).fill('ffffff'); // All white
 
       // Send test pattern
       await sendLEDData(deviceId, testColors);
 
-      // Set test pattern state for preview animation
-      updateDevice(deviceId, { testPattern: 'rainbow' });
+      console.log(`✅ Sent ${device.ledCount} white LEDs to ${device.ip}`);
 
-      // Clear test pattern after 3 seconds
-      setTimeout(() => {
-        updateDevice(deviceId, { testPattern: 'off' });
+      // Auto-off after 3 seconds
+      setTimeout(async () => {
+        const offColors = Array(device.ledCount).fill('000000');
+        await sendLEDData(deviceId, offColors);
+        console.log(`⚫ Turned off test LEDs on ${device.ip}`);
       }, 3000);
-
-      console.log(`✅ Rainbow test pattern sent to ${device.ip}`);
     } catch (error) {
       console.error(`❌ Failed to send test pattern to ${device.ip}:`, error);
     }
@@ -396,13 +494,24 @@ const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
       <div className="text-sm text-gray-300 bg-gray-800 p-3 rounded-lg">
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <strong>Test Button:</strong> Sends rainbow pattern to verify connectivity
+            <strong>Test Button:</strong> Flashes white for 3 seconds to verify connectivity
           </div>
           <div>
             <strong>Enable Toggle:</strong> Connect and stream LED data to device
           </div>
-          <div>
-            <strong>Protocol:</strong> HTTP JSON API (~30 FPS max)
+          <div className="flex items-center gap-2">
+            <strong>Protocol:</strong> WebSocket → UDP WARLS
+            {bridgeConnected ? (
+              <span className="text-green-400 text-xs flex items-center gap-1">
+                <Wifi className="w-3 h-3" />
+                Bridge Connected
+              </span>
+            ) : (
+              <span className="text-red-400 text-xs flex items-center gap-1">
+                <WifiOff className="w-3 h-3" />
+                Bridge Offline
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -449,15 +558,30 @@ const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
               {/* LED Count */}
               <input
                 type="number"
-                value={device.ledCount}
-                onChange={(e) =>
-                  updateDevice(device.id, { ledCount: parseInt(e.target.value) || 60 })
-                }
-                placeholder="LEDs"
+                value={device.ledCount || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '') {
+                    // Allow clearing - set to empty (0) temporarily
+                    updateDevice(device.id, { ledCount: 0 });
+                  } else {
+                    const parsed = parseInt(value);
+                    if (!isNaN(parsed) && parsed >= 0) {
+                      updateDevice(device.id, { ledCount: parsed });
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  // Reset to 90 if left empty or invalid on blur
+                  if (!device.ledCount || device.ledCount === 0 || isNaN(device.ledCount)) {
+                    updateDevice(device.id, { ledCount: 90 });
+                  }
+                }}
+                placeholder="90"
                 min="16"
                 max="1000"
                 className="bg-gray-700 text-white rounded px-2 py-1 w-20"
-                title={`Number of LEDs (currently ${device.ledCount})`}
+                title={`Number of LEDs (currently ${device.ledCount || 90})`}
               />
 
               {/* Direction Toggle */}
@@ -468,11 +592,11 @@ const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
                 className="px-2 py-1 rounded text-xs transition-colors bg-gray-600 hover:bg-gray-500"
                 title={`LED Direction: ${
                   device.reverseDirection
-                    ? 'Data flows left to right'
-                    : 'Data flows right to left'
+                    ? 'Normal (top-to-bottom)'
+                    : 'Reversed (bottom-to-top) - Default'
                 }`}
               >
-                {device.reverseDirection ? '→' : '←'}
+                {device.reverseDirection ? '↓' : '↑'}
               </button>
 
               {/* Controls */}
@@ -481,7 +605,7 @@ const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
                   onClick={() => handleTest(device.id)}
                   disabled={!device.enabled || device.connectionStatus !== 'connected'}
                   className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs transition-colors flex items-center gap-1"
-                  title="Send rainbow test pattern"
+                  title="Send solid white test (3 seconds)"
                 >
                   <Play className="w-3 h-3" />
                   Test

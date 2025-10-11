@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2, Piano } from 'lucide-react';
+import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2, Piano, Guitar } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onStartJam: () => void;
@@ -10,6 +10,7 @@ interface WelcomeScreenProps {
   onWLEDExperiment: () => void;
   onMIDITest: () => void;
   onPianoRoll: () => void;
+  onGuitarFretboard: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
@@ -20,7 +21,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onDJVisualizer,
   onWLEDExperiment,
   onMIDITest,
-  onPianoRoll
+  onPianoRoll,
+  onGuitarFretboard
 }) => {
   const [joinCode, setJoinCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
@@ -174,6 +176,25 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               </p>
               <div className="flex items-center gap-2 text-sm text-green-400 group-hover:text-green-300">
                 <span>Launch Piano</span>
+                <Play className="w-4 h-4" />
+              </div>
+            </button>
+
+            {/* Guitar Fretboard Visualizer */}
+            <button
+              onClick={onGuitarFretboard}
+              className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-amber-500/50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <Guitar className="w-6 h-6 text-amber-400" />
+                <h3 className="font-semibold text-white">Guitar Fretboard</h3>
+                <span className="text-xs bg-amber-600/30 text-amber-300 px-2 py-1 rounded">Beta</span>
+              </div>
+              <p className="text-sm text-gray-400 mb-4">
+                6×25 fretboard with chord progressions and LED matrix output
+              </p>
+              <div className="flex items-center gap-2 text-sm text-amber-400 group-hover:text-amber-300">
+                <span>Launch Guitar</span>
                 <Play className="w-4 h-4" />
               </div>
             </button>
