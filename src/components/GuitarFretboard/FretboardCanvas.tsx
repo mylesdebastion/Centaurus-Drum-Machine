@@ -149,8 +149,17 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+
+    // Get click position relative to displayed canvas
+    const displayX = e.clientX - rect.left;
+    const displayY = e.clientY - rect.top;
+
+    // Scale from displayed size to internal canvas size
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    const x = displayX * scaleX;
+    const y = displayY * scaleY;
 
     const fretWidth = canvas.width / GUITAR_CONSTANTS.FRETS;
     const stringHeight = canvas.height / (GUITAR_CONSTANTS.STRINGS + 1);
@@ -162,8 +171,11 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
 
     // Debug: Log ALL clicks to see what's being calculated
     console.group('🖱️ Canvas Click Debug');
-    console.log(`Click position: x=${x.toFixed(1)}, y=${y.toFixed(1)}`);
-    console.log(`Canvas size: ${canvas.width} x ${canvas.height}`);
+    console.log(`Display click: x=${displayX.toFixed(1)}, y=${displayY.toFixed(1)}`);
+    console.log(`Display size: ${rect.width.toFixed(1)} x ${rect.height.toFixed(1)}`);
+    console.log(`Scale factors: x=${scaleX.toFixed(2)}, y=${scaleY.toFixed(2)}`);
+    console.log(`Scaled click: x=${x.toFixed(1)}, y=${y.toFixed(1)}`);
+    console.log(`Canvas internal size: ${canvas.width} x ${canvas.height}`);
     console.log(`Fret width: ${fretWidth.toFixed(1)}, String height: ${stringHeight.toFixed(1)}`);
     console.log(`Calculated: String ${string}, Fret ${fret}`);
     console.log(`Valid range: String 0-${GUITAR_CONSTANTS.STRINGS - 1}, Fret 0-${GUITAR_CONSTANTS.FRETS - 1}`);
