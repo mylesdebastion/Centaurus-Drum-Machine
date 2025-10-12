@@ -1,0 +1,378 @@
+import React, { useState, useEffect } from 'react';
+import { Header } from '../Layout/Header';
+import { DrumMachine } from '../DrumMachine/DrumMachine';
+import { CompactDrumMachine } from '../DrumMachine/CompactDrumMachine';
+import { LiveAudioVisualizer } from '../LiveAudioVisualizer/LiveAudioVisualizer';
+import { UserList } from './UserList';
+import { MobileNavigation } from '../Layout/MobileNavigation';
+import { ResponsiveContainer } from '../Layout/ResponsiveContainer';
+import { DrumTrack, VisualizerSettings, User, MIDINote } from '../../types';
+import { createDefaultPattern } from '../../utils/drumPatterns';
+
+interface JamSessionLegacyProps {
+  sessionCode: string;
+  onLeaveSession: () => void;
+}
+
+export const JamSessionLegacy: React.FC<JamSessionLegacyProps> = ({
+  sessionCode,
+  onLeaveSession
+}) => {
+  const [users, setUsers] = useState<User[]>([
+    { id: '1', name: 'You', color: '#3b82f6', isHost: true },
+    { id: '2', name: 'Alex', color: '#ef4444', isHost: false },
+    { id: '3', name: 'Sam', color: '#10b981', isHost: false }
+  ]);
+
+  const [tracks, setTracks] = useState<DrumTrack[]>(() => createDefaultPattern());
+
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [tempo, setTempo] = useState(120);
+  const [isConnected] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [_midiNotes, setMidiNotes] = useState<MIDINote[]>([]); // Reserved for future MIDI visualization integration
+  const [isMobile, setIsMobile] = useState(false);
+  const [activeView, setActiveView] = useState<'drum' | 'users' | 'settings'>('drum');
+
+  const [visualizerSettings, setVisualizerSettings] = useState<VisualizerSettings>({
+    colorMode: 'spectrum',
+    brightness: 0.8,
+    ledMatrixEnabled: false,
+    ledMatrixIP: ''
+  });
+
+  // Simulate playback
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const interval = setInterval(() => {
+      setCurrentStep((prev) => (prev + 1) % 16);
+
+      // Generate MIDI notes for active steps (for future visualization integration)
+      tracks.forEach((track, trackIndex) => {
+        if (track.steps[currentStep] && !track.muted) {
+          const note: MIDINote = {
+            note: 36 + trackIndex * 2, // MIDI note numbers
+            velocity: track.velocities[currentStep],
+            channel: 10, // Drum channel
+            timestamp: Date.now(),
+            userId: '1'
+          };
+
+          setMidiNotes(prev => [...prev.slice(-10), note]); // Keep last 10 notes
+        }
+      });
+    }, (60 / tempo / 4) * 1000); // 16th note timing
+
+    return () => clearInterval(interval);
+  }, [isPlaying, tempo, currentStep, tracks]);
+
+  const handleStepToggle = (trackId: string, stepIndex: number) => {
+    setTracks(prev => prev.map(track => 
+      track.id === trackId
+        ? {
+            ...track,
+            steps: track.steps.map((step, index) => 
+              index === stepIndex ? !step : step
+            )
+          }
+        : track
+    ));
+  };
+
+  const handleVelocityChange = (trackId: string, stepIndex: number, velocity: number) => {
+    setTracks(prev => prev.map(track => 
+      track.id === trackId
+        ? {
+            ...track,
+            velocities: track.velocities.map((vel, index) => 
+              index === stepIndex ? velocity : vel
+            )
+          }
+        : track
+    ));
+  };
+
+  const handleTrackMute = (trackId: string) => {
+    setTracks(prev => prev.map(track => 
+      track.id === trackId ? { ...track, muted: !track.muted } : track
+    ));
+  };
+
+  const handleTrackSolo = (trackId: string) => {
+    setTracks(prev => prev.map(track => 
+      track.id === trackId ? { ...track, solo: !track.solo } : track
+    ));
+  };
+
+  const handleTrackVolumeChange = (trackId: string, volume: number) => {
+    setTracks(prev => prev.map(track => 
+      track.id === trackId ? { ...track, volume } : track
+    ));
+  };
+
+  const handlePlay = () => {
+    setIsPlaying(true);
+  };
+
+  const handleStop = () => {
+    setIsPlaying(false);
+    setCurrentStep(0);
+  };
+
+  const handleTempoChange = (newTempo: number) => {
+    setTempo(Math.max(60, Math.min(200, newTempo)));
+  };
+
+  const handleClearTrack = (trackId: string) => {
+    setTracks(prev => prev.map(track => 
+      track.id === trackId
+        ? {
+            ...track,
+            steps: new Array(16).fill(false),
+            velocities: new Array(16).fill(0.8)
+          }
+        : track
+    ));
+  };
+
+  const handleClearAll = () => {
+    setTracks(prev => prev.map(track => ({
+      ...track,
+      steps: new Array(16).fill(false),
+      velocities: new Array(16).fill(0.8)
+    })));
+  };
+
+  const handleAddTrack = (track: DrumTrack) => {
+    setTracks(prev => [...prev, track]);
+  };
+
+  const handleRemoveTrack = (trackId: string) => {
+    setTracks(prev => prev.filter(track => track.id !== trackId));
+  };
+
+  const handleLoadDefaultPattern = () => {
+    setTracks(createDefaultPattern());
+  };
+
+  return (
+    <ResponsiveContainer className="min-h-screen bg-gray-900">
+      <Header
+        sessionCode={sessionCode}
+        userCount={users.length}
+        isConnected={isConnected}
+        onSettingsClick={() => setShowSettings(!showSettings)}
+      />
+
+      <div className="p-4 md:p-6 pb-20 md:pb-6">
+        {/* Mobile Layout - tab-based views, all mounted */}
+        <div className={isMobile ? 'space-y-4' : 'hidden'}>
+          {/* Drum Tab - Drum Machine only (Visualizer rendered once below) */}
+          <div className={activeView === 'drum' ? 'space-y-4' : 'hidden'}>
+            <CompactDrumMachine
+              tracks={tracks}
+              currentStep={currentStep}
+              isPlaying={isPlaying}
+              tempo={tempo}
+              colorMode={visualizerSettings.colorMode}
+              onStepToggle={handleStepToggle}
+              onPlay={handlePlay}
+              onStop={handleStop}
+              onTempoChange={handleTempoChange}
+              onAddTrack={handleAddTrack}
+              onLoadDefaultPattern={handleLoadDefaultPattern}
+            />
+            {/* Visualizer moved outside conditional rendering - see below */}
+          </div>
+
+          {/* Users Tab - Users + Session Info */}
+          <div className={activeView === 'users' ? 'space-y-4' : 'hidden'}>
+            <UserList
+              users={users}
+              currentUserId="1"
+              onUserKick={(userId) => {
+                setUsers(prev => prev.filter(user => user.id !== userId));
+              }}
+            />
+
+            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+              <h3 className="text-lg font-semibold mb-3">Session Info</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Room Code:</span>
+                  <span className="font-mono text-primary-400">{sessionCode}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Tempo:</span>
+                  <span>{tempo} BPM</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Time Signature:</span>
+                  <span>4/4</span>
+                </div>
+              </div>
+              <button
+                onClick={onLeaveSession}
+                className="w-full mt-4 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition-colors"
+              >
+                Leave Session
+              </button>
+            </div>
+          </div>
+
+          {/* Settings Tab */}
+          <div className={activeView === 'settings' ? '' : 'hidden'}>
+            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+              <h3 className="text-lg font-semibold mb-4">Settings</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Visualizer Settings</label>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">Color Mode</label>
+                      <select
+                        value={visualizerSettings.colorMode}
+                        onChange={(e) => setVisualizerSettings({
+                          ...visualizerSettings,
+                          colorMode: e.target.value as any
+                        })}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:border-primary-500 focus:outline-none"
+                      >
+                        <option value="spectrum">Spectrum</option>
+                        <option value="chromatic">Chromatic</option>
+                        <option value="harmonic">Harmonic</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">
+                        Brightness: {Math.round(visualizerSettings.brightness * 100)}%
+                      </label>
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="1"
+                        step="0.1"
+                        value={visualizerSettings.brightness}
+                        onChange={(e) => setVisualizerSettings({
+                          ...visualizerSettings,
+                          brightness: parseFloat(e.target.value)
+                        })}
+                        className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop Layout - always rendered, visibility controlled */}
+        <div className={!isMobile ? 'grid lg:grid-cols-4 gap-6' : 'hidden'}>
+          {/* Desktop: Left column - Drum Machine only (Visualizer rendered once below) */}
+          <div className="lg:col-span-3 space-y-6">
+            <DrumMachine
+              tracks={tracks}
+              currentStep={currentStep}
+              isPlaying={isPlaying}
+              tempo={tempo}
+              colorMode={visualizerSettings.colorMode}
+              onStepToggle={handleStepToggle}
+              onVelocityChange={handleVelocityChange}
+              onTrackMute={handleTrackMute}
+              onTrackSolo={handleTrackSolo}
+              onTrackVolumeChange={handleTrackVolumeChange}
+              onPlay={handlePlay}
+              onStop={handleStop}
+              onTempoChange={handleTempoChange}
+              onClearTrack={handleClearTrack}
+              onClearAll={handleClearAll}
+              onAddTrack={handleAddTrack}
+              onRemoveTrack={handleRemoveTrack}
+              onLoadDefaultPattern={handleLoadDefaultPattern}
+            />
+
+            {/* Visualizer moved outside conditional rendering - see below */}
+          </div>
+
+          {/* Desktop: Right Sidebar - Users and Session Info */}
+          <div className="space-y-6">
+            <UserList
+              users={users}
+              currentUserId="1"
+              onUserKick={(userId) => {
+                setUsers(prev => prev.filter(user => user.id !== userId));
+              }}
+            />
+
+            {/* Session Info */}
+            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+              <h3 className="text-lg font-semibold mb-4">Session Info</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Room Code:</span>
+                  <span className="font-mono text-primary-400">{sessionCode}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Tempo:</span>
+                  <span>{tempo} BPM</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Time Signature:</span>
+                  <span>4/4</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Pattern Length:</span>
+                  <span>16 steps</span>
+                </div>
+              </div>
+
+              <button
+                onClick={onLeaveSession}
+                className="w-full mt-4 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition-colors"
+              >
+                Leave Session
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 🚨 CRITICAL FIX: Single LiveAudioVisualizer instance rendered ONCE
+             - Component never unmounts during breakpoint changes (resize/rotation)
+             - Audio context, WLED LEDs, and animation frames persist across layout changes
+             - CSS visibility controls whether component is shown, NOT conditional rendering
+             - Layout prop hints mobile vs desktop, but doesn't affect component lifecycle */}
+        <LiveAudioVisualizer
+          embedded
+          layout={isMobile ? 'mobile' : 'desktop'}
+          className={
+            isMobile
+              ? activeView === 'drum' ? 'mt-4' : 'hidden'  // Mobile: show with margin on 'drum' tab
+              : 'mt-6'  // Desktop: always show with margin
+          }
+        />
+      </div>
+
+      {/* Mobile Navigation */}
+      {isMobile && (
+        <MobileNavigation
+          activeView={activeView}
+          onViewChange={setActiveView}
+          userCount={users.length}
+        />
+      )}
+    </ResponsiveContainer>
+  );
+};

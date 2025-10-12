@@ -1,5 +1,15 @@
 import * as Tone from 'tone';
 
+/**
+ * Transport state for persistence across navigation
+ */
+export interface TransportState {
+  state: 'started' | 'stopped' | 'paused';
+  position: string; // "bars:beats:sixteenths"
+  bpm: number;
+  timestamp: number; // performance.now() for debugging
+}
+
 // Audio engine for handling drum and melodic instrument playback
 export class AudioEngine {
   private static instance: AudioEngine;
@@ -351,6 +361,123 @@ export class AudioEngine {
       this.guitarSynth.triggerRelease(noteName);
     } catch (error) {
       console.error(`Error triggering guitar note off ${note}:`, error);
+    }
+  }
+
+  /**
+   * Get current Tone.js Transport state for persistence
+   * Captures playback state, position, and tempo
+   */
+  public getTransportState(): TransportState {
+    if (!this.isInitialized) {
+      console.warn('[AudioEngine] Not initialized, returning default transport state');
+      return {
+        state: 'stopped',
+        position: '0:0:0',
+        bpm: 120,
+        timestamp: performance.now(),
+      };
+    }
+
+    try {
+      const state: TransportState = {
+        state: Tone.Transport.state as 'started' | 'stopped' | 'paused',
+        position: Tone.Transport.position as string,
+        bpm: Tone.Transport.bpm.value,
+        timestamp: performance.now(),
+      };
+
+      console.log('[AudioEngine] Transport state captured:', state);
+      return state;
+    } catch (error) {
+      console.error('[AudioEngine] Error capturing transport state:', error);
+      return {
+        state: 'stopped',
+        position: '0:0:0',
+        bpm: 120,
+        timestamp: performance.now(),
+      };
+    }
+  }
+
+  /**
+   * Restore Tone.js Transport state after navigation
+   * Preserves playback position, tempo, and play/pause state
+   */
+  public restoreTransportState(state: TransportState): void {
+    if (!this.isInitialized) {
+      console.warn('[AudioEngine] Not initialized, cannot restore transport state');
+      return;
+    }
+
+    try {
+      console.log('[AudioEngine] Restoring transport state:', state);
+
+      // Set BPM first
+      Tone.Transport.bpm.value = state.bpm;
+
+      // Set position
+      Tone.Transport.position = state.position;
+
+      // Resume playback if it was playing
+      if (state.state === 'started' && Tone.Transport.state !== 'started') {
+        Tone.Transport.start();
+      } else if (state.state === 'stopped' && Tone.Transport.state !== 'stopped') {
+        Tone.Transport.stop();
+      } else if (state.state === 'paused' && Tone.Transport.state !== 'paused') {
+        Tone.Transport.pause();
+      }
+
+      console.log('[AudioEngine] Transport state restored successfully');
+    } catch (error) {
+      console.error('[AudioEngine] Failed to restore transport state:', error);
+    }
+  }
+
+  /**
+   * Get current audio context state
+   * Useful for detecting suspended contexts (browser autoplay policy)
+   */
+  public getAudioContextState(): AudioContextState {
+    try {
+      return Tone.context.state;
+    } catch (error) {
+      console.error('[AudioEngine] Error getting audio context state:', error);
+      return 'suspended';
+    }
+  }
+
+  /**
+   * Ensure audio context is running
+   * Resumes suspended contexts (required for browser autoplay policies)
+   */
+  public async ensureAudioContext(): Promise<void> {
+    try {
+      if (Tone.context.state === 'suspended') {
+        console.log('[AudioEngine] Audio context suspended, resuming...');
+        await Tone.context.resume();
+        console.log('[AudioEngine] Audio context resumed successfully');
+      }
+    } catch (error) {
+      console.error('[AudioEngine] Failed to resume audio context:', error);
+    }
+  }
+
+  /**
+   * Sync Tone.js Transport BPM with global tempo
+   * Should be called when global tempo changes
+   */
+  public syncTransportBPM(bpm: number): void {
+    if (!this.isInitialized) {
+      console.warn('[AudioEngine] Not initialized, cannot sync transport BPM');
+      return;
+    }
+
+    try {
+      Tone.Transport.bpm.value = bpm;
+      console.log(`[AudioEngine] Transport BPM synced to ${bpm}`);
+    } catch (error) {
+      console.error('[AudioEngine] Error syncing transport BPM:', error);
     }
   }
 

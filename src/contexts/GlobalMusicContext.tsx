@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
 import { RootNote, ScaleName, useMusicalScale } from '../hooks/useMusicalScale';
+import { audioEngine } from '../utils/audioEngine';
 
 /**
  * Global Music State Interface
@@ -215,6 +216,18 @@ export const GlobalMusicProvider: React.FC<GlobalMusicProviderProps> = ({ childr
 
     return () => clearTimeout(timeoutId);
   }, [state]);
+
+  // Sync master volume with AudioEngine
+  useEffect(() => {
+    audioEngine.setMasterVolume(state.masterVolume);
+    console.log('[GlobalMusicContext] Synced master volume with AudioEngine:', state.masterVolume);
+  }, [state.masterVolume]);
+
+  // Sync tempo with AudioEngine Transport
+  useEffect(() => {
+    audioEngine.syncTransportBPM(state.tempo);
+    console.log('[GlobalMusicContext] Synced tempo with AudioEngine Transport:', state.tempo);
+  }, [state.tempo]);
 
   /**
    * Update tempo with validation (40-300 BPM)

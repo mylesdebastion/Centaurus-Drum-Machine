@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { GlobalMusicProvider } from './contexts/GlobalMusicContext';
+import { audioEngine, TransportState } from './utils/audioEngine';
 import { WelcomeScreen } from './components/Welcome/WelcomeScreen';
 import { JamSession } from './components/JamSession/JamSession';
+import { JamSessionLegacy } from './components/JamSessionLegacy/JamSessionLegacy';
 import { EducationMode } from './components/Education/EducationMode';
 import { IsometricSequencer } from './components/IsometricSequencer/IsometricSequencer';
 import { LiveAudioVisualizer } from './components/LiveAudioVisualizer/LiveAudioVisualizer';
@@ -11,10 +13,34 @@ import { MIDITest } from './components/MIDI/MIDITest';
 import { PianoRoll } from './components/PianoRoll/PianoRoll';
 import { GuitarFretboard } from './components/GuitarFretboard/GuitarFretboard';
 import { LumiTest } from './components/LumiTest/LumiTest';
+import { GlobalMusicHeaderTest } from './components/GlobalMusicHeaderTest';
+import { Studio } from './components/Studio/Studio';
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
   const navigate = useNavigate();
+  const location = useLocation();
+  const transportStateRef = useRef<TransportState | null>(null);
+
+  /**
+   * Persist audio transport state across navigation
+   * Save state before route changes, restore after
+   */
+  useEffect(() => {
+    // Restore transport state after navigation (if available)
+    if (transportStateRef.current) {
+      console.log('[App] Restoring transport state after navigation to:', location.pathname);
+      audioEngine.restoreTransportState(transportStateRef.current);
+      audioEngine.ensureAudioContext(); // Resume if suspended
+    }
+
+    // Save transport state before navigation (cleanup function)
+    return () => {
+      const state = audioEngine.getTransportState();
+      transportStateRef.current = state;
+      console.log('[App] Saved transport state before navigation from:', location.pathname);
+    };
+  }, [location]);
 
   const generateSessionCode = (): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -34,6 +60,12 @@ function App() {
   const handleJoinJam = (code: string) => {
     setSessionCode(code);
     navigate('/jam');
+  };
+
+  const handleStartJamLegacy = () => {
+    const code = generateSessionCode();
+    setSessionCode(code);
+    navigate('/jam-legacy');
   };
 
   const handleEducationMode = () => {
@@ -105,6 +137,22 @@ function App() {
     navigate('/');
   };
 
+  const handleHeaderTest = () => {
+    navigate('/header-test');
+  };
+
+  const handleExitHeaderTest = () => {
+    navigate('/');
+  };
+
+  const handleStudio = () => {
+    navigate('/studio');
+  };
+
+  const handleExitStudio = () => {
+    navigate('/');
+  };
+
   return (
     <GlobalMusicProvider>
       <Routes>
@@ -114,6 +162,7 @@ function App() {
             <WelcomeScreen
               onStartJam={handleStartJam}
               onJoinJam={handleJoinJam}
+              onStartJamLegacy={handleStartJamLegacy}
               onEducationMode={handleEducationMode}
               onIsometricMode={handleIsometricMode}
               onDJVisualizer={handleDJVisualizer}
@@ -122,6 +171,8 @@ function App() {
               onPianoRoll={handlePianoRoll}
               onGuitarFretboard={handleGuitarFretboard}
               onLumiTest={handleLumiTest}
+              onHeaderTest={handleHeaderTest}
+              onStudio={handleStudio}
             />
           }
         />
@@ -129,6 +180,15 @@ function App() {
           path="/jam"
           element={
             <JamSession
+              sessionCode={sessionCode}
+              onLeaveSession={handleLeaveSession}
+            />
+          }
+        />
+        <Route
+          path="/jam-legacy"
+          element={
+            <JamSessionLegacy
               sessionCode={sessionCode}
               onLeaveSession={handleLeaveSession}
             />
@@ -195,6 +255,22 @@ function App() {
           element={
             <LumiTest
               onBack={handleExitLumiTest}
+            />
+          }
+        />
+        <Route
+          path="/header-test"
+          element={
+            <GlobalMusicHeaderTest
+              onBack={handleExitHeaderTest}
+            />
+          }
+        />
+        <Route
+          path="/studio"
+          element={
+            <Studio
+              onBack={handleExitStudio}
             />
           }
         />

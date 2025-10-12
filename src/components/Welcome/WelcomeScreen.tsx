@@ -4,6 +4,7 @@ import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activ
 interface WelcomeScreenProps {
   onStartJam: () => void;
   onJoinJam: (code: string) => void;
+  onStartJamLegacy?: () => void;
   onEducationMode: () => void;
   onIsometricMode: () => void;
   onDJVisualizer: () => void;
@@ -12,11 +13,14 @@ interface WelcomeScreenProps {
   onPianoRoll: () => void;
   onGuitarFretboard: () => void;
   onLumiTest: () => void;
+  onHeaderTest?: () => void;
+  onStudio?: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onStartJam,
   onJoinJam,
+  onStartJamLegacy,
   onEducationMode,
   onIsometricMode,
   onDJVisualizer,
@@ -24,7 +28,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onMIDITest,
   onPianoRoll,
   onGuitarFretboard,
-  onLumiTest
+  onLumiTest,
+  onHeaderTest,
+  onStudio
 }) => {
   const [joinCode, setJoinCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
@@ -258,6 +264,48 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               </div>
             </button>
 
+            {/* Global Music Header Test */}
+            {onHeaderTest && (
+              <button
+                onClick={onHeaderTest}
+                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <Music2 className="w-6 h-6 text-cyan-400" />
+                  <h3 className="font-semibold text-white">Music Header Test</h3>
+                  <span className="text-xs bg-cyan-600/30 text-cyan-300 px-2 py-1 rounded">NEW</span>
+                </div>
+                <p className="text-sm text-gray-400 mb-4">
+                  Test global music controls: tempo, key/scale, color mode, volume
+                </p>
+                <div className="flex items-center gap-2 text-sm text-cyan-400 group-hover:text-cyan-300">
+                  <span>Launch Test</span>
+                  <Play className="w-4 h-4" />
+                </div>
+              </button>
+            )}
+
+            {/* Music Studio */}
+            {onStudio && (
+              <button
+                onClick={onStudio}
+                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-indigo-500/50 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <Grid3x3 className="w-6 h-6 text-indigo-400" />
+                  <h3 className="font-semibold text-white">Music Studio</h3>
+                  <span className="text-xs bg-indigo-600/30 text-indigo-300 px-2 py-1 rounded">NEW</span>
+                </div>
+                <p className="text-sm text-gray-400 mb-4">
+                  Dynamic workspace with multiple music modules (Story 4.7)
+                </p>
+                <div className="flex items-center gap-2 text-sm text-indigo-400 group-hover:text-indigo-300">
+                  <span>Launch Studio</span>
+                  <Play className="w-4 h-4" />
+                </div>
+              </button>
+            )}
+
             {/* DJ Visualizer */}
             <button
               onClick={onDJVisualizer}
@@ -282,10 +330,10 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               <div className="flex items-center gap-3 mb-3">
                 <Users className="w-6 h-6 text-purple-400" />
                 <h3 className="font-semibold text-white">Multiplayer Jam</h3>
-                <span className="text-xs bg-purple-600/30 text-purple-300 px-2 py-1 rounded">Beta</span>
+                <span className="text-xs bg-purple-600/30 text-purple-300 px-2 py-1 rounded">New</span>
               </div>
               <p className="text-sm text-gray-400 mb-4">
-                Sync with friends using room codes
+                Sync with friends using room codes (New version with global music controls)
               </p>
               <div className="space-y-2">
                 <button
@@ -293,7 +341,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                   className="btn-primary w-full text-sm px-4 py-2 flex items-center justify-center gap-2"
                 >
                   <Play className="w-4 h-4" />
-                  Create a Jam Room
+                  Create a Jam Room (New)
                 </button>
                 {!showJoinInput ? (
                   <button
@@ -321,6 +369,14 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                       Join
                     </button>
                   </form>
+                )}
+                {onStartJamLegacy && (
+                  <button
+                    onClick={onStartJamLegacy}
+                    className="w-full text-xs px-3 py-1.5 bg-gray-700/50 hover:bg-gray-700 text-gray-400 hover:text-gray-300 rounded transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>or use Legacy Version</span>
+                  </button>
                 )}
               </div>
             </div>
