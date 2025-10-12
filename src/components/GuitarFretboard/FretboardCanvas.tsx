@@ -92,10 +92,12 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
     };
 
     /**
-     * Calculate EXAGGERATED brightness based on interval from active note
+     * Calculate COMBINED brightness based on both interval and harmonic importance
      * This helps guide players toward musical intervals in real-time
      * ONLY works with a single active note (clicking/playing one note at a time)
      * ONLY lights up notes that are IN THE CURRENT SCALE
+     * Uses MAXIMUM of interval brightness and harmonic brightness to ensure
+     * important scale degrees (root, 5th, 3rd) stay visible
      * @param noteClass - Note class (0-11)
      * @returns brightness value (0-1)
      */
@@ -112,40 +114,61 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
         return 0.1; // Out of scale - keep very dim (same as harmonic brightness)
       }
 
+      // Get harmonic brightness (based on scale degree importance)
+      const harmonicBright = getHarmonicBrightness(noteClass);
+
       // Get the single active note
       const activeNote = Array.from(activeNoteClasses)[0];
       const interval = (noteClass - activeNote + 12) % 12;
 
-      // Exaggerated brightness scale emphasizing consonance/dissonance
-      // These brightness values ONLY apply to in-scale notes
+      // Calculate interval brightness (emphasizing consonance/dissonance)
+      let intervalBright: number;
       switch (interval) {
         case 0:  // Unison/Octave - Perfect consonance
-          return 1.0;
+          intervalBright = 1.0;
+          break;
         case 7:  // Perfect 5th - Very consonant
-          return 0.9;
+          intervalBright = 0.9;
+          break;
         case 5:  // Perfect 4th - Consonant
-          return 0.85;
+          intervalBright = 0.85;
+          break;
         case 4:  // Major 3rd - Consonant
-          return 0.8;
+          intervalBright = 0.8;
+          break;
         case 3:  // Minor 3rd - Consonant
-          return 0.75;
+          intervalBright = 0.75;
+          break;
         case 9:  // Major 6th - Consonant
-          return 0.7;
+          intervalBright = 0.7;
+          break;
         case 8:  // Minor 6th - Somewhat consonant
-          return 0.65;
+          intervalBright = 0.65;
+          break;
         case 2:  // Major 2nd - Neutral
-          return 0.6;
+          intervalBright = 0.6;
+          break;
         case 10: // Minor 7th - Somewhat dissonant
-          return 0.5;
+          intervalBright = 0.5;
+          break;
         case 11: // Major 7th - Dissonant
-          return 0.4;
+          intervalBright = 0.4;
+          break;
         case 6:  // Tritone - Very dissonant
-          return 0.2;
+          intervalBright = 0.2;
+          break;
         case 1:  // Minor 2nd - Very dissonant
-          return 0.15;
+          intervalBright = 0.15;
+          break;
         default:
-          return 0.3;
+          intervalBright = 0.3;
       }
+
+      // COMBINE both systems: Use the MAXIMUM of interval and harmonic brightness
+      // This ensures harmonically important notes (root, 5th, 3rd) stay visible
+      // even when they're dissonant intervals from the played note
+      // Example: Playing B in C major, C (root) = max(0.15 interval, 0.8 harmonic) = 0.8
+      return Math.max(intervalBright, harmonicBright);
     };
 
     // Draw fretboard grid
@@ -168,13 +191,14 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
 
         // Real-time interval guide brightness system:
         // When a SINGLE note is clicked/played (not chords):
-        //   IMPORTANT: Only highlights notes IN THE CURRENT SCALE
-        //   - Clicked note + octaves: 1.0 (100%)
-        //   - Perfect 5th (in-scale): 0.9 (90%)
-        //   - Perfect 4th (in-scale): 0.85 (85%)
-        //   - Major 3rd (in-scale): 0.8 (80%)
-        //   - Minor 3rd (in-scale): 0.75 (75%)
-        //   - Out-of-scale notes: 0.1 (10%) - stay very dim
+        //   Uses MAXIMUM of interval brightness AND harmonic brightness
+        //   This ensures important scale degrees stay visible!
+        //   Examples when playing B in C major:
+        //     - C (root): max(0.15 interval, 0.8 harmonic) = 0.8 ✓
+        //     - G (5th): max(0.65 interval, 0.7 harmonic) = 0.7 ✓
+        //     - F# (perfect 5th from B, out of scale): 0.1 (dimmed) ✓
+        //   Consonant intervals light up bright, but harmonically important
+        //   notes (root, 5th, 3rd) never dim below their harmonic brightness
         // Otherwise (no notes or multiple notes), uses scale-based harmonic brightness
         let brightness: number;
 
