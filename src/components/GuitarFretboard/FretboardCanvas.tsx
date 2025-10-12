@@ -95,6 +95,7 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
      * Calculate EXAGGERATED brightness based on interval from active note
      * This helps guide players toward musical intervals in real-time
      * ONLY works with a single active note (clicking/playing one note at a time)
+     * ONLY lights up notes that are IN THE CURRENT SCALE
      * @param noteClass - Note class (0-11)
      * @returns brightness value (0-1)
      */
@@ -105,11 +106,18 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
         return getHarmonicBrightness(noteClass); // Fallback to scale-based
       }
 
+      // CRITICAL: Check if note is in scale first!
+      // Out-of-scale notes should stay very dim regardless of interval
+      if (scaleNotes.length > 0 && !scaleNotes.includes(noteClass)) {
+        return 0.1; // Out of scale - keep very dim (same as harmonic brightness)
+      }
+
       // Get the single active note
       const activeNote = Array.from(activeNoteClasses)[0];
       const interval = (noteClass - activeNote + 12) % 12;
 
       // Exaggerated brightness scale emphasizing consonance/dissonance
+      // These brightness values ONLY apply to in-scale notes
       switch (interval) {
         case 0:  // Unison/Octave - Perfect consonance
           return 1.0;
@@ -160,13 +168,13 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
 
         // Real-time interval guide brightness system:
         // When a SINGLE note is clicked/played (not chords):
+        //   IMPORTANT: Only highlights notes IN THE CURRENT SCALE
         //   - Clicked note + octaves: 1.0 (100%)
-        //   - Perfect 5th: 0.9 (90%) - Very consonant
-        //   - Perfect 4th: 0.85 (85%)
-        //   - Major 3rd: 0.8 (80%)
-        //   - Minor 3rd: 0.75 (75%)
-        //   - Tritone: 0.2 (20%) - Very dissonant
-        //   - Minor 2nd: 0.15 (15%) - Very dissonant
+        //   - Perfect 5th (in-scale): 0.9 (90%)
+        //   - Perfect 4th (in-scale): 0.85 (85%)
+        //   - Major 3rd (in-scale): 0.8 (80%)
+        //   - Minor 3rd (in-scale): 0.75 (75%)
+        //   - Out-of-scale notes: 0.1 (10%) - stay very dim
         // Otherwise (no notes or multiple notes), uses scale-based harmonic brightness
         let brightness: number;
 
