@@ -24,23 +24,58 @@ All ROLI SysEx messages start with: `F0 00 21 10 ... F7`
 **Community Projects:**
 - **Primary**: [benob/LUMI-lights](https://github.com/benob/LUMI-lights)
   - Reverse-engineered SysEx commands from ROLI Dashboard
-  - Includes `lumi_sysex.js` library with functions like `set_color(index, red, green, blue)`
   - Documentation in `SYSEX.txt` file
-  - Live demo: https://benob.github.io/LUMI-lights/
+  - Live demo: https://benob.github.io/LUMI-lights/ (may not work on all browsers)
 
-- **Enhanced Fork**: [xivilay/lumi-web-control](https://github.com/xivilay/lumi-web-control)
+- **Working Implementation**: [xivilay/lumi-web-control](https://github.com/xivilay/lumi-web-control) ⭐ **VERIFIED WORKING**
   - Browser-based control interface
-  - Additional features beyond benob's original
+  - Live demo: https://xivilay.github.io/lumi-web-control/
+  - Enhanced fork with additional features
 
-**Usage Example:**
+**Correct SysEx Protocol** (from SYSEX.txt):
+
+Message Structure:
+```
+F0 <manufacturer> 77 <device-id> <command> <checksum> F7
+```
+
+Key Values:
+- Manufacturer: `00 21 10` (ROLI)
+- Device ID: `37` (LUMI)
+- Message type: `77`
+- Command: 8 bytes (7-bit values)
+
+**Color Encoding Algorithm:**
 ```javascript
-// Using WebMIDI API
-function set_color(index, red, green, blue) {
-  var value = (red << 16) | (green << 8) | blue;
-  // Sends SysEx command to LUMI device
-  lumi.output.sendSysex([0x00, 0x21, 0x10, /* ... */]);
+function encodeColor(r, g, b) {
+  const v1 = ((b & 0x3) << 5) | 0x4;
+  const v2 = ((b >> 2) & 0x3f) | (g & 1);
+  const v3 = g >> 1;
+  const v4 = r & 0x7f;
+  const v5 = (r >> 7) | 0x7e;
+  return [v1, v2, v3, v4, v5];
 }
 ```
+
+**Checksum Calculation:**
+```javascript
+function calculateChecksum(bytes, size) {
+  let c = size;
+  for (const b of bytes) {
+    c = (c * 3 + b) & 0xff;
+  }
+  return c & 0x7f;
+}
+```
+
+**Color Commands:**
+- Global Key Color: `10 20 [encoded-color-5-bytes] 03`
+- Root Key Color: `10 30 [encoded-color-5-bytes] 03`
+
+**Example Messages:**
+- Blue: `F0 00 21 10 77 37 10 20 64 3F 00 00 7E 03 [checksum] F7`
+- Green: `F0 00 21 10 77 37 10 20 04 40 7F 00 7E 03 [checksum] F7`
+- Red: `F0 00 21 10 77 37 10 20 04 00 00 7F 7F 03 [checksum] F7`
 
 **Advantages:**
 - Direct control from web applications

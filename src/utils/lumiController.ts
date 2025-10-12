@@ -25,6 +25,31 @@ export class LumiController {
 
   // ROLI SysEx header
   private readonly ROLI_MANUFACTURER_ID = [0x00, 0x21, 0x10];
+  private readonly LUMI_DEVICE_ID = 0x37;
+
+  /**
+   * Calculate checksum for SysEx message (from LUMI-lights protocol)
+   */
+  private calculateChecksum(bytes: number[], size: number): number {
+    let c = size;
+    for (const b of bytes) {
+      c = (c * 3 + b) & 0xff;
+    }
+    return c & 0x7f;
+  }
+
+  /**
+   * Encode RGB color to LUMI format (from LUMI-lights protocol)
+   * @returns 5-byte color encoding
+   */
+  private encodeColor(r: number, g: number, b: number): number[] {
+    const v1 = ((b & 0x3) << 5) | 0x4;
+    const v2 = ((b >> 2) & 0x3f) | (g & 1);
+    const v3 = g >> 1;
+    const v4 = r & 0x7f;
+    const v5 = (r >> 7) | 0x7e;
+    return [v1, v2, v3, v4, v5];
+  }
 
   /**
    * Connect to LUMI device
@@ -93,19 +118,38 @@ export class LumiController {
     if (keyIndex < 0 || keyIndex >= this.KEYS_PER_BLOCK) return;
 
     try {
-      // Reverse-engineered SysEx command format
-      // Based on benob/LUMI-lights research
-      const sysexData = [
-        ...this.ROLI_MANUFACTURER_ID,
-        0x77, // Command type (from benob's research)
-        0x37, // Subcommand (LED control)
-        keyIndex,
-        Math.floor(r),
-        Math.floor(g),
-        Math.floor(b)
+      // LUMI SysEx protocol: F0 <mfr> 77 <device-id> <command> <checksum> F7
+      // Command format: 10 20 [color-5-bytes] 03 (global key color)
+
+      const encodedColor = this.encodeColor(r, g, b);
+
+      // Build command: 10 20 [color] 03
+      const command = [
+        0x10,           // Command type
+        0x20,           // Global key color
+        ...encodedColor, // 5-byte encoded color
+        0x03            // Command end
       ];
 
-      this.device!.output.sendSysex(this.ROLI_MANUFACTURER_ID, sysexData.slice(3));
+      // Calculate checksum
+      const checksum = this.calculateChecksum(command, 8);
+
+      // Full SysEx message: F0 00 21 10 77 37 [command] [checksum] F7
+      const sysexMessage = [
+        0xF0,                          // SysEx start
+        ...this.ROLI_MANUFACTURER_ID,  // 00 21 10 (ROLI)
+        0x77,                          // Message type
+        this.LUMI_DEVICE_ID,           // 37 (LUMI)
+        ...command,                    // Command bytes
+        checksum,                      // Calculated checksum
+        0xF7                           // SysEx end
+      ];
+
+      // Send via WebMIDI
+      this.device!.output.send(sysexMessage);
+
+      console.log(`[LumiController] Set key ${keyIndex} to RGB(${r},${g},${b})`);
+      console.log(`[LumiController] SysEx:`, sysexMessage.map(b => b.toString(16).padStart(2, '0')).join(' '));
 
     } catch (error) {
       console.warn('[LumiController] Failed to send SysEx:', error);
