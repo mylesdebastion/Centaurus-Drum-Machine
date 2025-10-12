@@ -351,8 +351,8 @@ describe('localStorage Persistence', () => {
   it('should handle version mismatch in localStorage', () => {
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    mockLocalStorage.setItem(
-      'centaurus-global-music-state',
+    // Set up localStorage BEFORE creating the wrapper
+    mockLocalStorage.getItem.mockReturnValueOnce(
       JSON.stringify({
         version: 99, // Wrong version
         state: { tempo: 150 },
@@ -360,7 +360,12 @@ describe('localStorage Persistence', () => {
       })
     );
 
-    const { result } = renderHook(() => useGlobalMusic(), { wrapper });
+    // Create new wrapper to trigger initialization with mocked localStorage
+    const testWrapper = ({ children }: { children: React.ReactNode }) => (
+      <GlobalMusicProvider>{children}</GlobalMusicProvider>
+    );
+
+    const { result } = renderHook(() => useGlobalMusic(), { wrapper: testWrapper });
 
     // Should use default values due to version mismatch
     expect(result.current.tempo).toBe(120);

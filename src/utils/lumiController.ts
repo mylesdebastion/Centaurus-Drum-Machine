@@ -204,6 +204,151 @@ export class LumiController {
   }
 
   /**
+   * Set LUMI scale (requires scale sync)
+   * Based on research from benob/LUMI-lights SysEx protocol
+   *
+   * @param scale Scale name (major, minor, chromatic, etc.)
+   */
+  setScale(scale: string): void {
+    if (!this.device) return;
+
+    try {
+      // Map Piano Roll scale names to LUMI scale bytes
+      const scaleMapping: { [key: string]: number[] } = {
+        // Standard scales
+        'chromatic': [0x42, 0x04],
+        'major': [0x02, 0x00],
+        'minor': [0x22, 0x00],
+
+        // Modes - Using major as fallback (LUMI may not support all modes via SysEx)
+        'dorian': [0x02, 0x00],          // Fallback to major
+        'phrygian': [0x22, 0x00],        // Fallback to minor
+        'lydian': [0x02, 0x00],          // Fallback to major
+        'mixolydian': [0x02, 0x00],      // Fallback to major
+        'locrian': [0x22, 0x00],         // Fallback to minor
+
+        // Harmonic/melodic minor
+        'harmonic_minor': [0x22, 0x00],  // Fallback to minor
+        'melodic_minor': [0x22, 0x00],   // Fallback to minor
+
+        // Pentatonic
+        'pentatonic_major': [0x02, 0x00], // Fallback to major
+        'pentatonic_minor': [0x22, 0x00], // Fallback to minor
+
+        // Blues
+        'blues': [0x22, 0x00],            // Fallback to minor
+      };
+
+      const scaleBytes = scaleMapping[scale.toLowerCase()] || scaleMapping['chromatic'];
+
+      // SysEx command: F0 00 21 10 77 00 [command] [checksum] F7
+      // Command format: 10 60 [scale-2-bytes] 00 00 00 00
+      const command = [0x10, 0x60, ...scaleBytes, 0x00, 0x00, 0x00, 0x00];
+      const checksum = this.calculateChecksum(command, command.length);
+
+      const sysexMessage = [
+        0xF0,                          // SysEx start
+        ...this.ROLI_MANUFACTURER_ID,  // 00 21 10 (ROLI)
+        0x77,                          // Message type
+        0x00,                          // Topology index (0x00 = all blocks)
+        ...command,                    // Command bytes
+        checksum,                      // Calculated checksum
+        0xF7                           // SysEx end
+      ];
+
+      this.device.output.send(sysexMessage);
+      console.log(`[LumiController] Set scale to: ${scale}`);
+
+    } catch (error) {
+      console.warn('[LumiController] Failed to set scale:', error);
+    }
+  }
+
+  /**
+   * Set LUMI root key (requires scale sync)
+   *
+   * @param rootKey Root key name (C, C#, D, D#, E, F, F#, G, G#, A, A#, B)
+   */
+  setRootKey(rootKey: string): void {
+    if (!this.device) return;
+
+    try {
+      // Map root key names to LUMI key bytes
+      const keyMapping: { [key: string]: number[] } = {
+        'C': [0x03, 0x00], 'C#': [0x23, 0x00],
+        'D': [0x43, 0x00], 'D#': [0x63, 0x00],
+        'E': [0x03, 0x01], 'F': [0x23, 0x01],
+        'F#': [0x43, 0x01], 'G': [0x63, 0x01],
+        'G#': [0x03, 0x02], 'A': [0x23, 0x02],
+        'A#': [0x43, 0x02], 'B': [0x63, 0x02]
+      };
+
+      const keyBytes = keyMapping[rootKey] || keyMapping['C'];
+
+      // SysEx command: F0 00 21 10 77 00 [command] [checksum] F7
+      // Command format: 10 30 [key-2-bytes] 00 00 00 00
+      const command = [0x10, 0x30, ...keyBytes, 0x00, 0x00, 0x00, 0x00];
+      const checksum = this.calculateChecksum(command, command.length);
+
+      const sysexMessage = [
+        0xF0,                          // SysEx start
+        ...this.ROLI_MANUFACTURER_ID,  // 00 21 10 (ROLI)
+        0x77,                          // Message type
+        0x00,                          // Topology index (0x00 = all blocks)
+        ...command,                    // Command bytes
+        checksum,                      // Calculated checksum
+        0xF7                           // SysEx end
+      ];
+
+      this.device.output.send(sysexMessage);
+      console.log(`[LumiController] Set root key to: ${rootKey}`);
+
+    } catch (error) {
+      console.warn('[LumiController] Failed to set root key:', error);
+    }
+  }
+
+  /**
+   * Set LUMI color mode (0-3)
+   * Mode 1 (index 0) recommended for compatibility with MIDI Note On/Off
+   *
+   * @param mode Color mode index (0 = Mode 1, 1 = Mode 2, 2 = Mode 3, 3 = Mode 4)
+   */
+  setColorMode(mode: number): void {
+    if (!this.device) return;
+    if (mode < 0 || mode > 3) return;
+
+    try {
+      // BitArray encoding for color mode command
+      // This matches the benob/LUMI-lights protocol
+      const bits = new BitArray();
+      bits.append(0x10, 7);           // Command type
+      bits.append(0x40, 7);           // Color mode command
+      bits.append(0b00010, 5);        // Header
+      bits.append(mode & 3, 2);       // Mode (0-3)
+
+      const command = bits.get();
+      const checksum = this.calculateChecksum(command, command.length);
+
+      const sysexMessage = [
+        0xF0,                          // SysEx start
+        ...this.ROLI_MANUFACTURER_ID,  // 00 21 10 (ROLI)
+        0x77,                          // Message type
+        0x00,                          // Topology index (0x00 = all blocks)
+        ...command,                    // Command bytes (8 bytes)
+        checksum,                      // Calculated checksum
+        0xF7                           // SysEx end
+      ];
+
+      this.device.output.send(sysexMessage);
+      console.log(`[LumiController] Set color mode to: ${mode + 1}`);
+
+    } catch (error) {
+      console.warn('[LumiController] Failed to set color mode:', error);
+    }
+  }
+
+  /**
    * Check if a device name looks like a LUMI/Piano M device
    */
   static isLumiDevice(deviceName: string): boolean {
@@ -224,6 +369,44 @@ export class LumiController {
       connected: true,
       enabled: this.enabled
     };
+  }
+}
+
+/**
+ * BitArray helper class for LUMI SysEx encoding
+ * Based on benob/LUMI-lights implementation
+ */
+class BitArray {
+  private values: number[] = [];
+  private num_bits: number = 0;
+
+  append(value: number, size: number = 7) {
+    let current = Math.floor(this.num_bits / 7);
+    let used_bits = Math.floor(this.num_bits % 7);
+    let packed = 0;
+
+    if (used_bits > 0) {
+      packed = this.values[this.values.length - 1];
+      this.values.pop();
+    }
+
+    this.num_bits += size;
+
+    while (size > 0) {
+      packed |= (value << used_bits) & 127;
+      size -= (7 - used_bits);
+      value >>= (7 - used_bits);
+      this.values.push(packed);
+      packed = 0;
+      used_bits = 0;
+    }
+  }
+
+  get(size: number = 32): number[] {
+    while (this.values.length < 8) {
+      this.values.push(0);
+    }
+    return this.values;
   }
 }
 

@@ -428,7 +428,33 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
    */
   useEffect(() => {
     lumiController.setEnabled(lumiEnabled);
-  }, [lumiEnabled]);
+
+    // Initialize LUMI with current scale/key when enabled
+    if (lumiEnabled && lumiController.isReady()) {
+      console.log('[PianoVisualizer] Syncing LUMI with current scale/key');
+      lumiController.setScale(selectedScale);
+      lumiController.setRootKey(selectedRoot);
+      lumiController.setColorMode(0); // Mode 1 for best compatibility
+    }
+  }, [lumiEnabled, selectedScale, selectedRoot]);
+
+  /**
+   * Sync scale changes to LUMI
+   */
+  useEffect(() => {
+    if (lumiEnabled && lumiController.isReady()) {
+      lumiController.setScale(selectedScale);
+    }
+  }, [selectedScale, lumiEnabled]);
+
+  /**
+   * Sync root key changes to LUMI
+   */
+  useEffect(() => {
+    if (lumiEnabled && lumiController.isReady()) {
+      lumiController.setRootKey(selectedRoot);
+    }
+  }, [selectedRoot, lumiEnabled]);
 
   useEffect(() => {
     if (!lumiEnabled) return;
