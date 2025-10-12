@@ -220,18 +220,20 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
         const x = fret * fretWidth + fretWidth / 2;
         const y = (string + 1) * stringHeight;
 
+        const noteRadius = fretWidth / 3;
+
         // Draw fret circle
         ctx.fillStyle = `rgb(${color.r * brightness}, ${color.g * brightness}, ${color.b * brightness})`;
         ctx.beginPath();
-        ctx.arc(x, y, fretWidth / 3, 0, Math.PI * 2);
+        ctx.arc(x, y, noteRadius, 0, Math.PI * 2);
         ctx.fill();
 
-        // Draw white ring for active notes
+        // Draw white ring outline for active notes (same size as note circle)
         if (isChordNote || isMIDIActive) {
           ctx.strokeStyle = '#fff';
-          ctx.lineWidth = 2;
+          ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.arc(x, y, fretWidth / 4, 0, Math.PI * 2);
+          ctx.arc(x, y, noteRadius, 0, Math.PI * 2);
           ctx.stroke();
         }
       }
