@@ -122,53 +122,61 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
       const interval = (noteClass - activeNote + 12) % 12;
 
       // Calculate interval brightness (emphasizing consonance/dissonance)
+      // Lower values for dissonant intervals to DIM them below baseline
       let intervalBright: number;
       switch (interval) {
         case 0:  // Unison/Octave - Perfect consonance
           intervalBright = 1.0;
           break;
         case 7:  // Perfect 5th - Very consonant
-          intervalBright = 0.9;
+          intervalBright = 0.95;
           break;
-        case 5:  // Perfect 4th - Consonant
+        case 5:  // Perfect 4th - Consonant (brighter than 2nd)
           intervalBright = 0.85;
           break;
         case 4:  // Major 3rd - Consonant
-          intervalBright = 0.8;
+          intervalBright = 0.9;
           break;
         case 3:  // Minor 3rd - Consonant
-          intervalBright = 0.75;
+          intervalBright = 0.85;
           break;
         case 9:  // Major 6th - Consonant
-          intervalBright = 0.7;
+          intervalBright = 0.8;
           break;
         case 8:  // Minor 6th - Somewhat consonant
-          intervalBright = 0.65;
+          intervalBright = 0.7;
           break;
-        case 2:  // Major 2nd - Neutral
-          intervalBright = 0.6;
+        case 2:  // Major 2nd - DIM (quite a bit below baseline)
+          intervalBright = 0.3;
           break;
         case 10: // Minor 7th - Somewhat dissonant
           intervalBright = 0.5;
           break;
         case 11: // Major 7th - Dissonant
-          intervalBright = 0.4;
+          intervalBright = 0.35;
           break;
         case 6:  // Tritone - Very dissonant
-          intervalBright = 0.2;
+          intervalBright = 0.25;
           break;
         case 1:  // Minor 2nd - Very dissonant
-          intervalBright = 0.15;
+          intervalBright = 0.2;
           break;
         default:
           intervalBright = 0.3;
       }
 
-      // COMBINE both systems: Use the MAXIMUM of interval and harmonic brightness
-      // This ensures harmonically important notes (root, 5th, 3rd) stay visible
-      // even when they're dissonant intervals from the played note
-      // Example: Playing B in C major, C (root) = max(0.15 interval, 0.8 harmonic) = 0.8
-      return Math.max(intervalBright, harmonicBright);
+      // Use interval brightness as primary guide
+      // BUT apply a floor for harmonically important notes (root, 5th, 3rd)
+      // so they don't get as dim as out-of-scale notes
+      const isHarmonicallyImportant = harmonicBright >= 0.6; // Root (0.8), 5th (0.7), 3rd (0.6)
+
+      if (isHarmonicallyImportant && intervalBright < 0.4) {
+        // Important notes have a brightness floor of 0.4
+        // This keeps them visible but still noticeably dimmer than consonant intervals
+        return 0.4;
+      }
+
+      return intervalBright;
     };
 
     // Draw fretboard grid
@@ -191,14 +199,15 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
 
         // Real-time interval guide brightness system:
         // When a SINGLE note is clicked/played (not chords):
-        //   Uses MAXIMUM of interval brightness AND harmonic brightness
-        //   This ensures important scale degrees stay visible!
-        //   Examples when playing B in C major:
-        //     - C (root): max(0.15 interval, 0.8 harmonic) = 0.8 ✓
-        //     - G (5th): max(0.65 interval, 0.7 harmonic) = 0.7 ✓
-        //     - F# (perfect 5th from B, out of scale): 0.1 (dimmed) ✓
-        //   Consonant intervals light up bright, but harmonically important
-        //   notes (root, 5th, 3rd) never dim below their harmonic brightness
+        //   Uses interval brightness to DIM dissonant notes and BRIGHTEN consonant ones
+        //   Examples when playing C in C major:
+        //     - C (octave): 1.0 (brightest)
+        //     - G (5th): 0.95 (very bright)
+        //     - E (3rd): 0.9 (bright)
+        //     - F (4th): 0.85 (bright, more than 2nd)
+        //     - D (2nd): 0.3 (quite dim, below baseline)
+        //   Important scale degrees (root, 5th, 3rd) have brightness floor of 0.4
+        //   so they don't get as dim as out-of-scale notes (0.1)
         // Otherwise (no notes or multiple notes), uses scale-based harmonic brightness
         let brightness: number;
 
