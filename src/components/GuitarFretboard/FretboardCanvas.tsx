@@ -45,9 +45,11 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
       for (let fret = 0; fret < GUITAR_CONSTANTS.FRETS; fret++) {
         const noteClass = fretboardMatrix[string][fret];
 
-        // Check if chord note is active (convert from 1-indexed to 0-indexed string)
+        // Check if chord note is active
+        // Convert from guitar string notation (1-6, where 1=high E, 6=low E)
+        // to array index (0-5, where 0=low E, 5=high E)
         const isChordNote = activeChord.some(
-          cn => cn.string - 1 === string && cn.fret === fret
+          cn => GUITAR_CONSTANTS.STRINGS - cn.string === string && cn.fret === fret
         );
 
         // Check if MIDI note is active for this fret position

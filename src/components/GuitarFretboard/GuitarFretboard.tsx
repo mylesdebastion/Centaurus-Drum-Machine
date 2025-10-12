@@ -12,7 +12,7 @@ import {
   ROMAN_NUMERAL_PROGRESSIONS,
   resolveProgression
 } from './chordProgressions';
-import { createFretboardMatrix, getMIDINoteFromFret, fretboardToLEDIndex } from './constants';
+import { createFretboardMatrix, getMIDINoteFromFret, fretboardToLEDIndex, GUITAR_CONSTANTS } from './constants';
 import { useMIDIInput } from '../../hooks/useMIDIInput';
 import { useMusicalScale } from '../../hooks/useMusicalScale';
 import { ScaleSelector } from '../Music/ScaleSelector';
@@ -146,7 +146,10 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
     if (!guitarSynth) return;
 
     const frequencies = chordNotes.map(cn => {
-      const midiNote = getMIDINoteFromFret(cn.string - 1, cn.fret, currentTuningMIDI);
+      // Convert from guitar string notation (1-6, where 1=high E, 6=low E)
+      // to array index (0-5, where 0=low E, 5=high E)
+      const stringIndex = GUITAR_CONSTANTS.STRINGS - cn.string;
+      const midiNote = getMIDINoteFromFret(stringIndex, cn.fret, currentTuningMIDI);
       return Tone.Frequency(midiNote, 'midi').toFrequency();
     });
 
@@ -236,7 +239,8 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
     for (let string = 0; string < 6; string++) {
       for (let fret = 0; fret < 25; fret++) {
         const noteClass = fretboardMatrix[string][fret];
-        const isActive = chord.notes.some(cn => cn.string - 1 === string && cn.fret === fret);
+        // Convert from guitar string notation (1-6) to array index (0-5)
+        const isActive = chord.notes.some(cn => GUITAR_CONSTANTS.STRINGS - cn.string === string && cn.fret === fret);
         const color = getNoteColor(noteClass, colorMode);
 
         // 3-tier brightness system:
