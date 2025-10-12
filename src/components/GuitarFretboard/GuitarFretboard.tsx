@@ -1,7 +1,7 @@
 // Main Guitar Fretboard Component
 // Story 9.3: Guitar Fretboard Visualizer with LED Matrix Output
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as Tone from 'tone';
 import { Guitar, Settings, Play, Pause } from 'lucide-react';
 import { FretboardCanvas } from './FretboardCanvas';
@@ -35,6 +35,9 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
   const [showProgressionMenu, setShowProgressionMenu] = useState(false);
   const [selectedTuning, setSelectedTuning] = useState<GuitarTuning>(GUITAR_TUNINGS[0]); // Standard tuning
   const [showTuningMenu, setShowTuningMenu] = useState(false);
+
+  // Track clicked notes for interval guide (separate from chord diagram notes)
+  const [clickedNotes, setClickedNotes] = useState<Set<number>>(new Set());
 
   // Musical scale hook
   const {
@@ -207,10 +210,23 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
     console.log(`🎹 Calculated Note: ${fullNoteName} (MIDI ${midiNote})`);
     console.log(`🔊 Frequency: ${freq.toFixed(2)} Hz`);
     console.log(`🎼 Tuning Array: [${selectedTuning.strings.join(', ')}]`);
+    console.log(`🎯 Interval Guide: Note will be tracked for brightness system`);
     console.groupEnd();
 
-    // Play the note
+    // Add note to clicked notes Set for interval guide
+    setClickedNotes(prev => new Set(prev).add(midiNote));
+
+    // Play the note with 2-second sustain
     guitarSynth.triggerAttackRelease(freq, '2');
+
+    // Remove note from clicked notes after 2 seconds (matching sustain)
+    setTimeout(() => {
+      setClickedNotes(prev => {
+        const next = new Set(prev);
+        next.delete(midiNote);
+        return next;
+      });
+    }, 2000); // 2 second sustain
   }, [guitarSynth, currentTuningMIDI, selectedTuning]);
 
   // Keyboard shortcuts
@@ -230,6 +246,13 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [togglePlayPause]);
+
+  // Combine clicked notes with MIDI input notes for interval guide
+  const allActiveNotes = useMemo(() => {
+    const combined = new Set(activeMIDINotes);
+    clickedNotes.forEach(note => combined.add(note));
+    return combined;
+  }, [activeMIDINotes, clickedNotes]);
 
   // Generate LED matrix data (convert to hex strings for WLED)
   const generateLEDData = useCallback(() => {
@@ -335,14 +358,14 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
               <FretboardCanvas
                 activeChord={chord.notes}
-                activeMIDINotes={activeMIDINotes}
+                activeMIDINotes={allActiveNotes}
                 colorMode={colorMode}
                 onFretClick={handleFretClick}
                 scaleNotes={getCurrentScale()}
                 rootNote={ROOT_POSITIONS[selectedRoot]}
               />
               <p className="text-sm text-gray-400 mt-2 text-center">
-                Click frets to play notes | Press 'C' for color mode | Press 'N' for next progression | Press 'Space' to play/pause
+                Click frets to see interval guide | Press 'C' for color mode | Press 'N' for next progression | Press 'Space' to play/pause
               </p>
             </div>
           </div>
