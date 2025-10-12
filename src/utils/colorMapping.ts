@@ -62,7 +62,7 @@ export const getNoteColor = (note: number, mode: ColorMode): RGBColor => {
       const hue = (note / 127) * 270; // 0° = red, 270° = violet
       return hslToRgb(hue, 85, 55);
     
-    case 'chromatic':
+    case 'chromatic': {
       // Custom chromatic color mapping with smooth blends
       // C = Red, D = Orange, E = Yellow, F# = Green, A = Blue, B = Violet
       const chromaticHues = [
@@ -79,9 +79,10 @@ export const getNoteColor = (note: number, mode: ColorMode): RGBColor => {
         260,  // A# = Blue-Violet (blend)
         300   // B  = Violet/Magenta
       ];
-      const noteClass = note % 12;
-      const chromaticHue = chromaticHues[noteClass];
+      const chromaticNoteClass = note % 12;
+      const chromaticHue = chromaticHues[chromaticNoteClass];
       return hslToRgb(chromaticHue, 80, 60);
+    }
     
     case 'harmonic':
       // Map based on circle of fifths
