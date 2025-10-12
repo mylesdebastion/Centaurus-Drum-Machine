@@ -21,7 +21,10 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:benob.github.io)",
-      "WebFetch(domain:xivilay.github.io)"
+      "WebFetch(domain:xivilay.github.io)",
+      "Bash(curl -s https://api.github.com/repos/xivilay/lumi-web-control/contents/src/src)",
+      "Bash(curl -s https://raw.githubusercontent.com/xivilay/lumi-web-control/master/src/src/lumiSysexLib.js)",
+      "Bash(curl -s https://raw.githubusercontent.com/xivilay/lumi-web-control/master/src/src/App.js)"
     ],
     "deny": [],
     "ask": []

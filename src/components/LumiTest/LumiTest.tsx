@@ -130,7 +130,7 @@ export const LumiTest: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     addLog(`🔄 Switched to: ${device?.name}`);
   };
 
-  // Send SysEx using benob's protocol
+  // Send SysEx using xivilay's EXACT working protocol
   const sendGlobalColor = (r: number, g: number, b: number) => {
     if (!selectedOutput) {
       addLog('❌ No output device selected');
@@ -140,16 +140,17 @@ export const LumiTest: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     try {
       addLog(`🎨 Sending global color: RGB(${r}, ${g}, ${b})`);
 
-      // Build command using BitArray
+      // Build command using BitArray - EXACT xivilay implementation
       const bits = new BitArray();
-      bits.append(0x10, 8); // Command type
-      bits.append(0x20, 8); // Global color command
-      bits.append(b, 10);   // Blue (10 bits)
-      bits.append(g, 8);    // Green (8 bits)
-      bits.append(r, 15);   // Red (15 bits)
-      bits.append(0x03, 8); // Command end
+      bits.append(0x10, 7);           // Command type (7 bits, not 8!)
+      bits.append(0x20, 7);           // Global color command (7 bits, not 8!) - Color slot 0
+      bits.append(0b00100, 5);        // Header (5 bits)
+      bits.append(b & 0xff, 8);       // Blue (8 bits)
+      bits.append(g & 0xff, 8);       // Green (8 bits)
+      bits.append(r & 0xff, 8);       // Red (8 bits)
+      bits.append(0b11111111, 8);     // Footer (8 bits)
 
-      const command = bits.get(8);
+      const command = bits.get();
 
       // Calculate checksum
       const checksumValue = checksum(command);
@@ -157,20 +158,20 @@ export const LumiTest: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       addLog(`📦 Command bytes: ${command.map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')}`);
       addLog(`🔐 Checksum: 0x${checksumValue.toString(16).padStart(2, '0')}`);
 
-      // Build full SysEx message
+      // Build full SysEx message - EXACT xivilay structure
       const sysex = [
-        0xF0,       // SysEx start
-        0x00, 0x21, 0x10, // ROLI manufacturer ID
-        0x77,       // Message type
-        0x37,       // LUMI device ID
-        ...command, // Command bytes
-        checksumValue, // Checksum
-        0xF7        // SysEx end
+        0xF0,                // SysEx start
+        0x00, 0x21, 0x10,    // ROLI manufacturer ID (getRoliHeader)
+        0x77,                // Message type
+        0x00,                // Topology index (0x00 = all blocks)
+        ...command,          // Command bytes from BitArray
+        checksumValue,       // Checksum
+        0xF7                 // SysEx end
       ];
 
       addLog(`📨 Full SysEx: ${sysex.map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')}`);
 
-      // Send via WebMIDI
+      // Send via native Web MIDI API
       selectedOutput.send(sysex);
 
       addLog('✅ SysEx sent successfully');
@@ -353,13 +354,14 @@ export const LumiTest: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
         {/* Technical Notes */}
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-          <h2 className="text-xl font-semibold text-white mb-4">Technical Notes</h2>
+          <h2 className="text-xl font-semibold text-white mb-4">Technical Notes - xivilay Protocol</h2>
           <ul className="space-y-2 text-gray-300 text-sm">
-            <li>• <strong>Protocol:</strong> ROLI SysEx (F0 00 21 10 77 37 ... F7)</li>
-            <li>• <strong>Command:</strong> Global color (0x10 0x20)</li>
-            <li>• <strong>Encoding:</strong> BitArray with 10-bit blue, 8-bit green, 15-bit red</li>
+            <li>• <strong>Message:</strong> F0 00 21 10 77 00 [command-8-bytes] [checksum] F7</li>
+            <li>• <strong>Topology:</strong> 0x00 = all blocks (not device ID 0x37!)</li>
+            <li>• <strong>Command:</strong> Global color slot 0</li>
+            <li>• <strong>BitArray:</strong> 7-bit 0x10, 7-bit 0x20, 5-bit header, 8-bit B/G/R, 8-bit footer</li>
             <li>• <strong>Checksum:</strong> (sum * 3 + byte) &amp; 0xff, result &amp; 0x7f</li>
-            <li>• <strong>Reference:</strong> benob/LUMI-lights and xivilay/lumi-web-control</li>
+            <li>• <strong>Reference:</strong> xivilay/lumi-web-control (verified working)</li>
           </ul>
         </div>
 
