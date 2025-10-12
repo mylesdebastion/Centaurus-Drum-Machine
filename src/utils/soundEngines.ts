@@ -3,7 +3,7 @@ import * as Tone from 'tone';
 /**
  * Sound engine types available for the IsometricSequencer
  */
-export type SoundEngineType = 'keys' | 'sine' | 'drums' | 'pluck' | 'pad' | 'fm-bell' | 'bass';
+export type SoundEngineType = 'keys' | 'sine' | 'drums' | 'pluck' | 'pad' | 'fm-bell' | 'bass' | 'guitar';
 
 /**
  * Interface for sound engine implementations
@@ -457,6 +457,67 @@ class BassSoundEngine implements SoundEngine {
 }
 
 /**
+ * Acoustic guitar sound engine using Tone.js Sampler
+ * Uses real acoustic guitar samples with reverb for spatial depth
+ */
+class GuitarSoundEngine implements SoundEngine {
+  private sampler: Tone.Sampler;
+  private reverb: Tone.Reverb;
+
+  constructor() {
+    // Create reverb for spatial depth
+    this.reverb = new Tone.Reverb({
+      decay: 1.8,
+      wet: 0.25
+    }).toDestination();
+
+    // Use Tone.Sampler with real acoustic guitar samples
+    // From Tonejs-Instruments library - verified available samples
+    this.sampler = new Tone.Sampler({
+      urls: {
+        A2: "A2.mp3",
+        A3: "A3.mp3",
+        A4: "A4.mp3",
+        C3: "C3.mp3",
+        C4: "C4.mp3",
+        C5: "C5.mp3",
+        "D#3": "Ds3.mp3",
+        "D#4": "Ds4.mp3",
+        "F#2": "Fs2.mp3",
+        "F#3": "Fs3.mp3",
+        "F#4": "Fs4.mp3",
+      },
+      baseUrl: "https://nbrosowsky.github.io/tonejs-instruments/samples/guitar-acoustic/",
+      onload: () => {
+        console.log('🎸 Acoustic guitar samples loaded successfully');
+      },
+      volume: -4,
+      release: 1
+    }).connect(this.reverb);
+  }
+
+  playNote(frequency: number, velocity: number = 0.8, duration: number = 1.0): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.sampler.triggerAttackRelease(note, duration, undefined, velocity);
+  }
+
+  triggerAttack(frequency: number, velocity: number = 0.8): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.sampler.triggerAttack(note, undefined, velocity);
+  }
+
+  triggerRelease(frequency: number): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.sampler.triggerRelease(note);
+  }
+
+  dispose(): void {
+    this.sampler.dispose();
+    this.reverb.dispose();
+  }
+}
+
+/**
  * Factory function to create sound engines
  */
 export function createSoundEngine(
@@ -479,6 +540,8 @@ export function createSoundEngine(
       return new FMBellSoundEngine();
     case 'bass':
       return new BassSoundEngine();
+    case 'guitar':
+      return new GuitarSoundEngine();
     default:
       return new RhodesSoundEngine();
   }
@@ -494,5 +557,6 @@ export const soundEngineNames: Record<SoundEngineType, string> = {
   'pluck': 'Pluck',
   'pad': 'Pad',
   'fm-bell': 'FM Bell',
-  'bass': 'Bass'
+  'bass': 'Bass',
+  'guitar': 'Guitar'
 };
