@@ -12,6 +12,7 @@ interface FretboardCanvasProps {
   colorMode: ColorMode;
   onFretClick: (string: number, fret: number) => void;
   scaleNotes?: number[];  // Optional: scale notes for highlighting (0-11)
+  rootNote?: number;      // Optional: root note of the scale (0-11)
 }
 
 export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
@@ -19,7 +20,8 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
   activeMIDINotes,
   colorMode,
   onFretClick,
-  scaleNotes = []
+  scaleNotes = [],
+  rootNote
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fretboardMatrix = createFretboardMatrix();
@@ -40,6 +42,46 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, width, height);
 
+    /**
+     * Calculate harmonic brightness based on scale degree importance
+     * @param noteClass - Note class (0-11)
+     * @returns brightness value (0-1)
+     */
+    const getHarmonicBrightness = (noteClass: number): number => {
+      // If no scale or root info, use default
+      if (scaleNotes.length === 0 || rootNote === undefined) {
+        return 0.5; // Medium brightness for unknown scales
+      }
+
+      // Check if note is in scale
+      if (!scaleNotes.includes(noteClass)) {
+        return 0.1; // Out of scale - very dim
+      }
+
+      // Calculate scale degree (interval from root)
+      const interval = (noteClass - rootNote + 12) % 12;
+
+      // Map scale degree to brightness based on harmonic importance
+      switch (interval) {
+        case 0:  // Root (1st) - Tonic
+          return 0.8;
+        case 7:  // Perfect 5th - Dominant
+          return 0.7;
+        case 4:  // Major 3rd - Mediant
+        case 3:  // Minor 3rd
+          return 0.6;
+        case 11: // Major 7th - Leading tone
+        case 10: // Minor 7th
+          return 0.5;
+        case 2:  // Major 2nd
+        case 5:  // Perfect 4th
+        case 9:  // Major 6th
+          return 0.45;
+        default:
+          return 0.4; // Other scale tones
+      }
+    };
+
     // Draw fretboard grid
     for (let string = 0; string < GUITAR_CONSTANTS.STRINGS; string++) {
       for (let fret = 0; fret < GUITAR_CONSTANTS.FRETS; fret++) {
@@ -58,17 +100,20 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
 
         const color = getNoteColor(noteClass, colorMode);
 
-        // 3-tier brightness system:
-        // - Triggered (chord/MIDI): 1.0 (full brightness)
-        // - In-scale (not triggered): 0.65 (bright)
-        // - Out-of-scale: 0.2 (dim but colored)
-        let brightness = 0.2; // Default: out-of-scale
-        const isInScale = scaleNotes.length === 0 || scaleNotes.includes(noteClass);
+        // Harmonic brightness system:
+        // - Active/triggered: 1.0 (100%)
+        // - Root: 0.8 (80%)
+        // - 5th: 0.7 (70%)
+        // - 3rd: 0.6 (60%)
+        // - 7th: 0.5 (50%)
+        // - 2nd/4th/6th: 0.45 (45%)
+        // - Out-of-scale: 0.1 (10%)
+        let brightness: number;
 
         if (isChordNote || isMIDIActive) {
-          brightness = 1.0; // Triggered
-        } else if (isInScale) {
-          brightness = 0.65; // In-scale but not triggered
+          brightness = 1.0; // Active notes at full brightness
+        } else {
+          brightness = getHarmonicBrightness(noteClass);
         }
 
         const x = fret * fretWidth + fretWidth / 2;
@@ -143,7 +188,7 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
       ctx.fillText(STRING_NAMES[string], 30, (string + 1) * stringHeight + 5);
     }
 
-  }, [activeChord, activeMIDINotes, colorMode, fretboardMatrix, scaleNotes]);
+  }, [activeChord, activeMIDINotes, colorMode, fretboardMatrix, scaleNotes, rootNote]);
 
   // Handle fret clicks
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {

@@ -14,7 +14,7 @@ import {
 } from './chordProgressions';
 import { createFretboardMatrix, getMIDINoteFromFret, fretboardToLEDIndex, GUITAR_CONSTANTS } from './constants';
 import { useMIDIInput } from '../../hooks/useMIDIInput';
-import { useMusicalScale } from '../../hooks/useMusicalScale';
+import { useMusicalScale, ROOT_POSITIONS } from '../../hooks/useMusicalScale';
 import { ScaleSelector } from '../Music/ScaleSelector';
 import { GUITAR_TUNINGS, getTuningMIDINotes, type GuitarTuning } from './tunings';
 
@@ -339,6 +339,7 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
                 colorMode={colorMode}
                 onFretClick={handleFretClick}
                 scaleNotes={getCurrentScale()}
+                rootNote={ROOT_POSITIONS[selectedRoot]}
               />
               <p className="text-sm text-gray-400 mt-2 text-center">
                 Click frets to play notes | Press 'C' for color mode | Press 'N' for next progression | Press 'Space' to play/pause
