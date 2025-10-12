@@ -11,6 +11,7 @@ interface WelcomeScreenProps {
   onMIDITest: () => void;
   onPianoRoll: () => void;
   onGuitarFretboard: () => void;
+  onLumiTest: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
@@ -22,7 +23,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onWLEDExperiment,
   onMIDITest,
   onPianoRoll,
-  onGuitarFretboard
+  onGuitarFretboard,
+  onLumiTest
 }) => {
   const [joinCode, setJoinCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
@@ -232,6 +234,25 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 Test direct mobile → WLED WebSocket connection without bridge
               </p>
               <div className="flex items-center gap-2 text-sm text-purple-400 group-hover:text-purple-300">
+                <span>Launch Test</span>
+                <Play className="w-4 h-4" />
+              </div>
+            </button>
+
+            {/* LUMI SysEx Test */}
+            <button
+              onClick={onLumiTest}
+              className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-pink-500/50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <Piano className="w-6 h-6 text-pink-400" />
+                <h3 className="font-semibold text-white">LUMI SysEx Test</h3>
+                <span className="text-xs bg-pink-600/30 text-pink-300 px-2 py-1 rounded">Debug</span>
+              </div>
+              <p className="text-sm text-gray-400 mb-4">
+                Test ROLI Piano M / LUMI Keys SysEx protocol in isolated environment
+              </p>
+              <div className="flex items-center gap-2 text-sm text-pink-400 group-hover:text-pink-300">
                 <span>Launch Test</span>
                 <Play className="w-4 h-4" />
               </div>

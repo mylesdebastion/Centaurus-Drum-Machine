@@ -9,6 +9,7 @@ import { WLEDDirectTest } from './components/WLEDExperiment/WLEDDirectTest';
 import { MIDITest } from './components/MIDI/MIDITest';
 import { PianoRoll } from './components/PianoRoll/PianoRoll';
 import { GuitarFretboard } from './components/GuitarFretboard/GuitarFretboard';
+import { LumiTest } from './components/LumiTest/LumiTest';
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
@@ -95,6 +96,14 @@ function App() {
     navigate('/');
   };
 
+  const handleLumiTest = () => {
+    navigate('/lumi-test');
+  };
+
+  const handleExitLumiTest = () => {
+    navigate('/');
+  };
+
   return (
     <Routes>
       <Route
@@ -110,6 +119,7 @@ function App() {
             onMIDITest={handleMIDITest}
             onPianoRoll={handlePianoRoll}
             onGuitarFretboard={handleGuitarFretboard}
+            onLumiTest={handleLumiTest}
           />
         }
       />
@@ -175,6 +185,14 @@ function App() {
         element={
           <GuitarFretboard
             onBack={handleExitGuitarFretboard}
+          />
+        }
+      />
+      <Route
+        path="/lumi-test"
+        element={
+          <LumiTest
+            onBack={handleExitLumiTest}
           />
         }
       />

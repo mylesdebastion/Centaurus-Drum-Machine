@@ -20,7 +20,8 @@
       "Bash(findstr:*)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:benob.github.io)"
+      "WebFetch(domain:benob.github.io)",
+      "WebFetch(domain:xivilay.github.io)"
     ],
     "deny": [],
     "ask": []
