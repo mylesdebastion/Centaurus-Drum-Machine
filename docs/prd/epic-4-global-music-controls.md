@@ -150,6 +150,45 @@ so that **students see consistent visual associations**.
 
 ---
 
+## Story 4.7: Module Loading System & Dynamic Canvas
+
+As a **user**,
+I want **to dynamically load and arrange multiple music modules (piano, guitar, visualizer, etc.) in a flexible canvas**,
+so that **I can customize my music production workspace without audio/visualization interruptions**.
+
+**Acceptance Criteria**:
+1. Create `/studio` test route with GlobalMusicHeader + ModuleCanvas
+2. Implement "+ Add Module" button with module selection panel
+3. Desktop layout: CSS Grid with multiple modules visible (2-3 columns)
+4. Mobile layout: Single module view with bottom tab navigation
+5. **Critical**: All loaded modules always mounted, CSS controls visibility (JamSession pattern)
+6. Module-specific settings accessible without conflicting with global settings
+7. Optional: Drag-drop module reordering (if not too complex)
+8. Persist loaded modules to localStorage
+
+**Integration Verification**:
+- **IV1**: Audio continues playing when adding/removing modules (no interruption)
+- **IV2**: Visualizations persist across layout changes (responsive resize)
+- **IV3**: Module-specific settings don't interfere with global settings
+
+**Architecture Pattern** (from JamSession):
+```typescript
+/* 🚨 CRITICAL: Always render modules, CSS controls visibility */
+{loadedModules.map(module => (
+  <div
+    key={module.id}
+    className={`
+      ${isMobile && activeModuleId !== module.id ? 'hidden' : ''}
+      ${!isMobile ? 'col-span-1' : ''}
+    `}
+  >
+    <module.component layout={isMobile ? 'mobile' : 'desktop'} />
+  </div>
+))}
+```
+
+---
+
 ## Story 4.6: View Integration & Refactoring
 
 As a **developer**,
@@ -265,9 +304,16 @@ interface GlobalMusicState {
 
 ## Future Enhancements (Post-MVP)
 
+### Module System Enhancements
+- **Drag-drop Module Reordering**: Visual reordering of modules in grid (if Story 4.7 deferred)
+- **Module Presets**: Save/load workspace configurations (which modules + layouts)
+- **Module Marketplace**: Community-contributed modules
+- **Module Isolation**: Run modules in separate audio contexts for independent processing
+- **Module Routing**: Audio/MIDI routing between modules
+
+### Global Features
 - **Ableton Link Integration**: Tempo sync with other apps/hardware
 - **Multi-user Sync**: Shared global state across jam session participants
-- **Preset System**: Save/load favorite key/scale/tempo configurations
 - **Advanced Hardware Orchestration**: Multi-device coordination patterns
 - **Custom Color Palettes**: User-defined visualization color schemes
 - **Time Signature Support**: Beyond 4/4 (3/4, 5/4, 7/8, etc.)
@@ -275,4 +321,4 @@ interface GlobalMusicState {
 
 ---
 
-**This epic establishes the professional UX foundation for Centaurus while maintaining MVP focus on core functionality.**
+**This epic establishes the professional UX foundation for Centaurus while maintaining MVP focus on core functionality. Story 4.7 introduces a modular workspace system that could potentially replace JamSession as the main collaborative environment.**

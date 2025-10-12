@@ -15,14 +15,21 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],
-    include: ['src/hardware/__tests__/**/*.test.{ts,tsx}'],
+    include: [
+      'src/hardware/__tests__/**/*.test.{ts,tsx}',
+      'src/contexts/__tests__/**/*.test.{ts,tsx}',
+    ],
     coverage: {
       reporter: ['text', 'html'],
-      include: ['src/hardware/**/*.{ts,tsx}'],
+      include: [
+        'src/hardware/**/*.{ts,tsx}',
+        'src/contexts/**/*.{ts,tsx}',
+      ],
       exclude: [
         'node_modules/',
         'src/test-setup.ts',
         'src/hardware/**/*.test.{ts,tsx}',
+        'src/contexts/**/*.test.{ts,tsx}',
       ],
       threshold: {
         global: {

@@ -38,4 +38,5 @@
     - [Story 4.3: Persistent Audio Engine Lifecycle](./epic-4-global-music-controls.md#story-43-persistent-audio-engine-lifecycle)
     - [Story 4.4: Hardware I/O Integration Points](./epic-4-global-music-controls.md#story-44-hardware-io-integration-points)
     - [Story 4.5: Visualization Color Mapping System](./epic-4-global-music-controls.md#story-45-visualization-color-mapping-system)
+    - [Story 4.7: Module Loading System & Dynamic Canvas](./epic-4-global-music-controls.md#story-47-module-loading-system--dynamic-canvas)
     - [Story 4.6: View Integration & Refactoring](./epic-4-global-music-controls.md#story-46-view-integration--refactoring)
