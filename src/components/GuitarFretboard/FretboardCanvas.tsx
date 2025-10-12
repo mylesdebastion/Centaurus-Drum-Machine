@@ -45,16 +45,10 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
     // Collect all currently active note classes (0-11) for interval-based brightness
     const activeNoteClasses = new Set<number>();
 
-    // From MIDI notes
+    // Only track MIDI notes (clicked/played notes), not chord diagram notes
+    // This ensures the interval guide only activates when actually playing
     activeMIDINotes.forEach(midiNote => {
       activeNoteClasses.add(midiNote % 12);
-    });
-
-    // From chord notes
-    activeChord.forEach(cn => {
-      const stringIndex = GUITAR_CONSTANTS.STRINGS - cn.string;
-      const noteClass = fretboardMatrix[stringIndex][cn.fret];
-      activeNoteClasses.add(noteClass);
     });
 
     /**
@@ -98,69 +92,52 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
     };
 
     /**
-     * Calculate EXAGGERATED brightness based on interval from active notes
+     * Calculate EXAGGERATED brightness based on interval from active note
      * This helps guide players toward musical intervals in real-time
+     * ONLY works with a single active note (clicking/playing one note at a time)
      * @param noteClass - Note class (0-11)
      * @returns brightness value (0-1)
      */
     const getIntervalBasedBrightness = (noteClass: number): number => {
-      if (activeNoteClasses.size === 0) {
+      // Only use interval guide for single active notes
+      // With multiple notes, every fretboard note would relate consonantly to something
+      if (activeNoteClasses.size !== 1) {
         return getHarmonicBrightness(noteClass); // Fallback to scale-based
       }
 
-      // Find the brightest interval relationship to any active note
-      let maxBrightness = 0;
+      // Get the single active note
+      const activeNote = Array.from(activeNoteClasses)[0];
+      const interval = (noteClass - activeNote + 12) % 12;
 
-      activeNoteClasses.forEach(activeNote => {
-        const interval = (noteClass - activeNote + 12) % 12;
-
-        // Exaggerated brightness scale emphasizing consonance/dissonance
-        let brightness: number;
-        switch (interval) {
-          case 0:  // Unison/Octave - Perfect consonance
-            brightness = 1.0;
-            break;
-          case 7:  // Perfect 5th - Very consonant
-            brightness = 0.9;
-            break;
-          case 5:  // Perfect 4th - Consonant
-            brightness = 0.85;
-            break;
-          case 4:  // Major 3rd - Consonant
-            brightness = 0.8;
-            break;
-          case 3:  // Minor 3rd - Consonant
-            brightness = 0.75;
-            break;
-          case 9:  // Major 6th - Consonant
-            brightness = 0.7;
-            break;
-          case 8:  // Minor 6th - Somewhat consonant
-            brightness = 0.65;
-            break;
-          case 2:  // Major 2nd - Neutral
-            brightness = 0.6;
-            break;
-          case 10: // Minor 7th - Somewhat dissonant
-            brightness = 0.5;
-            break;
-          case 11: // Major 7th - Dissonant
-            brightness = 0.4;
-            break;
-          case 6:  // Tritone - Very dissonant
-            brightness = 0.2;
-            break;
-          case 1:  // Minor 2nd - Very dissonant
-            brightness = 0.15;
-            break;
-          default:
-            brightness = 0.3;
-        }
-
-        maxBrightness = Math.max(maxBrightness, brightness);
-      });
-
-      return maxBrightness;
+      // Exaggerated brightness scale emphasizing consonance/dissonance
+      switch (interval) {
+        case 0:  // Unison/Octave - Perfect consonance
+          return 1.0;
+        case 7:  // Perfect 5th - Very consonant
+          return 0.9;
+        case 5:  // Perfect 4th - Consonant
+          return 0.85;
+        case 4:  // Major 3rd - Consonant
+          return 0.8;
+        case 3:  // Minor 3rd - Consonant
+          return 0.75;
+        case 9:  // Major 6th - Consonant
+          return 0.7;
+        case 8:  // Minor 6th - Somewhat consonant
+          return 0.65;
+        case 2:  // Major 2nd - Neutral
+          return 0.6;
+        case 10: // Minor 7th - Somewhat dissonant
+          return 0.5;
+        case 11: // Major 7th - Dissonant
+          return 0.4;
+        case 6:  // Tritone - Very dissonant
+          return 0.2;
+        case 1:  // Minor 2nd - Very dissonant
+          return 0.15;
+        default:
+          return 0.3;
+      }
     };
 
     // Draw fretboard grid
@@ -182,16 +159,15 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
         const color = getNoteColor(noteClass, colorMode);
 
         // Real-time interval guide brightness system:
-        // When notes are active (clicked/played):
-        //   - Active note: 1.0 (100%)
-        //   - Octave: 1.0 (100%) - Perfect consonance
+        // When a SINGLE note is clicked/played (not chords):
+        //   - Clicked note + octaves: 1.0 (100%)
         //   - Perfect 5th: 0.9 (90%) - Very consonant
         //   - Perfect 4th: 0.85 (85%)
         //   - Major 3rd: 0.8 (80%)
         //   - Minor 3rd: 0.75 (75%)
         //   - Tritone: 0.2 (20%) - Very dissonant
         //   - Minor 2nd: 0.15 (15%) - Very dissonant
-        // When no notes are active, uses scale-based harmonic brightness
+        // Otherwise (no notes or multiple notes), uses scale-based harmonic brightness
         let brightness: number;
 
         if (isChordNote || isMIDIActive) {
