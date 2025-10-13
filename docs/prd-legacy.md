@@ -1,8 +1,23 @@
 # Centaurus Drum Machine - APC40 Hardware Controller Integration PRD
 
-**Version**: 1.0  
-**Date**: 2025-09-25  
-**Product Manager**: John (BMad PM Agent)  
+**⚠️ HISTORICAL DOCUMENT**
+
+This document represents the original comprehensive PRD for Epic 1 (APC40 Hardware Controller Integration) created on 2025-09-25. It has been superseded by more structured documentation:
+
+**Current PRD:** See [`docs/prd/`](./prd/)
+- [PRD Index](./prd/index.md) - Product requirements overview
+- [Requirements](./prd/requirements.md) - Functional and non-functional requirements
+- [Technical Constraints](./prd/technical-constraints-and-integration-requirements.md) - Integration requirements
+
+**Epic 1 Details:** See [`docs/epics/epic-1-apc40-hardware-controller-integration.md`](./epics/epic-1-apc40-hardware-controller-integration.md)
+
+This document is preserved for historical reference and contains valuable context from initial planning, including the original user stories, requirements analysis, and integration strategies that shaped the hardware abstraction layer design.
+
+---
+
+**Version**: 1.0
+**Date**: 2025-09-25
+**Product Manager**: John (BMad PM Agent)
 
 ## Intro Project Analysis and Context
 

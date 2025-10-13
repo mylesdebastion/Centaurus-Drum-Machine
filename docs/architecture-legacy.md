@@ -1,8 +1,24 @@
 # Centaurus Drum Machine - APC40 Hardware Controller Integration Architecture
 
-**Version**: 1.0  
-**Date**: 2025-09-25  
-**Architect**: Winston (BMad Architect Agent)  
+**⚠️ HISTORICAL DOCUMENT**
+
+This document represents the original comprehensive architecture for Epic 1 (APC40 Hardware Controller Integration) created on 2025-09-25. It has been superseded by more structured documentation:
+
+**Current Architecture:** See [`docs/architecture/`](./architecture/)
+- [Architecture Index](./architecture/index.md) - Architecture overview
+- [Tech Stack](./architecture/tech-stack.md) - Technology stack details
+- [Component Architecture](./architecture/component-architecture.md) - Component structure
+- [Source Tree](./architecture/source-tree.md) - File organization
+
+**Epic 1 Details:** See [`docs/epics/epic-1-apc40-hardware-controller-integration.md`](./epics/epic-1-apc40-hardware-controller-integration.md)
+
+This document is preserved for historical reference and contains valuable context from initial planning, including the hardware abstraction layer design and Web MIDI API integration patterns.
+
+---
+
+**Version**: 1.0
+**Date**: 2025-09-25
+**Architect**: Winston (BMad Architect Agent)
 
 ## Introduction
 
