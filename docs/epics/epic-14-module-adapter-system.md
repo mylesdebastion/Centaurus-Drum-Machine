@@ -150,6 +150,44 @@
 
 ---
 
+### **Story 14.7: LED Compositor Implementation** 🆕 **HIGH**
+**Status:** NEW - Promoted from post-MVP to core Epic 14
+**Complexity:** Medium-High
+**Prerequisites:** Story 14.2 (Module Adapter) must complete
+**Blocks:** Stories 14.3-14.5 (modules need compositor API)
+**Design Document:** `docs/architecture/led-compositor-design.md`
+
+**Goal:** Implement LED Compositor Service that blends multiple module outputs onto limited LED hardware using visual compositing (multiply/screen blending modes).
+
+**Business Value:**
+- Users with 1-2 LED strips can see multiple visualizations simultaneously (Piano notes + Audio ripples)
+- Prevents information loss from priority-based routing
+- Compatibility detection prevents confusing output (Piano + Guitar warning)
+
+**Deliverables:**
+- `src/services/LEDCompositor.ts` (~250 lines) - Compositor service with frame blending
+- `src/types/ledFrame.ts` (~30 lines) - LEDFrame interface
+- `src/types/visualizationMode.ts` (~60 lines) - VisualizationMode enum + compatibility matrix
+- `src/types/blendMode.ts` (~50 lines) - BlendMode type + blendPixels function
+- Blending mode UI controls in GlobalMusicHeader (~30 lines)
+- Compatibility warning UI component (~40 lines)
+- **Total:** ~460 lines of new code
+
+**Acceptance Criteria:**
+1. ✅ LEDCompositor service functional (submitFrame, checkCompatibility, compositeFrames methods)
+2. ✅ 4 blending modes implemented (multiply, screen, additive, max)
+3. ✅ Compatibility detection working (COMPATIBILITY_MATRIX enforced)
+4. ✅ UI controls for blend mode selection
+5. ✅ Warning UI when incompatible visualizations detected
+6. ✅ Manual verification: Piano + Audio ripple blending (both visible simultaneously)
+7. ✅ Manual verification: Piano + Guitar incompatibility warning shown
+
+**Estimated Effort:** 8-10 hours
+
+**Note:** Audio Input Mode toggle deferred to Epic 15+ (existing `/dj-visualizer` work needs review, global vs. local planning required, MIDI note input support missing). See design document Section A.6 for details.
+
+---
+
 ## Technical Architecture
 
 ### Module Adapter Pattern
@@ -225,25 +263,51 @@ interface GlobalMusicState {
 - [ ] Edge cases handled (visualizers continue running)
 - [ ] Performance maintained (no audio clicks on transport changes)
 
+### Story 14.7 (LED Compositor) - NEW
+- [ ] LEDCompositor service functional with 4 blending modes
+- [ ] Compatibility detection prevents incompatible visualizations
+- [ ] UI controls for blend mode selection
+- [ ] Warning UI when incompatible modes detected
+- [ ] Manual verification: Piano + Audio ripple blending works
+- [ ] Manual verification: Piano + Guitar incompatibility warning shown
+
 ### Overall Epic Success
-- [ ] All 6 stories COMPLETE
+- [ ] All 7 stories COMPLETE (was 6, added Story 14.7)
 - [ ] Studio/Jam have synchronized musical parameters
 - [ ] Standalone views function identically to pre-refactoring
+- [ ] LED compositing enables multi-visualization on limited hardware
 - [ ] Documentation debt addressed (12 components added to source-tree.md)
 - [ ] Zero breaking changes to existing routes
 
 ---
 
-## Open Questions (Require User Research)
+## Open Questions & Resolutions
 
-**Deferred to Product Owner for user story research:**
+**✅ RESOLVED (2025-10-13 - Stakeholder Feedback from Myles):**
 
-1. **LED Routing Strategy** - Per-module WLED config vs. global routing table?
-2. **Hardware Sharing (MIDI/WLED)** - Can multiple modules share devices simultaneously?
-3. **Chord Progression System** - Global "chord mode" vs. module-specific content?
-4. **Transport Edge Cases** - Module-level play override behavior? Visualizer stop behavior?
+1. **LED Routing Strategy** - ✅ **RESOLVED:** LED Compositor Service with visual blending
+   - **Decision:** Multiple modules submit LED frames to compositor, which blends them using multiply/screen modes
+   - **Rationale:** Users want to see multiple visualizations simultaneously (Piano notes + Audio ripples), not choose which "wins"
+   - **Implementation:** Story 14.7 (LED Compositor Implementation)
+   - **Design Document:** `docs/architecture/led-compositor-design.md`
 
-**Decision:** These questions require user persona research and use case analysis before architectural decisions can be made. Architecture document marks these as "TBD" and provides placeholder patterns.
+2. **Hardware Sharing (MIDI/WLED)** - ✅ **RESOLVED:** Compatibility detection with toggle mode fallback
+   - **Decision:** Compatibility matrix checks visualization modes, prevents incompatible blending (Piano 88 LEDs + Guitar 150 LEDs)
+   - **Rationale:** Incompatible addressing schemes create confusing output, must be prevented
+   - **Implementation:** Story 14.7 (Compatibility matrix in `visualizationMode.ts`)
+
+**⏸️ DEFERRED to Future Epics:**
+
+3. **Chord Progression System** - ⏸️ **Epic 15+:** Global "chord mode" vs. module-specific content?
+   - **Reason:** Separate feature domain, warrants dedicated epic for chord progression features
+
+4. **Transport Edge Cases** - ⏸️ **Partial Resolution:** Visualizers always-on (ignore transport state)
+   - **Resolved:** Visualizers continue running when global transport paused (Story 14.6)
+   - **Deferred:** Module-level play override behavior (prototype current assumptions, gather user feedback)
+
+5. **Audio Input Mode** - ⏸️ **Epic 15+:** Show Live Audio vs. Clean Triggers Only
+   - **Reason:** Existing `/dj-visualizer` work needs review, global vs. local planning required, MIDI note input support missing
+   - **Design Note:** See `docs/architecture/led-compositor-design.md` Section A.6
 
 ---
 
@@ -274,8 +338,9 @@ interface GlobalMusicState {
 ## Related Documentation
 
 **Architecture Documents:**
-- `docs/architecture/brownfield-module-refactoring.md` - **PRIMARY DOCUMENT** (Story 14.1 deliverable, Sections 1-2 complete)
-- `docs/architecture-refactoring-checkpoint.md` - Session checkpoint for resumability
+- `docs/architecture/brownfield-module-refactoring.md` - **PRIMARY DOCUMENT** (Story 14.1 deliverable, Sections 1-12 COMPLETE)
+- `docs/architecture/led-compositor-design.md` - **LED COMPOSITOR DESIGN** (Story 14.7 deliverable, NEW - 2025-10-13)
+- `docs/architecture-refactoring-checkpoint.md` - Session checkpoint for resumability (if needed)
 - `docs/architecture/component-architecture.md` - Will be updated with module adapter pattern
 
 **Epic 4 Foundation:**

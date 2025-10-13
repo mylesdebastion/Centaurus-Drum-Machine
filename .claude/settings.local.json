@@ -32,7 +32,8 @@
       "Bash(curl -s \"https://raw.githubusercontent.com/benob/LUMI-lights/master/littlefoot/ripple.littlefoot\")",
       "Bash(curl -s \"https://raw.githubusercontent.com/benob/LUMI-lights/master/littlefoot/random_colors.littlefoot\")",
       "WebFetch(domain:weareroli.github.io)",
-      "Bash(npm run test:run:*)"
+      "Bash(npm run test:run:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

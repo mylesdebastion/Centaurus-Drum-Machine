@@ -1,5 +1,36 @@
 # Claude Code Development Guidelines
 
+## Project Scale & Testing Philosophy
+
+**Scale:** Small-to-medium creative coding project (5 interactive modules, solo developer/small team)
+
+**Testing Approach:**
+- **Manual testing** with human-in-the-loop verification (NOT automated test suites)
+- Browser DevTools for debugging and performance monitoring
+- Visual/audio inspection of module behavior across views
+- Git history + Dev Agent Records as implementation verification
+
+**What We DON'T Use:**
+- ❌ Automated unit test frameworks (Vitest, Jest, etc.)
+- ❌ Integration test suites or E2E test frameworks
+- ❌ Code coverage metrics or test coverage requirements
+- ❌ CI/CD test pipelines
+- ❌ Formal QA department sign-offs
+
+**BMAD Workflow Adaptation:**
+- Architecture documents include **"Manual Verification Steps"** not "Test Suites"
+- Stories focus on **"Verification Checklist"** not "Test Coverage %"
+- Dev Agent Records document **manual testing performed**, not tests written
+- "Testing Strategy" sections describe **browser-based verification workflows**
+
+**Quality Assurance:**
+- Developer manually tests features in browser (localhost:5173)
+- Audio/visual behavior verified by ear and eye
+- Responsive design tested via browser DevTools (mobile/tablet/desktop)
+- Hardware integration (MIDI/WLED) tested with physical devices when available
+
+---
+
 ## UX Design Standards (bolt.new Template)
 
 **Core Design Philosophy**: For all designs and UI components, make them **beautiful, not cookie cutter**. Create webpages and components that are **fully featured and worthy for production**.
