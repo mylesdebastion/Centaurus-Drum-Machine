@@ -50,39 +50,49 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
   onLoadDefaultPattern,
   embedded = false
 }) => {
-  // Responsive layout: use compact view on small screens or when embedded in constrained containers
+  // Responsive layout: use compact view when container width is constrained
   const [isCompact, setIsCompact] = useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const checkScreenSize = () => {
-      // Use compact layout if:
-      // 1. Screen width < 768px (mobile/tablet) OR
-      // 2. Embedded in Studio with constrained width (< 900px container)
-      const shouldBeCompact = window.innerWidth < 768 || (embedded && window.innerWidth < 1400);
-      setIsCompact(shouldBeCompact);
-    };
+    if (!containerRef.current) return;
 
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    return () => window.removeEventListener('resize', checkScreenSize);
-  }, [embedded]);
+    // Use ResizeObserver to measure actual container width
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const containerWidth = entry.contentRect.width;
+        // Switch to compact layout if container width < 900px
+        // This handles both mobile screens AND Studio 2/3 column layouts
+        const shouldBeCompact = containerWidth < 900;
+        setIsCompact(shouldBeCompact);
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
 
   // Use compact drum machine for narrow layouts
   if (isCompact) {
     return (
-      <CompactDrumMachine
-        tracks={tracks}
-        currentStep={currentStep}
-        isPlaying={isPlaying}
-        tempo={tempo}
-        colorMode={colorMode}
-        onStepToggle={onStepToggle}
-        onPlay={onPlay}
-        onStop={onStop}
-        onTempoChange={onTempoChange}
-        onAddTrack={onAddTrack}
-        onLoadDefaultPattern={onLoadDefaultPattern}
-      />
+      <div ref={containerRef}>
+        <CompactDrumMachine
+          tracks={tracks}
+          currentStep={currentStep}
+          isPlaying={isPlaying}
+          tempo={tempo}
+          colorMode={colorMode}
+          onStepToggle={onStepToggle}
+          onPlay={onPlay}
+          onStop={onStop}
+          onTempoChange={onTempoChange}
+          onAddTrack={onAddTrack}
+          onLoadDefaultPattern={onLoadDefaultPattern}
+        />
+      </div>
     );
   }
   // Initialize audio engine on play (requires user interaction for Tone.js)
@@ -119,7 +129,7 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
 
   // Desktop layout with full grid
   return (
-    <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+    <div ref={containerRef} className="bg-gray-800 rounded-xl p-6 border border-gray-700">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold">Drum Machine</h2>
         <div className="flex items-center gap-4">
