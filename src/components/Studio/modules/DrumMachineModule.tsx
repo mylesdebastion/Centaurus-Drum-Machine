@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DrumMachine } from '../../DrumMachine/DrumMachine';
+import { CompactDrumMachine } from '../../DrumMachine/CompactDrumMachine';
 import { useGlobalMusic } from '../../../contexts/GlobalMusicContext';
 import { DrumTrack } from '../../../types';
 import { createDefaultPattern } from '../../../utils/drumPatterns';
@@ -7,6 +8,10 @@ import { createDefaultPattern } from '../../../utils/drumPatterns';
 /**
  * DrumMachineModule - Wrapper for DrumMachine in Studio (Story 4.7)
  * Manages state internally and integrates with GlobalMusicContext
+ *
+ * Layout adaptation:
+ * - 'desktop' (1 module): Full DrumMachine with all tracks visible
+ * - 'mobile' (2-3 modules): CompactDrumMachine with tabbed track selection
  */
 
 interface DrumMachineModuleProps {
@@ -16,7 +21,7 @@ interface DrumMachineModuleProps {
   embedded?: boolean;
 }
 
-export const DrumMachineModule: React.FC<DrumMachineModuleProps> = ({ embedded = false }) => {
+export const DrumMachineModule: React.FC<DrumMachineModuleProps> = ({ layout = 'desktop' }) => {
   const music = useGlobalMusic();
 
   // Drum Machine state
@@ -148,6 +153,26 @@ export const DrumMachineModule: React.FC<DrumMachineModuleProps> = ({ embedded =
     setTracks(createDefaultPattern());
   };
 
+  // Render compact layout when available width is constrained (2-3 module grid)
+  if (layout === 'mobile') {
+    return (
+      <CompactDrumMachine
+        tracks={tracks}
+        currentStep={currentStep}
+        isPlaying={localIsPlaying}
+        tempo={music.tempo}
+        colorMode={music.colorMode}
+        onStepToggle={handleStepToggle}
+        onPlay={handlePlay}
+        onStop={handleStop}
+        onTempoChange={music.updateTempo}
+        onAddTrack={handleAddTrack}
+        onLoadDefaultPattern={handleLoadDefaultPattern}
+      />
+    );
+  }
+
+  // Render full layout when module occupies full width (1 module)
   return (
     <DrumMachine
       tracks={tracks}
@@ -168,7 +193,6 @@ export const DrumMachineModule: React.FC<DrumMachineModuleProps> = ({ embedded =
       onAddTrack={handleAddTrack}
       onRemoveTrack={handleRemoveTrack}
       onLoadDefaultPattern={handleLoadDefaultPattern}
-      embedded={embedded}
     />
   );
 };

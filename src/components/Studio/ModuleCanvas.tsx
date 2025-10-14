@@ -74,6 +74,12 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
         const ModuleComponent = definition.component;
         const isActive = !isMobile || activeModuleId === module.instanceId;
 
+        // Determine layout based on available width:
+        // - Mobile browsers always get 'mobile' layout
+        // - Desktop with 2-3 modules = 'mobile' layout (constrained width, use CompactDrumMachine)
+        // - Desktop with 1 module = 'desktop' layout (full width, use full DrumMachine)
+        const effectiveLayout = isMobile || modules.length >= 2 ? 'mobile' : 'desktop';
+
         return (
           <div
             key={module.instanceId}
@@ -89,7 +95,7 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
               onClose={() => onRemoveModule(module.instanceId)}
             >
               <ModuleComponent
-                layout={isMobile ? 'mobile' : 'desktop'}
+                layout={effectiveLayout}
                 settings={module.settings}
                 onSettingsChange={(newSettings: Record<string, any>) =>
                   onUpdateSettings(module.instanceId, newSettings)
