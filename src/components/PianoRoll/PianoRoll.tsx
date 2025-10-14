@@ -862,148 +862,16 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                 </div>
               </div>
 
-              {/* Settings Menu */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowSettings(!showSettings)}
-                  className={`p-2 hover:bg-gray-700 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center ${
-                    showSettings ? 'bg-gray-700' : ''
-                  }`}
-                  aria-label="Toggle settings"
-                >
-                  <Settings className="w-5 h-5" />
-                </button>
-
-                {showSettings && (
-                  <div className="absolute top-full right-0 mt-2 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl overflow-hidden z-50">
-                    <div className="p-4 border-b border-gray-700 bg-gray-900">
-                      <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                        <Settings className="w-4 h-4" />
-                        Visualizer Settings
-                      </h3>
-                    </div>
-
-                    <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
-                      {/* Visible Octaves */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Visible Octaves: <span className="text-primary-400">{visibleOctaves}</span>
-                        </label>
-                        <input
-                          type="range"
-                          min="1"
-                          max="7"
-                          step="1"
-                          value={visibleOctaves}
-                          onChange={(e) => setVisibleOctaves(Number(e.target.value))}
-                          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
-                        />
-                        <div className="flex justify-between text-xs text-gray-500 mt-1">
-                          <span>1</span>
-                          <span>7</span>
-                        </div>
-                      </div>
-
-                      {/* Start Octave */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Start Octave: <span className="text-primary-400">C{startOctave}</span>
-                        </label>
-                        <input
-                          type="range"
-                          min="0"
-                          max="7"
-                          step="1"
-                          value={startOctave}
-                          onChange={(e) => setStartOctave(Number(e.target.value))}
-                          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
-                        />
-                        <div className="flex justify-between text-xs text-gray-500 mt-1">
-                          <span>C0</span>
-                          <span>C7</span>
-                        </div>
-                      </div>
-
-                      {/* WLED Output */}
-                      <div className="pt-2 border-t border-gray-700">
-                        <div className="flex items-center justify-between mb-2">
-                          <label htmlFor="wled-enabled" className="text-sm font-medium text-gray-300">
-                            WLED Output (144 LEDs)
-                          </label>
-                          <input
-                            type="checkbox"
-                            id="wled-enabled"
-                            checked={wledEnabled}
-                            onChange={(e) => setWledEnabled(e.target.checked)}
-                            className="w-5 h-5 text-primary-600 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-primary-500"
-                          />
-                        </div>
-
-                        {wledEnabled && (
-                          <input
-                            type="text"
-                            value={wledIP}
-                            onChange={(e) => setWledIP(e.target.value)}
-                            placeholder="WLED IP (e.g., 192.168.8.106)"
-                            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                          />
-                        )}
-                        <p className="text-xs text-gray-500 mt-2">
-                          Sends real-time color data to WLED LED strip controller
-                        </p>
-                      </div>
-
-                      {/* LUMI/Piano M Output - PROOF OF CONCEPT */}
-                      <div className="pt-2 border-t border-gray-700">
-                        <div className="flex items-center justify-between mb-2">
-                          <label htmlFor="lumi-enabled" className="text-sm font-medium text-gray-300">
-                            ROLI Piano M / LUMI Keys
-                          </label>
-                          <input
-                            type="checkbox"
-                            id="lumi-enabled"
-                            checked={lumiEnabled}
-                            onChange={(e) => setLumiEnabled(e.target.checked)}
-                            className="w-5 h-5 text-primary-600 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-primary-500"
-                          />
-                        </div>
-
-                        {/* MIDI Output Device Selector */}
-                        {midiOutputDevices.length > 0 && (
-                          <div className="mt-2">
-                            <label className="block text-xs font-medium text-gray-400 mb-1">
-                              MIDI Output Device
-                            </label>
-                            <select
-                              value={selectedOutputId || ''}
-                              onChange={(e) => {
-                                const deviceId = e.target.value;
-                                setSelectedOutputId(deviceId);
-                                const output = midiOutputManager.selectDevice(deviceId);
-                                if (output) {
-                                  lumiController.connect(output);
-                                  console.log('[PianoVisualizer] Switched to MIDI output:', deviceId);
-                                }
-                              }}
-                              className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            >
-                              {midiOutputDevices.map((device) => (
-                                <option key={device.id} value={device.id}>
-                                  {device.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-
-                        <p className="text-xs text-gray-500 mt-2">
-                          <strong className="text-orange-400">PROOF OF CONCEPT:</strong> Controls LUMI lights via reverse-engineered SysEx. Requires LUMI device connected via WebMIDI.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* Settings Toggle Button */}
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className={`p-2 hover:bg-gray-700 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center ${
+                  showSettings ? 'bg-gray-700' : ''
+                }`}
+                aria-label="Toggle settings"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
             </div>
 
             <div className="h-64 sm:h-80 md:h-96">
@@ -1040,6 +908,131 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
               </div>
             )}
           </div>
+
+          {/* Settings Panels */}
+          {showSettings && (
+            <>
+              {/* Visualizer Settings */}
+              <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+                <h3 className="text-sm font-medium text-gray-300 mb-3">Visualizer Settings</h3>
+
+                <div className="space-y-4">
+                  {/* Visible Octaves */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Visible Octaves: <span className="text-primary-400">{visibleOctaves}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="7"
+                      step="1"
+                      value={visibleOctaves}
+                      onChange={(e) => setVisibleOctaves(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>1</span>
+                      <span>7</span>
+                    </div>
+                  </div>
+
+                  {/* Start Octave */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Start Octave: <span className="text-primary-400">C{startOctave}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="7"
+                      step="1"
+                      value={startOctave}
+                      onChange={(e) => setStartOctave(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>C0</span>
+                      <span>C7</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* WLED Output Settings */}
+              <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-gray-300">WLED Output (144 LEDs)</h3>
+                  <input
+                    type="checkbox"
+                    id="wled-enabled"
+                    checked={wledEnabled}
+                    onChange={(e) => setWledEnabled(e.target.checked)}
+                    className="w-5 h-5 text-primary-600 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+
+                {wledEnabled && (
+                  <input
+                    type="text"
+                    value={wledIP}
+                    onChange={(e) => setWledIP(e.target.value)}
+                    placeholder="WLED IP (e.g., 192.168.8.106)"
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 mb-2"
+                  />
+                )}
+                <p className="text-xs text-gray-500">
+                  Sends real-time color data to WLED LED strip controller
+                </p>
+              </div>
+
+              {/* LUMI/Piano M Output Settings */}
+              <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-gray-300">ROLI Piano M / LUMI Keys</h3>
+                  <input
+                    type="checkbox"
+                    id="lumi-enabled"
+                    checked={lumiEnabled}
+                    onChange={(e) => setLumiEnabled(e.target.checked)}
+                    className="w-5 h-5 text-primary-600 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+
+                {/* MIDI Output Device Selector */}
+                {midiOutputDevices.length > 0 && (
+                  <div className="mb-2">
+                    <label className="block text-xs font-medium text-gray-400 mb-1">
+                      MIDI Output Device
+                    </label>
+                    <select
+                      value={selectedOutputId || ''}
+                      onChange={(e) => {
+                        const deviceId = e.target.value;
+                        setSelectedOutputId(deviceId);
+                        const output = midiOutputManager.selectDevice(deviceId);
+                        if (output) {
+                          lumiController.connect(output);
+                          console.log('[PianoVisualizer] Switched to MIDI output:', deviceId);
+                        }
+                      }}
+                      className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      {midiOutputDevices.map((device) => (
+                        <option key={device.id} value={device.id}>
+                          {device.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-500">
+                  <strong className="text-orange-400">PROOF OF CONCEPT:</strong> Controls LUMI lights via reverse-engineered SysEx. Requires LUMI device connected via WebMIDI.
+                </p>
+              </div>
+            </>
+          )}
 
           {/* MIDI Setup Panel */}
           <CollapsiblePanel title="MIDI Setup" defaultOpen={true} mobileOnly={true}>
