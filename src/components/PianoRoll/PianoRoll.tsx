@@ -51,6 +51,14 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
   const selectedRoot = isStandalone ? localSelectedRoot : globalMusic.key;
   const selectedScale = isStandalone ? localSelectedScale : globalMusic.scale;
 
+  // Sync with global transport state when in Studio (Epic 14)
+  // Global play button controls all modules, but module buttons control only themselves
+  useEffect(() => {
+    if (!isStandalone) {
+      setLocalIsPlayingChords(globalMusic.isPlaying);
+    }
+  }, [globalMusic.isPlaying, isStandalone]);
+
   // Local-only state (not part of global context)
   const [visibleOctaves, setVisibleOctaves] = useState(4);
   const [startOctave, setStartOctave] = useState(3);
@@ -69,7 +77,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
   const [selectedChordIndex, setSelectedChordIndex] = useState(0);
   const [showProgressionMenu, setShowProgressionMenu] = useState(false);
   const [chordProgressionEnabled, setChordProgressionEnabled] = useState(false);
-  const [isPlayingChords, setIsPlayingChords] = useState(false);
+  const [localIsPlayingChords, setLocalIsPlayingChords] = useState(false);
 
   // Sound engine state
   const [selectedSoundEngine, setSelectedSoundEngine] = useState<SoundEngineType>('keys');
@@ -201,7 +209,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
 
   // Auto-advance chords when playing
   useEffect(() => {
-    if (!isPlayingChords || !chordProgressionEnabled) return;
+    if (!localIsPlayingChords || !chordProgressionEnabled) return;
 
     // Play current chord immediately
     playCurrentChord();
@@ -216,7 +224,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     }, 2000); // Change chord every 2 seconds
 
     return () => clearInterval(interval);
-  }, [isPlayingChords, chordProgressionEnabled, selectedProgressionIndex, playCurrentChord, selectedChordIndex]);
+  }, [localIsPlayingChords, chordProgressionEnabled, selectedProgressionIndex, playCurrentChord, selectedChordIndex]);
 
   // Initialize audio context and sound engine
   useEffect(() => {
@@ -282,7 +290,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     if (!audioContextRef.current || !masterGainRef.current) return;
 
     // Stop chord playback to prevent using disposed engine
-    setIsPlayingChords(false);
+    setLocalIsPlayingChords(false);
 
     // Clear all pending note release timeouts
     noteReleaseTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
@@ -683,23 +691,24 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                 )}
 
                 {/* Chord Progression Controls */}
-                {/* Play/Stop Button */}
+                {/* Play/Stop Button - Module-specific control */}
                 <button
                   onClick={() => {
-                    const newPlayingState = !isPlayingChords;
-                    setIsPlayingChords(newPlayingState);
+                    const newPlayingState = !localIsPlayingChords;
+                    setLocalIsPlayingChords(newPlayingState);
+
                     // Enable chords when play is clicked
                     if (newPlayingState) {
                       setChordProgressionEnabled(true);
                     }
                   }}
                   className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-all text-sm font-semibold ${
-                    isPlayingChords
+                    localIsPlayingChords
                       ? 'bg-red-600 hover:bg-red-700'
                       : 'bg-blue-600 hover:bg-blue-700'
                   }`}
                 >
-                  {isPlayingChords ? (
+                  {localIsPlayingChords ? (
                     <>
                       <Square className="w-4 h-4" />
                       Stop Chords

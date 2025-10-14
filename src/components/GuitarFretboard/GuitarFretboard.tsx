@@ -44,7 +44,7 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
   const [localColorMode, setLocalColorMode] = useState<ColorMode>('chromatic');
   const [guitarSynth, setGuitarSynth] = useState<Tone.PolySynth | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [localIsPlaying, setLocalIsPlaying] = useState(false); // Local playback state
   const [showProgressionMenu, setShowProgressionMenu] = useState(false);
   const [selectedTuning, setSelectedTuning] = useState<GuitarTuning>(GUITAR_TUNINGS[0]); // Standard tuning
   const [showTuningMenu, setShowTuningMenu] = useState(false);
@@ -68,6 +68,14 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
   const colorMode = isStandalone ? localColorMode : globalMusic.colorMode;
   const selectedRoot = isStandalone ? localSelectedRoot : globalMusic.key;
   const selectedScale = isStandalone ? localSelectedScale : globalMusic.scale;
+
+  // Sync with global transport state when in Studio (Epic 14)
+  // Global play button controls all modules, but module buttons control only themselves
+  useEffect(() => {
+    if (!isStandalone) {
+      setLocalIsPlaying(globalMusic.isPlaying);
+    }
+  }, [globalMusic.isPlaying, isStandalone]);
 
   // Helper to get current scale notes (handles both local and global)
   const getCurrentScale = useCallback(() => {
@@ -204,14 +212,14 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
 
   // Auto-advance chords every 5 seconds (only when playing)
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!localIsPlaying) return;
 
     const interval = setInterval(() => {
       setCurrentChord(prev => (prev + 1) % progression.chords.length);
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [progression, isPlaying]);
+  }, [progression, localIsPlaying]);
 
   /**
    * Play the current chord notes
@@ -239,21 +247,24 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
    * Play current chord when it changes (if playing mode is active)
    */
   useEffect(() => {
-    if (isPlaying && guitarSynth) {
+    if (localIsPlaying && guitarSynth) {
       playChord(chord.notes);
     }
-  }, [currentChord, isPlaying, guitarSynth, playChord, chord.notes]);
+  }, [currentChord, localIsPlaying, guitarSynth, playChord, chord.notes]);
 
   /**
-   * Toggle play/pause for chord progression
+   * Toggle play/pause for chord progression (module-specific control)
+   * This controls only this module, not other modules
    */
   const togglePlayPause = useCallback(() => {
-    setIsPlaying(prev => !prev);
+    const newPlayingState = !localIsPlaying;
+    setLocalIsPlaying(newPlayingState);
+
     // Play chord immediately when starting
-    if (!isPlaying && guitarSynth) {
+    if (newPlayingState && guitarSynth) {
       playChord(chord.notes);
     }
-  }, [isPlaying, guitarSynth, playChord, chord.notes]);
+  }, [localIsPlaying, guitarSynth, playChord, chord.notes]);
 
   // Handle fret clicks
   const handleFretClick = useCallback((string: number, fret: number) => {
@@ -433,13 +444,13 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
             <button
               onClick={togglePlayPause}
               className={`p-2 rounded-lg transition-colors ${
-                isPlaying
+                localIsPlaying
                   ? 'bg-red-600 hover:bg-red-700 text-white'
                   : 'bg-green-600 hover:bg-green-700 text-white'
               }`}
-              aria-label={isPlaying ? 'Pause' : 'Play'}
+              aria-label={localIsPlaying ? 'Pause' : 'Play'}
             >
-              {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+              {localIsPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
             </button>
           </div>
 
@@ -465,7 +476,10 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
                       setCurrentProgressionIndex(index);
                       setCurrentChord(0);
                       setShowProgressionMenu(false);
-                      setIsPlaying(false);
+                      // Stop playback when changing progression
+                      if (localIsPlaying) {
+                        setLocalIsPlaying(false);
+                      }
                     }}
                     className={`w-full px-4 py-3 text-left hover:bg-gray-700 transition-colors border-b border-gray-700 last:border-b-0 ${
                       currentProgressionIndex === index
@@ -665,13 +679,13 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
                 <button
                   onClick={togglePlayPause}
                   className={`p-2 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${
-                    isPlaying
+                    localIsPlaying
                       ? 'bg-red-600 hover:bg-red-700 text-white'
                       : 'bg-green-600 hover:bg-green-700 text-white'
                   }`}
-                  aria-label={isPlaying ? 'Pause' : 'Play'}
+                  aria-label={localIsPlaying ? 'Pause' : 'Play'}
                 >
-                  {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                  {localIsPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                 </button>
               </div>
 
@@ -697,7 +711,10 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
                           setCurrentProgressionIndex(index);
                           setCurrentChord(0);
                           setShowProgressionMenu(false);
-                          setIsPlaying(false); // Stop playing when changing progression
+                          // Stop playback when changing progression
+                          if (localIsPlaying) {
+                            setLocalIsPlaying(false);
+                          }
                         }}
                         className={`w-full px-4 py-3 text-left hover:bg-gray-700 transition-colors min-h-[44px] border-b border-gray-700 last:border-b-0 ${
                           currentProgressionIndex === index

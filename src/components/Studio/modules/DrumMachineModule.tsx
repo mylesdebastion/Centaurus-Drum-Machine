@@ -22,12 +22,25 @@ export const DrumMachineModule: React.FC<DrumMachineModuleProps> = () => {
   // Drum Machine state
   const [tracks, setTracks] = useState<DrumTrack[]>(() => createDefaultPattern());
   const [currentStep, setCurrentStep] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [localIsPlaying, setLocalIsPlaying] = useState(false);
   const playbackTimerRef = useRef<number | null>(null);
 
-  // Playback timer - synced with global tempo
+  // Sync with global transport state (Epic 14 - Module Adapter Pattern)
+  // Global play button controls all modules, but module buttons control only themselves
   useEffect(() => {
-    if (isPlaying) {
+    setLocalIsPlaying(music.isPlaying);
+  }, [music.isPlaying]);
+
+  // Reset step when playback stops
+  useEffect(() => {
+    if (!localIsPlaying) {
+      setCurrentStep(0);
+    }
+  }, [localIsPlaying]);
+
+  // Playback timer - synced with tempo
+  useEffect(() => {
+    if (localIsPlaying) {
       const stepDuration = (60 / music.tempo / 4) * 1000; // 16th note duration
       playbackTimerRef.current = window.setInterval(() => {
         setCurrentStep((prev) => (prev + 1) % 16);
@@ -42,12 +55,15 @@ export const DrumMachineModule: React.FC<DrumMachineModuleProps> = () => {
         clearInterval(playbackTimerRef.current);
       }
     };
-  }, [isPlaying, music.tempo]);
+  }, [localIsPlaying, music.tempo]);
 
-  // Drum Machine handlers
-  const handlePlay = () => setIsPlaying(true);
+  // Drum Machine handlers - module-specific control
+  const handlePlay = () => {
+    setLocalIsPlaying(true);
+  };
+
   const handleStop = () => {
-    setIsPlaying(false);
+    setLocalIsPlaying(false);
     setCurrentStep(0);
   };
 
@@ -136,7 +152,7 @@ export const DrumMachineModule: React.FC<DrumMachineModuleProps> = () => {
     <DrumMachine
       tracks={tracks}
       currentStep={currentStep}
-      isPlaying={isPlaying}
+      isPlaying={localIsPlaying}
       tempo={music.tempo}
       colorMode={music.colorMode}
       onStepToggle={handleStepToggle}
