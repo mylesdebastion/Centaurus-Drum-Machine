@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { DrumTrack, ColorMode } from '../../types';
 import { TrackRow } from './TrackRow';
 import { TransportControls } from './TransportControls';
 import { TrackManager } from './TrackManager';
+import { CompactDrumMachine } from './CompactDrumMachine';
 import { audioEngine } from '../../utils/audioEngine';
 
 interface DrumMachineProps {
@@ -49,6 +50,41 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
   onLoadDefaultPattern,
   embedded = false
 }) => {
+  // Responsive layout: use compact view on small screens or when embedded in constrained containers
+  const [isCompact, setIsCompact] = useState(false);
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      // Use compact layout if:
+      // 1. Screen width < 768px (mobile/tablet) OR
+      // 2. Embedded in Studio with constrained width (< 900px container)
+      const shouldBeCompact = window.innerWidth < 768 || (embedded && window.innerWidth < 1400);
+      setIsCompact(shouldBeCompact);
+    };
+
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, [embedded]);
+
+  // Use compact drum machine for narrow layouts
+  if (isCompact) {
+    return (
+      <CompactDrumMachine
+        tracks={tracks}
+        currentStep={currentStep}
+        isPlaying={isPlaying}
+        tempo={tempo}
+        colorMode={colorMode}
+        onStepToggle={onStepToggle}
+        onPlay={onPlay}
+        onStop={onStop}
+        onTempoChange={onTempoChange}
+        onAddTrack={onAddTrack}
+        onLoadDefaultPattern={onLoadDefaultPattern}
+      />
+    );
+  }
   // Initialize audio engine on play (requires user interaction for Tone.js)
   const handlePlay = async () => {
     try {
@@ -81,6 +117,7 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
     });
   }, [currentStep, isPlaying, tracks]);
 
+  // Desktop layout with full grid
   return (
     <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
       <div className="flex items-center justify-between mb-6">
@@ -91,7 +128,7 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
             className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
-            <span className="hidden sm:inline">Load Default Beat</span>
+            Load Default Beat
           </button>
           <button
             onClick={onClearAll}
@@ -117,47 +154,42 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
         maxTracks={8}
       />
 
-      {/* Step Grid Container - scrollable when embedded */}
-      <div className={embedded ? 'overflow-x-auto' : ''}>
-        <div className={embedded ? 'min-w-[800px]' : ''}>
-          {/* Step Numbers */}
-          <div className="flex items-center mb-4">
-            <div className="w-32"></div> {/* Track label space */}
-            <div className="flex gap-2">
-              {Array.from({ length: 16 }, (_, i) => (
-                <div
-                  key={i}
-                  className={`w-12 h-6 flex items-center justify-center text-xs font-mono ${
-                    i % 4 === 0 ? 'text-primary-400' : 'text-gray-500'
-                  }`}
-                >
-                  {i + 1}
-                </div>
-              ))}
+      {/* Step Numbers */}
+      <div className="flex items-center mb-4">
+        <div className="w-32"></div> {/* Track label space */}
+        <div className="flex gap-2">
+          {Array.from({ length: 16 }, (_, i) => (
+            <div
+              key={i}
+              className={`w-12 h-6 flex items-center justify-center text-xs font-mono ${
+                i % 4 === 0 ? 'text-primary-400' : 'text-gray-500'
+              }`}
+            >
+              {i + 1}
             </div>
-          </div>
-
-          {/* Tracks */}
-          <div className="space-y-3">
-            {tracks.map((track) => (
-              <TrackRow
-                key={track.id}
-                track={track}
-                currentStep={currentStep}
-                isPlaying={isPlaying}
-                colorMode={colorMode}
-                onStepToggle={(stepIndex) => onStepToggle(track.id, stepIndex)}
-                onVelocityChange={(stepIndex, velocity) => onVelocityChange(track.id, stepIndex, velocity)}
-                onMute={() => onTrackMute(track.id)}
-                onSolo={() => onTrackSolo(track.id)}
-                onVolumeChange={(volume) => onTrackVolumeChange(track.id, volume)}
-                onClear={() => onClearTrack(track.id)}
-                onRemove={() => onRemoveTrack(track.id)}
-                canRemove={tracks.length > 1}
-              />
-            ))}
-          </div>
+          ))}
         </div>
+      </div>
+
+      {/* Tracks */}
+      <div className="space-y-3">
+        {tracks.map((track) => (
+          <TrackRow
+            key={track.id}
+            track={track}
+            currentStep={currentStep}
+            isPlaying={isPlaying}
+            colorMode={colorMode}
+            onStepToggle={(stepIndex) => onStepToggle(track.id, stepIndex)}
+            onVelocityChange={(stepIndex, velocity) => onVelocityChange(track.id, stepIndex, velocity)}
+            onMute={() => onTrackMute(track.id)}
+            onSolo={() => onTrackSolo(track.id)}
+            onVolumeChange={(volume) => onTrackVolumeChange(track.id, volume)}
+            onClear={() => onClearTrack(track.id)}
+            onRemove={() => onRemoveTrack(track.id)}
+            canRemove={tracks.length > 1}
+          />
+        ))}
       </div>
 
       {/* Pattern Info */}
