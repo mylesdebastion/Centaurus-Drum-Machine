@@ -2,10 +2,16 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { wledBridgePlugin } from './vite-plugins/wled-bridge'
+import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), wledBridgePlugin()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   server: {
     host: '0.0.0.0', // Listen on all network interfaces for tablet/mobile access
     port: 5173,
