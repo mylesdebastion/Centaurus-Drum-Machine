@@ -171,6 +171,14 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
 
     const chordNotes = Array.from(getChordMIDINotes());
 
+    // Send MIDI to visualizer (Studio inter-module communication)
+    const sourceManager = (window as any).frequencySourceManager;
+    if (sourceManager) {
+      chordNotes.forEach((midiNote) => {
+        sourceManager.addMidiNote(midiNote, 89); // velocity ~70% (89/127)
+      });
+    }
+
     // Trigger chord attack with error handling
     chordNotes.forEach((midiNote) => {
       const frequency = 440 * Math.pow(2, (midiNote - 69) / 12);
@@ -383,6 +391,12 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
         console.warn('[PianoVisualizer] Sound engine error on key click:', error);
       }
     }
+
+    // Send MIDI to visualizer (Studio inter-module communication)
+    const sourceManager = (window as any).frequencySourceManager;
+    if (sourceManager) {
+      sourceManager.addMidiNote(midiNote, 102); // velocity ~80% (102/127)
+    }
   }, [initializeAudio, midiToFrequency]);
 
   /**
@@ -400,6 +414,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     }
     // Keep audioEngine for backwards compatibility
     audioEngine.triggerPianoNoteOff(midiNote);
+
+    // Note: MIDI note-off events are not sent to visualizer
+    // The synthetic frequency generator handles decay automatically
   }, [midiToFrequency]);
 
   /**

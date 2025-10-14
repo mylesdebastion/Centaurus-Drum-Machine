@@ -227,13 +227,25 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
   const playChord = useCallback((chordNotes: typeof chord.notes) => {
     if (!guitarSynth) return;
 
+    const midiNotes: number[] = [];
     const frequencies = chordNotes.map(cn => {
       // Convert from guitar string notation (1-6, where 1=high E, 6=low E)
       // to array index (0-5, where 0=low E, 5=high E)
       const stringIndex = GUITAR_CONSTANTS.STRINGS - cn.string;
       const midiNote = getMIDINoteFromFret(stringIndex, cn.fret, currentTuningMIDI);
+      midiNotes.push(midiNote);
       return Tone.Frequency(midiNote, 'midi').toFrequency();
     });
+
+    // Send MIDI to visualizer (Studio inter-module communication)
+    const sourceManager = (window as any).frequencySourceManager;
+    if (sourceManager) {
+      midiNotes.forEach((midiNote, i) => {
+        setTimeout(() => {
+          sourceManager.addMidiNote(midiNote, 102); // velocity ~80%
+        }, i * 50); // Stagger with strum effect
+      });
+    }
 
     // Strum effect: play notes slightly offset
     frequencies.forEach((freq, i) => {
@@ -300,6 +312,12 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
 
     // Play the note with 2-second sustain
     guitarSynth.triggerAttackRelease(freq, '2');
+
+    // Send MIDI to visualizer (Studio inter-module communication)
+    const sourceManager = (window as any).frequencySourceManager;
+    if (sourceManager) {
+      sourceManager.addMidiNote(midiNote, 102); // velocity ~80% (102/127)
+    }
 
     // Remove note from clicked notes after 2 seconds (matching sustain)
     setTimeout(() => {
