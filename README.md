@@ -48,11 +48,18 @@ cd centaurus-drum-machine
 # Install dependencies
 npm install
 
+# Configure environment (for Supabase features)
+cp .env.example .env.development
+# Edit .env.development with your Supabase credentials
+# See docs/ENVIRONMENT_SETUP.md for detailed instructions
+
 # Start development server
 npm run dev
 ```
 
 The development server will start on `http://localhost:5173` (HTTPS not required for localhost).
+
+**📚 For environment setup and deployment:** See [docs/ENVIRONMENT_SETUP.md](docs/ENVIRONMENT_SETUP.md)
 
 ### HTTPS Development Setup
 
@@ -242,6 +249,7 @@ npm run test:coverage # Run tests with coverage report
 - **Styling**: Tailwind CSS
 - **Icons**: Lucide React
 - **MIDI**: Native Web MIDI API
+- **Backend**: Supabase (Realtime, Postgres, Auth)
 - **Testing**: Vitest + React Testing Library
 
 ## Project Structure
