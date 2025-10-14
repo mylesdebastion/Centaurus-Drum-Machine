@@ -2,9 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GlobalMusicHeader } from '../GlobalMusicHeader';
 import { DrumMachine } from '../DrumMachine/DrumMachine';
 import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
-import { Users, Music, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
+import { Users, Music, ArrowLeft, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
 import { DrumTrack } from '../../types';
 import { createDefaultPattern } from '../../utils/drumPatterns';
+import { supabaseSessionService } from '../../services/supabaseSession';
+import { ConnectionStatus } from './ConnectionStatus';
+import { UserList } from './UserList';
+import type { Participant, ConnectionStatus as StatusType } from '../../types/session';
 
 /**
  * New Jam Session (Epic 4)
@@ -23,12 +27,65 @@ export const JamSession: React.FC<JamSessionProps> = ({
   const music = useGlobalMusic();
   const [activeTab, setActiveTab] = useState<'drum' | 'piano' | 'users'>('drum');
   const [showDrumMachine, setShowDrumMachine] = useState(true);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+
+  // Supabase session state
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [connectionStatus, setConnectionStatus] = useState<StatusType>('disconnected');
 
   // Drum Machine state
   const [tracks, setTracks] = useState<DrumTrack[]>(() => createDefaultPattern());
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const playbackTimerRef = useRef<number | null>(null);
+
+  // Subscribe to Supabase session updates
+  useEffect(() => {
+    console.log('[JamSession] Setting up Supabase subscriptions');
+
+    // Subscribe to presence updates (participant list)
+    const unsubscribePresence = supabaseSessionService.onPresenceSync((newParticipants) => {
+      console.log('[JamSession] Presence sync:', newParticipants);
+      setParticipants(newParticipants);
+    });
+
+    // Subscribe to connection status changes
+    const unsubscribeStatus = supabaseSessionService.onConnectionStatusChange((status) => {
+      console.log('[JamSession] Connection status:', status);
+      setConnectionStatus(status);
+    });
+
+    // Subscribe to tempo changes from other participants
+    const unsubscribeTempo = supabaseSessionService.onTempoChange((tempo) => {
+      console.log('[JamSession] Remote tempo change:', tempo);
+      music.updateTempo(tempo);
+    });
+
+    // Subscribe to playback control from other participants (future)
+    const unsubscribePlayback = supabaseSessionService.onPlaybackChange((playing) => {
+      console.log('[JamSession] Remote playback change:', playing);
+      // Future: sync playback state
+    });
+
+    // Get initial connection status
+    setConnectionStatus(supabaseSessionService.connectionStatus);
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      console.log('[JamSession] Cleaning up Supabase subscriptions');
+      unsubscribePresence();
+      unsubscribeStatus();
+      unsubscribeTempo();
+      unsubscribePlayback();
+    };
+  }, [music]);
+
+  // Broadcast tempo changes to other participants
+  useEffect(() => {
+    if (supabaseSessionService.isInSession()) {
+      supabaseSessionService.broadcastTempo(music.tempo);
+    }
+  }, [music.tempo]);
 
   // Playback timer - synced with global tempo
   useEffect(() => {
@@ -147,17 +204,71 @@ export const JamSession: React.FC<JamSessionProps> = ({
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={onLeaveSession}
+              onClick={() => setShowLeaveConfirm(true)}
               className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
               aria-label="Leave Session"
+              title="Leave Session"
             >
               <ArrowLeft className="w-5 h-5 text-gray-400 hover:text-white" />
             </button>
             <div>
               <h1 className="text-xl font-bold text-white">Jam Session</h1>
-              <p className="text-sm text-gray-400">Session Code: {sessionCode}</p>
+              <p className="text-sm text-gray-400">
+                Code: {sessionCode} • {participants.length} {participants.length === 1 ? 'participant' : 'participants'}
+              </p>
             </div>
           </div>
+
+          {/* Connection Status & Actions */}
+          <div className="flex items-center gap-3">
+            <ConnectionStatus status={connectionStatus} compact />
+            <button
+              onClick={() => setShowLeaveConfirm(true)}
+              className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-red-900/20 border border-red-700/50 text-red-200 hover:bg-red-900/30 rounded-lg transition-colors text-sm"
+              title="Leave Session"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Leave</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Leave Confirmation Modal */}
+      {showLeaveConfirm && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40"
+            onClick={() => setShowLeaveConfirm(false)}
+          />
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-800 rounded-lg border border-gray-700 shadow-2xl max-w-md w-full p-6">
+              <h2 className="text-xl font-semibold text-white mb-4">Leave Session?</h2>
+              <p className="text-gray-400 mb-6">
+                Are you sure you want to leave this jam session? Other participants will be notified.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowLeaveConfirm(false)}
+                  className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                >
+                  Stay
+                </button>
+                <button
+                  onClick={onLeaveSession}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"
+                >
+                  Leave
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Tab Navigation */}
+      <div className="bg-gray-800/30 border-b border-gray-700 px-4">
+        <div className="max-w-7xl mx-auto flex items-center gap-2 py-2">
 
           {/* Tab Navigation */}
           <div className="flex items-center gap-2">
@@ -296,22 +407,36 @@ export const JamSession: React.FC<JamSessionProps> = ({
           )}
 
           {activeTab === 'users' && (
-            <div className="bg-gray-800 rounded-lg border border-gray-700 p-8">
-              <div className="text-center">
-                <Users className="w-16 h-16 text-green-400 mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-white mb-2">Collaborative Users</h2>
-                <p className="text-gray-400 mb-6">
-                  Multi-user collaboration coming soon (Epic 6: Shared Sessions)
+            <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+              <div className="mb-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <Users className="w-6 h-6 text-green-400" />
+                  <h2 className="text-xl font-bold text-white">Participants</h2>
+                </div>
+                <p className="text-sm text-gray-400">
+                  Real-time participant list. Others will see when you join or leave.
                 </p>
-                <div className="bg-gray-700/50 rounded-lg p-4 max-w-md mx-auto">
-                  <div className="flex items-center gap-3 p-3 bg-gray-600 rounded-lg">
-                    <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                      Y
-                    </div>
-                    <div className="flex-1 text-left">
-                      <div className="text-white font-semibold">You (Host)</div>
-                      <div className="text-xs text-gray-400">Connected</div>
-                    </div>
+              </div>
+
+              <UserList
+                participants={participants}
+                myPeerId={supabaseSessionService.myPeerId}
+              />
+
+              {/* Epic 7 Status */}
+              <div className="mt-6 bg-green-900/20 border border-green-700/50 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5 animate-pulse" />
+                  <div>
+                    <h4 className="text-sm font-semibold text-green-200 mb-1">
+                      ✅ Epic 7: Jam Session Backend Active
+                    </h4>
+                    <ul className="text-xs text-green-300/70 space-y-0.5">
+                      <li>• Real-time presence tracking via Supabase</li>
+                      <li>• Tempo sync across all participants</li>
+                      <li>• Connection status: {connectionStatus}</li>
+                      <li>• Session code: {sessionCode}</li>
+                    </ul>
                   </div>
                 </div>
               </div>

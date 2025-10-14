@@ -16,9 +16,15 @@ import { LumiTest } from './components/LumiTest/LumiTest';
 import { GlobalMusicHeaderTest } from './components/GlobalMusicHeaderTest';
 import { Studio } from './components/Studio/Studio';
 import { SupabaseConnectionTest } from './components/SupabaseConnectionTest';
+import { ChordMelodyArranger } from './components/Studio/modules/ChordMelodyArranger';
+import { UsernameModal, getStoredUsername } from './components/JamSession/UsernameModal';
+import { supabaseSessionService } from './services/supabaseSession';
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'create' | 'join' | null>(null);
+  const [pendingJoinCode, setPendingJoinCode] = useState<string>('');
   const navigate = useNavigate();
   const location = useLocation();
   const transportStateRef = useRef<TransportState | null>(null);
@@ -43,6 +49,73 @@ function App() {
     };
   }, [location]);
 
+  const handleStartJam = () => {
+    // Check if username exists, if not show modal
+    const storedUsername = getStoredUsername();
+    if (storedUsername) {
+      createSessionWithUsername(storedUsername);
+    } else {
+      setPendingAction('create');
+      setShowUsernameModal(true);
+    }
+  };
+
+  const handleJoinJam = (code: string) => {
+    // Check if username exists, if not show modal
+    const storedUsername = getStoredUsername();
+    if (storedUsername) {
+      joinSessionWithUsername(code, storedUsername);
+    } else {
+      setPendingAction('join');
+      setPendingJoinCode(code);
+      setShowUsernameModal(true);
+    }
+  };
+
+  const handleUsernameSubmit = async (username: string) => {
+    setShowUsernameModal(false);
+
+    try {
+      if (pendingAction === 'create') {
+        await createSessionWithUsername(username);
+      } else if (pendingAction === 'join') {
+        await joinSessionWithUsername(pendingJoinCode, username);
+      }
+    } catch (error) {
+      console.error('[App] Session error:', error);
+      alert(error instanceof Error ? error.message : 'Failed to connect to session');
+    } finally {
+      setPendingAction(null);
+      setPendingJoinCode('');
+    }
+  };
+
+  const handleUsernameCancel = () => {
+    setShowUsernameModal(false);
+    setPendingAction(null);
+    setPendingJoinCode('');
+  };
+
+  const createSessionWithUsername = async (username: string) => {
+    try {
+      const roomCode = await supabaseSessionService.createSession(username);
+      setSessionCode(roomCode);
+      navigate('/jam');
+    } catch (error) {
+      throw new Error('Failed to create session. Please try again.');
+    }
+  };
+
+  const joinSessionWithUsername = async (code: string, username: string) => {
+    try {
+      await supabaseSessionService.joinSession(code, username);
+      setSessionCode(code);
+      navigate('/jam');
+    } catch (error) {
+      throw new Error('Failed to join session. Check the room code and try again.');
+    }
+  };
+
   const generateSessionCode = (): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
@@ -50,17 +123,6 @@ function App() {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return result;
-  };
-
-  const handleStartJam = () => {
-    const code = generateSessionCode();
-    setSessionCode(code);
-    navigate('/jam');
-  };
-
-  const handleJoinJam = (code: string) => {
-    setSessionCode(code);
-    navigate('/jam');
   };
 
   const handleStartJamLegacy = () => {
@@ -77,7 +139,11 @@ function App() {
     navigate('/isometric');
   };
 
-  const handleLeaveSession = () => {
+  const handleLeaveSession = async () => {
+    // Leave Supabase session if in one
+    if (supabaseSessionService.isInSession()) {
+      await supabaseSessionService.leaveSession();
+    }
     navigate('/');
     setSessionCode('');
   };
@@ -162,8 +228,23 @@ function App() {
     navigate('/');
   };
 
+  const handleChordMelodyTest = () => {
+    navigate('/chord-melody-test');
+  };
+
+  const handleExitChordMelodyTest = () => {
+    navigate('/');
+  };
+
   return (
     <GlobalMusicProvider>
+      {/* Username Modal */}
+      <UsernameModal
+        isOpen={showUsernameModal}
+        onSave={handleUsernameSubmit}
+        onCancel={handleUsernameCancel}
+      />
+
       <Routes>
         <Route
           path="/"
@@ -295,6 +376,17 @@ function App() {
                 ← Back
               </button>
               <SupabaseConnectionTest />
+            </div>
+          }
+        />
+        <Route
+          path="/chord-melody-test"
+          element={
+            <div className="h-screen">
+              <ChordMelodyArranger
+                onBack={handleExitChordMelodyTest}
+                embedded={false}
+              />
             </div>
           }
         />
