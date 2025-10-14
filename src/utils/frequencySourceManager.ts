@@ -64,8 +64,8 @@ export class FrequencySourceManager {
   /**
    * Add a MIDI note event to the synthetic generator
    */
-  addMidiNote(midiNote: number, velocity: number): void {
-    this.midiGenerator.addMidiNote(midiNote, velocity);
+  addMidiNote(midiNote: number, velocity: number, color?: { r: number; g: number; b: number }): void {
+    this.midiGenerator.addMidiNote(midiNote, velocity, color);
   }
 
   /**
@@ -183,5 +183,12 @@ export class FrequencySourceManager {
    */
   getDrumGenerator(): SyntheticFrequencyGenerator {
     return this.drumGenerator;
+  }
+
+  /**
+   * Get color for a frequency bin from MIDI generator (for note-based coloring)
+   */
+  getMidiColorForBin(bin: number): { r: number; g: number; b: number } | null {
+    return this.midiGenerator.getColorForBin(bin);
   }
 }

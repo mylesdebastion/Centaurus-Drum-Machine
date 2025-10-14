@@ -73,4 +73,11 @@ export class FrequencyDataAdapter {
     }
     return { frequency: 0, amplitude: 0 };
   }
+
+  /**
+   * Get the source manager (for MIDI color queries)
+   */
+  getSourceManager(): FrequencySourceManager {
+    return this.sourceManager;
+  }
 }

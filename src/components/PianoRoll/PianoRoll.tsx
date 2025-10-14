@@ -175,7 +175,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     const sourceManager = (window as any).frequencySourceManager;
     if (sourceManager) {
       chordNotes.forEach((midiNote) => {
-        sourceManager.addMidiNote(midiNote, 89); // velocity ~70% (89/127)
+        const noteClass = midiNote % 12;
+        const noteColor = getNoteColor(noteClass, colorMode);
+        sourceManager.addMidiNote(midiNote, 89, noteColor); // velocity ~70% (89/127)
       });
     }
 
@@ -395,9 +397,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     // Send MIDI to visualizer (Studio inter-module communication)
     const sourceManager = (window as any).frequencySourceManager;
     if (sourceManager) {
-      sourceManager.addMidiNote(midiNote, 102); // velocity ~80% (102/127)
+      const noteClass = midiNote % 12;
+      const noteColor = getNoteColor(noteClass, colorMode);
+      sourceManager.addMidiNote(midiNote, 102, noteColor); // velocity ~80% (102/127)
     }
-  }, [initializeAudio, midiToFrequency]);
+  }, [initializeAudio, midiToFrequency, colorMode]);
 
   /**
    * Handle key release (mouse/touch)

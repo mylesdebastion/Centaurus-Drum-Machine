@@ -241,8 +241,10 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
     const sourceManager = (window as any).frequencySourceManager;
     if (sourceManager) {
       midiNotes.forEach((midiNote, i) => {
+        const noteClass = midiNote % 12;
+        const noteColor = getNoteColor(noteClass, colorMode);
         setTimeout(() => {
-          sourceManager.addMidiNote(midiNote, 102); // velocity ~80%
+          sourceManager.addMidiNote(midiNote, 102, noteColor); // velocity ~80%
         }, i * 50); // Stagger with strum effect
       });
     }
@@ -316,7 +318,9 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
     // Send MIDI to visualizer (Studio inter-module communication)
     const sourceManager = (window as any).frequencySourceManager;
     if (sourceManager) {
-      sourceManager.addMidiNote(midiNote, 102); // velocity ~80% (102/127)
+      const noteClass = midiNote % 12;
+      const noteColor = getNoteColor(noteClass, colorMode);
+      sourceManager.addMidiNote(midiNote, 102, noteColor); // velocity ~80% (102/127)
     }
 
     // Remove note from clicked notes after 2 seconds (matching sustain)

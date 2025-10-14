@@ -12,6 +12,8 @@ export interface NoteEvent {
   frequency: number;  // Hz
   velocity: number;   // 0-1
   timestamp: number;  // ms
+  midiNote?: number;  // MIDI note number (0-127) for color mapping
+  color?: { r: number; g: number; b: number };  // RGB color for this note
 }
 
 export interface SyntheticFrequencyConfig {
@@ -47,9 +49,15 @@ export class SyntheticFrequencyGenerator {
   /**
    * Add a MIDI note event
    */
-  addMidiNote(midiNote: number, velocity: number): void {
+  addMidiNote(midiNote: number, velocity: number, color?: { r: number; g: number; b: number }): void {
     const frequency = midiToFrequency(midiNote);
-    this.addNote(frequency, velocity);
+    this.activeNotes.push({
+      frequency,
+      velocity,
+      timestamp: Date.now(),
+      midiNote,
+      color
+    });
   }
 
   /**
@@ -164,5 +172,38 @@ export class SyntheticFrequencyGenerator {
    */
   getConfig(): SyntheticFrequencyConfig {
     return { ...this.config };
+  }
+
+  /**
+   * Get color for a frequency bin (for MIDI mode visualization)
+   * Returns the color of the active note closest to this frequency
+   */
+  getColorForBin(bin: number): { r: number; g: number; b: number } | null {
+    const { sampleRate, fftSize } = this.config;
+    const binFrequency = (bin * sampleRate) / fftSize;
+
+    // Find the closest active note with a color
+    let closestNote: NoteEvent | null = null;
+    let minDistance = Infinity;
+
+    for (const note of this.activeNotes) {
+      if (note.color) {
+        const distance = Math.abs(Math.log2(note.frequency) - Math.log2(binFrequency));
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestNote = note;
+        }
+      }
+    }
+
+    // Return color if found a close note (within 1 semitone)
+    return (closestNote && minDistance < 0.1) ? closestNote.color || null : null;
+  }
+
+  /**
+   * Get all active notes (for debugging)
+   */
+  getActiveNotes(): NoteEvent[] {
+    return [...this.activeNotes];
   }
 }
