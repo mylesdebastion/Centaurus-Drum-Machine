@@ -102,7 +102,7 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
   }, [selectedRoot, selectedScale]);
 
   // State update helpers (Epic 14 - Module Adapter Pattern)
-  const updateColorMode = useCallback((mode: 'chromatic' | 'harmonic') => {
+  const updateColorMode = useCallback((mode: ColorMode) => {
     if (isStandalone) {
       setLocalColorMode(mode);
     } else {
@@ -139,15 +139,15 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
   };
   const chord = progression.chords[currentChord] || { name: 'C', notes: [] };
 
-  // Log when tuning changes
-  useEffect(() => {
-    console.group(`🎸 Tuning Changed: ${selectedTuning.name}`);
-    console.log(`📝 Category: ${selectedTuning.category}`);
-    console.log(`🎵 Strings (low to high): ${selectedTuning.strings.join(' - ')}`);
-    console.log(`🎹 MIDI Notes: [${currentTuningMIDI.join(', ')}]`);
-    console.log(`💬 Description: ${selectedTuning.description}`);
-    console.groupEnd();
-  }, [selectedTuning, currentTuningMIDI]);
+  // Log when tuning changes (disabled to reduce console spam)
+  // useEffect(() => {
+  //   console.group(`🎸 Tuning Changed: ${selectedTuning.name}`);
+  //   console.log(`📝 Category: ${selectedTuning.category}`);
+  //   console.log(`🎵 Strings (low to high): ${selectedTuning.strings.join(' - ')}`);
+  //   console.log(`🎹 MIDI Notes: [${currentTuningMIDI.join(', ')}]`);
+  //   console.log(`💬 Description: ${selectedTuning.description}`);
+  //   console.groupEnd();
+  // }, [selectedTuning, currentTuningMIDI]);
 
   // Use the MIDI input hook with auto-connect and keyboard fallback
   const { activeNotes: activeMIDINotes, isKeyboardMode } = useMIDIInput({
@@ -298,16 +298,16 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
     const stringNames = ['E (low)', 'A', 'D', 'G', 'B', 'E (high)'];
     const openStringNote = selectedTuning.strings[string];
 
-    // Log comprehensive debugging info
-    console.group(`🎸 Fret Click: String ${string + 1}, Fret ${fret}`);
-    console.log(`📍 Position: ${stringNames[string]} string, fret ${fret}`);
-    console.log(`🎚️ Tuning: ${selectedTuning.name}`);
-    console.log(`🎵 Open String: ${openStringNote} (MIDI ${currentTuningMIDI[string]})`);
-    console.log(`🎹 Calculated Note: ${fullNoteName} (MIDI ${midiNote})`);
-    console.log(`🔊 Frequency: ${freq.toFixed(2)} Hz`);
-    console.log(`🎼 Tuning Array: [${selectedTuning.strings.join(', ')}]`);
-    console.log(`🎯 Interval Guide: Note will be tracked for brightness system`);
-    console.groupEnd();
+    // Log comprehensive debugging info (disabled to reduce console spam)
+    // console.group(`🎸 Fret Click: String ${string + 1}, Fret ${fret}`);
+    // console.log(`📍 Position: ${stringNames[string]} string, fret ${fret}`);
+    // console.log(`🎚️ Tuning: ${selectedTuning.name}`);
+    // console.log(`🎵 Open String: ${openStringNote} (MIDI ${currentTuningMIDI[string]})`);
+    // console.log(`🎹 Calculated Note: ${fullNoteName} (MIDI ${midiNote})`);
+    // console.log(`🔊 Frequency: ${freq.toFixed(2)} Hz`);
+    // console.log(`🎼 Tuning Array: [${selectedTuning.strings.join(', ')}]`);
+    // console.log(`🎯 Interval Guide: Note will be tracked for brightness system`);
+    // console.groupEnd();
 
     // Add note to clicked notes Set for interval guide
     setClickedNotes(prev => new Set(prev).add(midiNote));
@@ -337,7 +337,9 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'c' || e.key === 'C') {
-        updateColorMode(colorMode === 'chromatic' ? 'harmonic' : 'chromatic');
+        // Cycle through all three color modes: chromatic -> harmonic -> spectrum -> chromatic
+        const nextMode = colorMode === 'chromatic' ? 'harmonic' : colorMode === 'harmonic' ? 'spectrum' : 'chromatic';
+        updateColorMode(nextMode);
       } else if (e.key === 'n' || e.key === 'N') {
         setCurrentProgressionIndex(prev => (prev + 1) % ROMAN_NUMERAL_PROGRESSIONS.length);
         setCurrentChord(0);
@@ -369,7 +371,12 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
         const noteClass = fretboardMatrix[string][fret];
         // Convert from guitar string notation (1-6) to array index (0-5)
         const isActive = chord.notes.some(cn => GUITAR_CONSTANTS.STRINGS - cn.string === string && cn.fret === fret);
-        const color = getNoteColor(noteClass, colorMode);
+
+        // Spectrum mode: use full MIDI note range (low=red, high=purple)
+        // Chromatic/Harmonic: use note class (repeating colors per octave)
+        const midiNote = getMIDINoteFromFret(string, fret, currentTuningMIDI);
+        const noteForColor = colorMode === 'spectrum' ? midiNote : noteClass;
+        const color = getNoteColor(noteForColor, colorMode);
 
         // 3-tier brightness system:
         // - Triggered: 1.0 (full brightness)
@@ -654,14 +661,40 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
               />
             )}
 
-            {/* Chromatic/Harmonic Toggle - Only show in standalone mode */}
+            {/* Color Mode Toggle - Only show in standalone mode */}
             {isStandalone && (
-              <button
-                onClick={() => updateColorMode(colorMode === 'chromatic' ? 'harmonic' : 'chromatic')}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors min-h-[44px] text-sm"
-              >
-                {colorMode === 'chromatic' ? 'Chromatic' : 'Harmonic'}
-              </button>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => updateColorMode('chromatic')}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    colorMode === 'chromatic'
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Chromatic
+                </button>
+                <button
+                  onClick={() => updateColorMode('harmonic')}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    colorMode === 'harmonic'
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Harmonic
+                </button>
+                <button
+                  onClick={() => updateColorMode('spectrum')}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    colorMode === 'spectrum'
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Spectrum
+                </button>
+              </div>
             )}
             <button
               onClick={() => setShowSettings(!showSettings)}

@@ -113,7 +113,10 @@ export const PianoCanvas: React.FC<PianoCanvasProps> = ({
       const isPressed = pressedKeys.has(midiNote);
 
       // Get color
-      const color = getNoteColor(noteClass, colorMode);
+      // Spectrum mode: use full MIDI note range (low=red, high=purple)
+      // Chromatic/Harmonic: use note class (repeating colors per octave)
+      const noteForColor = colorMode === 'spectrum' ? midiNote : noteClass;
+      const color = getNoteColor(noteForColor, colorMode);
 
       // 3-tier brightness system:
       // - Triggered: 1.0 (full brightness)
@@ -169,7 +172,10 @@ export const PianoCanvas: React.FC<PianoCanvasProps> = ({
           const isPressed = pressedKeys.has(blackMidiNote);
 
           // Get color
-          const color = getNoteColor(blackNoteClass, colorMode);
+          // Spectrum mode: use full MIDI note range (low=red, high=purple)
+          // Chromatic/Harmonic: use note class (repeating colors per octave)
+          const noteForColor = colorMode === 'spectrum' ? blackMidiNote : blackNoteClass;
+          const color = getNoteColor(noteForColor, colorMode);
 
           // 3-tier brightness system:
           // - Triggered: 1.0 (full brightness)

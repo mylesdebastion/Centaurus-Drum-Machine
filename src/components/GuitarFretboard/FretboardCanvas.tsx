@@ -195,7 +195,11 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
         const midiNote = getMIDINoteFromFret(string, fret);
         const isMIDIActive = activeMIDINotes.has(midiNote);
 
-        const color = getNoteColor(noteClass, colorMode);
+        // Get color
+        // Spectrum mode: use full MIDI note range (low=red, high=purple)
+        // Chromatic/Harmonic: use note class (repeating colors per octave)
+        const noteForColor = colorMode === 'spectrum' ? midiNote : noteClass;
+        const color = getNoteColor(noteForColor, colorMode);
 
         // Real-time interval guide brightness system:
         // When a SINGLE note is clicked/played (not chords):

@@ -90,7 +90,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
 
   // State update helpers (Epic 14 - Module Adapter Pattern)
   // Updates local state if standalone, global state if embedded
-  const updateColorMode = useCallback((mode: 'chromatic' | 'harmonic') => {
+  const updateColorMode = useCallback((mode: ColorMode) => {
     if (isStandalone) {
       setLocalColorMode(mode);
     } else {
@@ -397,8 +397,10 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     // Send MIDI to visualizer (Studio inter-module communication)
     const sourceManager = (window as any).frequencySourceManager;
     if (sourceManager) {
-      const noteClass = midiNote % 12;
-      const noteColor = getNoteColor(noteClass, colorMode);
+      // Spectrum mode: use full MIDI note range (low=red, high=purple)
+      // Chromatic/Harmonic: use note class (repeating colors per octave)
+      const noteForColor = colorMode === 'spectrum' ? midiNote : (midiNote % 12);
+      const noteColor = getNoteColor(noteForColor, colorMode);
       sourceManager.addMidiNote(midiNote, 102, noteColor); // velocity ~80% (102/127)
     }
   }, [initializeAudio, midiToFrequency, colorMode]);
@@ -680,7 +682,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                 </div>
                 )}
 
-                {/* Chromatic/Harmonic Mode Toggle - Only show in standalone mode */}
+                {/* Color Mode Toggle - Only show in standalone mode */}
                 {isStandalone && (
                 <div className="flex gap-1">
                   <button
@@ -702,6 +704,16 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                     }`}
                   >
                     Harmonic
+                  </button>
+                  <button
+                    onClick={() => updateColorMode('spectrum')}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      colorMode === 'spectrum'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    Spectrum
                   </button>
                 </div>
                 )}
