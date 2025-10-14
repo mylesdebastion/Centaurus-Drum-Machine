@@ -179,6 +179,11 @@ class SupabaseSessionService {
    * ```
    */
   async joinSession(roomCode: string, userName: string): Promise<void> {
+    // Validate room code format (6 alphanumeric characters)
+    if (!roomCode || !/^[A-Z0-9]{6}$/.test(roomCode)) {
+      throw new Error('Invalid room code format. Must be 6 alphanumeric characters.');
+    }
+
     // Leave existing session if any
     if (this.channel) {
       await this.leaveSession();
@@ -272,9 +277,47 @@ class SupabaseSessionService {
    */
   onPresenceSync(callback: (participants: Participant[]) => void): () => void {
     this.presenceSyncCallbacks.push(callback);
+
+    // Immediately call with current presence state if in session
+    if (this.channel) {
+      const currentParticipants = this.getCurrentParticipants();
+      callback(currentParticipants);
+    }
+
     return () => {
       this.presenceSyncCallbacks = this.presenceSyncCallbacks.filter(cb => cb !== callback);
     };
+  }
+
+  /**
+   * Get current participants from presence state
+   * @returns {Participant[]} Current participant list
+   */
+  private getCurrentParticipants(): Participant[] {
+    if (!this.channel) return [];
+
+    const presenceState = this.channel.presenceState<{
+      name: string;
+      isHost: boolean;
+      joinedAt: string;
+    }>();
+
+    const participants: Participant[] = [];
+
+    Object.entries(presenceState).forEach(([presenceKey, presences]) => {
+      // Each presenceKey can have multiple entries (if user reconnects)
+      // We take the most recent one
+      const mostRecent = presences[presences.length - 1];
+
+      participants.push({
+        id: presenceKey,
+        name: mostRecent.name,
+        isHost: mostRecent.isHost,
+        joinedAt: mostRecent.joinedAt,
+      });
+    });
+
+    return participants;
   }
 
   /**
@@ -421,17 +464,24 @@ class SupabaseSessionService {
           isHost: mostRecent.isHost,
           joinedAt: mostRecent.joinedAt,
         });
-
-        // Store our own peer ID
-        if (!this._myPeerId) {
-          this._myPeerId = presenceKey;
-        }
       });
 
       console.log('[SupabaseSessionService] Presence sync:', participants);
+      console.log('[SupabaseSessionService] My peer ID:', this._myPeerId);
 
       // Invoke all presence sync callbacks
       this.presenceSyncCallbacks.forEach(callback => callback(participants));
+    });
+
+    // Listen for join events to capture our own peer ID
+    this.channel.on('presence', { event: 'join' }, ({ key, currentPresences }) => {
+      console.log('[SupabaseSessionService] Presence join event:', key);
+
+      // If this is our first join, store our peer ID
+      if (!this._myPeerId && currentPresences.length > 0) {
+        this._myPeerId = key;
+        console.log('[SupabaseSessionService] Set myPeerId:', this._myPeerId);
+      }
     });
   }
 
@@ -468,9 +518,11 @@ class SupabaseSessionService {
   private setupConnectionListener(): void {
     if (!this.channel) return;
 
-    // Note: Supabase handles automatic reconnection internally
-    // Connection status is primarily managed via subscription callback
-    // This is a placeholder for future connection monitoring
+    // Connection status is handled via the subscription callback in createSession/joinSession
+    // This method exists for future enhancements (e.g., monitoring network state directly)
+
+    // Note: We could monitor Supabase client connection state here if needed:
+    // this.supabase.channel('system').subscribe((status) => { ... })
   }
 
   /**
