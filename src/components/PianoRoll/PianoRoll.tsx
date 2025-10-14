@@ -16,9 +16,16 @@ import { useModuleContext } from '../../hooks/useModuleContext';
 import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
 import { ledCompositor } from '../../services/LEDCompositor';
 import { midiEventBus } from '../../utils/midiEventBus';
+import { ModuleRoutingService } from '../../services/moduleRoutingService';
+import type { NoteEvent } from '../../types/moduleRouting';
 
 interface PianoRollProps {
   onBack: () => void;
+  instanceId?: string; // Module instance ID for routing (when embedded in Studio)
+  layout?: 'mobile' | 'desktop'; // Layout mode (for module adapter pattern)
+  settings?: Record<string, any>; // Module settings (for module adapter pattern)
+  onSettingsChange?: (settings: Record<string, any>) => void; // Settings callback
+  embedded?: boolean; // Whether embedded in Studio
 }
 
 /**
@@ -34,11 +41,19 @@ interface PianoRollProps {
  * - Click-to-play functionality
  * - Responsive octave view
  */
-export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
+export const PianoRoll: React.FC<PianoRollProps> = ({
+  onBack,
+  instanceId = 'piano-roll-standalone',
+  layout: _layout, // Reserved for module adapter pattern
+  settings: _settings, // Reserved for module adapter pattern
+  onSettingsChange: _onSettingsChange, // Reserved for module adapter pattern
+  embedded: _embedded = false // Reserved for module adapter pattern
+}) => {
   // Module Adapter Pattern - Context Detection (Epic 14, Story 14.3)
   const context = useModuleContext();
   const globalMusic = useGlobalMusic();
   const isStandalone = context === 'standalone';
+  const routingService = ModuleRoutingService.getInstance();
 
   // Graceful Degradation - State Resolution
   // When standalone: use local state
@@ -392,7 +407,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
   const [crossModuleNotes, setCrossModuleNotes] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    // Subscribe to note-on events
+    // Subscribe to note-on events (old event bus)
     const unsubscribeOn = midiEventBus.onNoteOn((event) => {
       // Ignore notes from piano itself to avoid feedback
       if (event.source === 'piano-roll') return;
@@ -404,7 +419,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
       });
     });
 
-    // Subscribe to note-off events
+    // Subscribe to note-off events (old event bus)
     const unsubscribeOff = midiEventBus.onNoteOff((note, source) => {
       // Ignore notes from piano itself
       if (source === 'piano-roll') return;
@@ -422,6 +437,56 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
       unsubscribeOff();
     };
   }, []);
+
+  // ModuleRoutingService integration (Epic 15 - Module Routing System)
+  // Register module and subscribe to note events from other modules
+  useEffect(() => {
+    // Register module with routing service when embedded in Studio
+    if (!isStandalone) {
+      routingService.registerModule({
+        instanceId,
+        moduleId: 'piano-roll',
+        name: 'Piano Roll',
+        capabilities: {
+          canReceiveNotes: true,
+          canReceiveChords: false, // Piano Roll displays notes, not chord symbols
+        },
+      });
+      console.log('[PianoRoll] Registered with ModuleRoutingService:', instanceId);
+    }
+
+    // Subscribe to note events from ModuleRoutingService
+    const unsubscribe = routingService.subscribeToNoteEvents(
+      instanceId,
+      (event: NoteEvent) => {
+        // Handle incoming note events from other modules
+        console.log('[PianoRoll] Received note event:', event);
+
+        if (event.type === 'note-on') {
+          setCrossModuleNotes(prev => {
+            const next = new Set(prev);
+            next.add(event.pitch);
+            return next;
+          });
+        } else if (event.type === 'note-off') {
+          setCrossModuleNotes(prev => {
+            const next = new Set(prev);
+            next.delete(event.pitch);
+            return next;
+          });
+        }
+      }
+    );
+
+    // Cleanup on unmount
+    return () => {
+      unsubscribe();
+      if (!isStandalone) {
+        routingService.unregisterModule(instanceId);
+        console.log('[PianoRoll] Unregistered from ModuleRoutingService:', instanceId);
+      }
+    };
+  }, [isStandalone, instanceId, routingService]);
 
   // Merge local MIDI input with cross-module MIDI notes
   const activeNotes = useMemo(() => {
