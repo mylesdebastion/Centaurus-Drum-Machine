@@ -25,6 +25,7 @@ interface DrumMachineProps {
   onAddTrack: (track: DrumTrack) => void;
   onRemoveTrack: (trackId: string) => void;
   onLoadDefaultPattern: () => void;
+  embedded?: boolean; // When embedded in Studio with limited width
 }
 
 export const DrumMachine: React.FC<DrumMachineProps> = ({
@@ -42,10 +43,11 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
   onStop,
   onTempoChange,
   onClearTrack,
- onClearAll,
+  onClearAll,
   onAddTrack,
   onRemoveTrack,
-  onLoadDefaultPattern
+  onLoadDefaultPattern,
+  embedded = false
 }) => {
   // Initialize audio engine on play (requires user interaction for Tone.js)
   const handlePlay = async () => {
@@ -89,7 +91,7 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
             className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
-            Load Default Beat
+            <span className="hidden sm:inline">Load Default Beat</span>
           </button>
           <button
             onClick={onClearAll}
@@ -115,42 +117,47 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
         maxTracks={8}
       />
 
-      {/* Step Numbers */}
-      <div className="flex items-center mb-4">
-        <div className="w-32"></div> {/* Track label space */}
-        <div className="flex gap-2">
-          {Array.from({ length: 16 }, (_, i) => (
-            <div
-              key={i}
-              className={`w-12 h-6 flex items-center justify-center text-xs font-mono ${
-                i % 4 === 0 ? 'text-primary-400' : 'text-gray-500'
-              }`}
-            >
-              {i + 1}
+      {/* Step Grid Container - scrollable when embedded */}
+      <div className={embedded ? 'overflow-x-auto' : ''}>
+        <div className={embedded ? 'min-w-[800px]' : ''}>
+          {/* Step Numbers */}
+          <div className="flex items-center mb-4">
+            <div className="w-32"></div> {/* Track label space */}
+            <div className="flex gap-2">
+              {Array.from({ length: 16 }, (_, i) => (
+                <div
+                  key={i}
+                  className={`w-12 h-6 flex items-center justify-center text-xs font-mono ${
+                    i % 4 === 0 ? 'text-primary-400' : 'text-gray-500'
+                  }`}
+                >
+                  {i + 1}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* Tracks */}
-      <div className="space-y-3">
-        {tracks.map((track) => (
-          <TrackRow
-            key={track.id}
-            track={track}
-            currentStep={currentStep}
-            isPlaying={isPlaying}
-            colorMode={colorMode}
-            onStepToggle={(stepIndex) => onStepToggle(track.id, stepIndex)}
-            onVelocityChange={(stepIndex, velocity) => onVelocityChange(track.id, stepIndex, velocity)}
-            onMute={() => onTrackMute(track.id)}
-            onSolo={() => onTrackSolo(track.id)}
-            onVolumeChange={(volume) => onTrackVolumeChange(track.id, volume)}
-            onClear={() => onClearTrack(track.id)}
-            onRemove={() => onRemoveTrack(track.id)}
-            canRemove={tracks.length > 1}
-          />
-        ))}
+          {/* Tracks */}
+          <div className="space-y-3">
+            {tracks.map((track) => (
+              <TrackRow
+                key={track.id}
+                track={track}
+                currentStep={currentStep}
+                isPlaying={isPlaying}
+                colorMode={colorMode}
+                onStepToggle={(stepIndex) => onStepToggle(track.id, stepIndex)}
+                onVelocityChange={(stepIndex, velocity) => onVelocityChange(track.id, stepIndex, velocity)}
+                onMute={() => onTrackMute(track.id)}
+                onSolo={() => onTrackSolo(track.id)}
+                onVolumeChange={(volume) => onTrackVolumeChange(track.id, volume)}
+                onClear={() => onClearTrack(track.id)}
+                onRemove={() => onRemoveTrack(track.id)}
+                canRemove={tracks.length > 1}
+              />
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Pattern Info */}

@@ -16,7 +16,7 @@ interface DrumMachineModuleProps {
   embedded?: boolean;
 }
 
-export const DrumMachineModule: React.FC<DrumMachineModuleProps> = () => {
+export const DrumMachineModule: React.FC<DrumMachineModuleProps> = ({ embedded = false }) => {
   const music = useGlobalMusic();
 
   // Drum Machine state
@@ -168,6 +168,7 @@ export const DrumMachineModule: React.FC<DrumMachineModuleProps> = () => {
       onAddTrack={handleAddTrack}
       onRemoveTrack={handleRemoveTrack}
       onLoadDefaultPattern={handleLoadDefaultPattern}
+      embedded={embedded}
     />
   );
 };
