@@ -360,6 +360,34 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
     return combined;
   }, [activeMIDINotes, clickedNotes]);
 
+  /**
+   * Get unique note colors for a chord based on active color mode
+   * Returns array of {noteClass, color} for visual indicators
+   */
+  const getChordNoteColors = useCallback((chordNotes: typeof chord.notes) => {
+    const noteClasses = new Set<number>();
+    const noteColors: Array<{ noteClass: number; color: { r: number; g: number; b: number } }> = [];
+
+    chordNotes.forEach(cn => {
+      const stringIndex = GUITAR_CONSTANTS.STRINGS - cn.string;
+      const midiNote = getMIDINoteFromFret(stringIndex, cn.fret, currentTuningMIDI);
+      const noteClass = midiNote % 12;
+
+      // Only add unique note classes
+      if (!noteClasses.has(noteClass)) {
+        noteClasses.add(noteClass);
+        // Spectrum mode: use full MIDI note range (low=red, high=purple)
+        // Chromatic/Harmonic: use note class (repeating colors per octave)
+        const noteForColor = colorMode === 'spectrum' ? midiNote : noteClass;
+        const color = getNoteColor(noteForColor, colorMode);
+        noteColors.push({ noteClass, color });
+      }
+    });
+
+    // Sort by note class for consistent ordering
+    return noteColors.sort((a, b) => a.noteClass - b.noteClass);
+  }, [currentTuningMIDI, colorMode]);
+
   // Generate LED matrix data for LED Compositor (Epic 14, Story 14.4)
   const generateLEDData = useCallback((): { hex: string[], rgb: Uint8ClampedArray } => {
     const ledDataHex: string[] = Array(150).fill('000000');
@@ -528,25 +556,41 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
 
           {/* Chord List */}
           <div className="space-y-2">
-            {progression.chords.map((c, i) => (
-              <button
-                key={i}
-                onClick={() => {
-                  setCurrentChord(i);
-                  if (guitarSynth) playChord(c.notes);
-                }}
-                className={`w-full p-2 rounded-lg transition-colors text-left ${
-                  i === currentChord
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{c.name}</span>
-                  <span className="text-xs opacity-75">{selectedRomanProgression.romanNumerals[i]}</span>
-                </div>
-              </button>
-            ))}
+            {progression.chords.map((c, i) => {
+              const noteColors = getChordNoteColors(c.notes);
+              return (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setCurrentChord(i);
+                    if (guitarSynth) playChord(c.notes);
+                  }}
+                  className={`w-full p-2 rounded-lg transition-colors text-left ${
+                    i === currentChord
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium">{c.name}</span>
+                    <span className="text-xs opacity-75">{selectedRomanProgression.romanNumerals[i]}</span>
+                  </div>
+                  {/* Color indicators showing notes in the chord */}
+                  <div className="flex gap-1">
+                    {noteColors.map((nc, idx) => (
+                      <div
+                        key={idx}
+                        className="w-3 h-3 rounded-full"
+                        style={{
+                          backgroundColor: `rgb(${nc.color.r}, ${nc.color.g}, ${nc.color.b})`
+                        }}
+                        title={`Note ${nc.noteClass}`}
+                      />
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -788,25 +832,41 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
                 )}
               </div>
               <div className="space-y-2">
-                {progression.chords.map((c, i) => (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      setCurrentChord(i);
-                      if (guitarSynth) playChord(c.notes);
-                    }}
-                    className={`w-full p-2 rounded-lg transition-colors text-left min-h-[44px] ${
-                      i === currentChord
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">{c.name}</span>
-                      <span className="text-xs opacity-75">{selectedRomanProgression.romanNumerals[i]}</span>
-                    </div>
-                  </button>
-                ))}
+                {progression.chords.map((c, i) => {
+                  const noteColors = getChordNoteColors(c.notes);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setCurrentChord(i);
+                        if (guitarSynth) playChord(c.notes);
+                      }}
+                      className={`w-full p-2 rounded-lg transition-colors text-left min-h-[44px] ${
+                        i === currentChord
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium">{c.name}</span>
+                        <span className="text-xs opacity-75">{selectedRomanProgression.romanNumerals[i]}</span>
+                      </div>
+                      {/* Color indicators showing notes in the chord */}
+                      <div className="flex gap-1">
+                        {noteColors.map((nc, idx) => (
+                          <div
+                            key={idx}
+                            className="w-3 h-3 rounded-full"
+                            style={{
+                              backgroundColor: `rgb(${nc.color.r}, ${nc.color.g}, ${nc.color.b})`
+                            }}
+                            title={`Note ${nc.noteClass}`}
+                          />
+                        ))}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
