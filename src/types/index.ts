@@ -102,3 +102,30 @@ export type {
   ControllerState,
   HardwareContextType,
 } from '../hardware';
+
+// Module adapter types (Epic 14 - Module Adapter Pattern)
+export type {
+  ModuleContext,
+  ModuleAdapterProps,
+  ModuleStateResolution,
+} from './moduleAdapter';
+
+// LED Compositor types (Epic 14, Story 14.7 - LED Compositor)
+export type {
+  BlendMode,
+  RGB,
+} from './blendMode';
+export { blendPixels } from './blendMode';
+
+export type {
+  LEDFrame,
+} from './ledFrame';
+
+export type {
+  VisualizationMode,
+} from './visualizationMode';
+export {
+  COMPATIBILITY_MATRIX,
+  checkModeCompatibility,
+  checkNotePerLedCompatibility,
+} from './visualizationMode';

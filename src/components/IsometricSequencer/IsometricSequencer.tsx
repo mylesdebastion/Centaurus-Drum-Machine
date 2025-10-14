@@ -4,6 +4,8 @@ import { SingleLaneVisualizer } from '../../utils/SingleLaneVisualizer';
 import { LEDStripManager } from '../LEDStripManager/LEDStripManager';
 import { APC40Controller, APC40ButtonEvent } from '../../utils/APC40Controller';
 import { createSoundEngine, SoundEngine, SoundEngineType, soundEngineNames } from '../../utils/soundEngines';
+import { useModuleContext } from '../../hooks/useModuleContext';
+import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
 
 interface IsometricSequencerProps {
   onBack: () => void;
@@ -101,19 +103,55 @@ class Camera3D {
 }
 
 export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }) => {
+  // Module Adapter Pattern - Context Detection (Epic 14, Story 14.5)
+  const context = useModuleContext();
+  const globalMusic = useGlobalMusic();
+  const isStandalone = context === 'standalone';
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const audioContextRef = useRef<AudioContext>();
   const masterGainRef = useRef<GainNode>();
 
-  // State
+  // State (local state for standalone mode)
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState(120);
   const [currentBeat, setCurrentBeat] = useState(0);
-  const [selectedRoot, setSelectedRoot] = useState('C'); // Root note (C, D, E, etc.)
-  const [selectedScale, setSelectedScale] = useState('major'); // Scale type (major, minor, etc.)
+  const [localSelectedRoot, setLocalSelectedRoot] = useState('C'); // Root note (C, D, E, etc.)
+  const [localSelectedScale, setLocalSelectedScale] = useState('major'); // Scale type (major, minor, etc.)
   const [showAllNotes, setShowAllNotes] = useState(false); // Toggle between scale and chromatic
-  const [useHarmonicMode, setUseHarmonicMode] = useState(false); // Toggle harmonic mode (Circle of Fifths note arrangement)
+  const [localUseHarmonicMode, setLocalUseHarmonicMode] = useState(false); // Toggle harmonic mode (Circle of Fifths note arrangement)
+
+  // Graceful Degradation - State Resolution
+  const selectedRoot = isStandalone ? localSelectedRoot : globalMusic.key;
+  const selectedScale = isStandalone ? localSelectedScale : globalMusic.scale;
+  const useHarmonicMode = isStandalone ? localUseHarmonicMode : (globalMusic.colorMode === 'harmonic');
+
+  // State update helpers (Epic 14 - Module Adapter Pattern)
+  const setSelectedRoot = useCallback((root: string) => {
+    if (isStandalone) {
+      setLocalSelectedRoot(root);
+    } else {
+      globalMusic.updateKey(root);
+    }
+  }, [isStandalone, globalMusic]);
+
+  const setSelectedScale = useCallback((scale: string) => {
+    if (isStandalone) {
+      setLocalSelectedScale(scale);
+    } else {
+      globalMusic.updateScale(scale);
+    }
+  }, [isStandalone, globalMusic]);
+
+  const setUseHarmonicMode = useCallback((harmonic: boolean) => {
+    if (isStandalone) {
+      setLocalUseHarmonicMode(harmonic);
+    } else {
+      globalMusic.updateColorMode(harmonic ? 'harmonic' : 'chromatic');
+    }
+  }, [isStandalone, globalMusic]);
+
   const [pattern, setPattern] = useState<boolean[][]>(
     Array(12).fill(null).map(() => Array(16).fill(false))
   );
@@ -1811,6 +1849,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
             <span className="text-sm text-cyan-400 w-8">{bpm}</span>
           </div>
 
+          {/* Harmonic Mode Toggle - Only show in standalone mode */}
+          {isStandalone && (
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -1822,6 +1862,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
               <span className="text-sm text-gray-300">Harmonic</span>
             </label>
           </div>
+          )}
 
           <div className="flex items-center gap-2">
             <input
@@ -1950,7 +1991,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           Clear
         </button>
 
-        {/* Key selector */}
+        {/* Key selector - Only show in standalone mode */}
+        {isStandalone && (
         <div className="relative flex">
           <button
             onClick={() => setShowKeyMenu(!showKeyMenu)}
@@ -1986,8 +2028,10 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
             </div>
           )}
         </div>
+        )}
 
-        {/* Scale selector */}
+        {/* Scale selector - Only show in standalone mode */}
+        {isStandalone && (
         <div className="relative flex">
           <button
             onClick={() => setShowScaleMenu(!showScaleMenu)}
@@ -2023,6 +2067,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
             </div>
           )}
         </div>
+        )}
 
         <div className="relative flex">
           <button

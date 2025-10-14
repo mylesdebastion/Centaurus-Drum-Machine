@@ -71,7 +71,7 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
             key={module.instanceId}
             className={`
               ${!isActive ? 'hidden' : ''}
-              ${isMobile ? 'w-full' : 'h-[500px]'}
+              ${isMobile ? 'w-full' : 'h-[600px] overflow-y-auto'}
             `}
           >
             <ModuleWrapper

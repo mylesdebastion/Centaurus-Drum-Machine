@@ -180,10 +180,21 @@ export function romanNumeralToChord(
     chordRoot = getNoteFromScaleDegree(keyRoot, parsed.scaleDegree, scaleType);
   }
 
-  const chordShape = getChordShape(chordRoot, parsed.quality);
+  // Map sharp notes to flat enharmonics for chord library lookup
+  // Chord library uses flats, not sharps (Bb not A#, Eb not D#, etc.)
+  const enharmonicMap: Record<string, string> = {
+    'C#': 'Db',
+    'D#': 'Eb',
+    'F#': 'Gb',
+    'G#': 'Ab',
+    'A#': 'Bb'
+  };
+  const lookupRoot = enharmonicMap[chordRoot] || chordRoot;
+
+  const chordShape = getChordShape(lookupRoot, parsed.quality);
 
   if (!chordShape) {
-    console.warn(`Chord shape not found: ${chordRoot}-${parsed.quality}`);
+    console.warn(`Chord shape not found: ${lookupRoot}-${parsed.quality} (original: ${chordRoot})`);
     return undefined;
   }
 

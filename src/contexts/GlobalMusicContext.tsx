@@ -17,6 +17,13 @@ export interface GlobalMusicState {
   colorMode: 'chromatic' | 'harmonic';
   /** Master volume (0-1) */
   masterVolume: number;
+  /**
+   * Global transport state (play/pause)
+   * Epic 14, Story 14.2 - Controls playback synchronization across all modules
+   * NOT persisted to localStorage (in-memory only)
+   * @default false - always starts paused
+   */
+  isPlaying: boolean;
   /** Hardware configuration */
   hardware: {
     midi: {
@@ -48,6 +55,12 @@ export interface GlobalMusicContextValue extends GlobalMusicState {
   updateScale: (scale: ScaleName) => void;
   updateColorMode: (mode: 'chromatic' | 'harmonic') => void;
   updateMasterVolume: (volume: number) => void;
+  /**
+   * Update global transport state (Epic 14, Story 14.2)
+   * Synchronizes Tone.js Transport with global state
+   * @param playing - true to start playback, false to pause
+   */
+  updateTransportState: (playing: boolean) => void;
   updateMidiInput: (device: string | null) => void;
   updateMidiOutput: (device: string | null) => void;
   updateMidiConnected: (connected: boolean) => void;
@@ -71,6 +84,7 @@ const DEFAULT_STATE: GlobalMusicState = {
   scale: 'major',
   colorMode: 'chromatic',
   masterVolume: 0.7,
+  isPlaying: false, // Epic 14, Story 14.2 - Always starts paused
   hardware: {
     midi: {
       inputDevice: null,
@@ -148,12 +162,16 @@ function loadStateFromLocalStorage(): GlobalMusicState {
 /**
  * Save state to localStorage
  * Handles errors gracefully (quota exceeded, disabled localStorage, etc.)
+ * Epic 14, Story 14.2: EXCLUDES isPlaying field (transport state is in-memory only)
  */
 function saveStateToLocalStorage(state: GlobalMusicState): void {
   try {
+    // Destructure to exclude isPlaying (not persisted)
+    const { isPlaying, ...persistedState } = state;
+
     const stored: StoredState = {
       version: STORAGE_VERSION,
-      state,
+      state: persistedState as GlobalMusicState, // Cast needed due to isPlaying exclusion
       timestamp: new Date().toISOString(),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
@@ -338,6 +356,30 @@ export const GlobalMusicProvider: React.FC<GlobalMusicProviderProps> = ({ childr
   }, []);
 
   /**
+   * Update global transport state (Epic 14, Story 14.2)
+   * Syncs React state with Tone.js Transport
+   */
+  const updateTransportState = useCallback((playing: boolean) => {
+    // Validation
+    if (typeof playing !== 'boolean') {
+      console.warn(`[GlobalMusicContext] Invalid transport state: ${playing}. Must be boolean.`);
+      return;
+    }
+
+    // Update React state
+    setState(prev => ({ ...prev, isPlaying: playing }));
+
+    // Sync with Tone.js Transport via AudioEngine
+    if (playing) {
+      audioEngine.startTransport();
+      console.log('[GlobalMusicContext] Transport started');
+    } else {
+      audioEngine.stopTransport();
+      console.log('[GlobalMusicContext] Transport stopped');
+    }
+  }, []);
+
+  /**
    * Memoize context value to prevent unnecessary re-renders
    */
   const contextValue = useMemo<GlobalMusicContextValue>(
@@ -348,6 +390,7 @@ export const GlobalMusicProvider: React.FC<GlobalMusicProviderProps> = ({ childr
       updateScale,
       updateColorMode,
       updateMasterVolume,
+      updateTransportState, // Epic 14, Story 14.2
       updateMidiInput,
       updateMidiOutput,
       updateMidiConnected,
@@ -368,6 +411,7 @@ export const GlobalMusicProvider: React.FC<GlobalMusicProviderProps> = ({ childr
       updateScale,
       updateColorMode,
       updateMasterVolume,
+      updateTransportState, // Epic 14, Story 14.2
       updateMidiInput,
       updateMidiOutput,
       updateMidiConnected,

@@ -9,6 +9,8 @@ import {
   ArrowUp,
   ArrowDown,
   Settings,
+  Play,
+  Pause,
 } from 'lucide-react';
 import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
 import { useResponsive } from '../../hooks/useResponsive';
@@ -191,6 +193,37 @@ const ColorModeToggle: React.FC<ColorModeToggleProps> = ({ mode, onModeChange })
 };
 
 /**
+ * Transport Controls Component
+ * Epic 14, Story 14.2 - Global play/pause transport control
+ * Provides DAW-style master transport synchronization
+ */
+interface TransportControlsProps {
+  isPlaying: boolean;
+  onTogglePlay: () => void;
+}
+
+const TransportControls: React.FC<TransportControlsProps> = ({ isPlaying, onTogglePlay }) => {
+  return (
+    <button
+      onClick={onTogglePlay}
+      className={`p-2 rounded-lg transition-all transform hover:scale-105 ${
+        isPlaying
+          ? 'bg-accent-600 hover:bg-accent-700' // Playing: accent color
+          : 'bg-primary-600 hover:bg-primary-700' // Paused: primary color
+      }`}
+      title={isPlaying ? 'Pause' : 'Play'}
+      aria-label={isPlaying ? 'Pause global transport' : 'Play global transport'}
+    >
+      {isPlaying ? (
+        <Pause className="w-5 h-5 text-white" />
+      ) : (
+        <Play className="w-5 h-5 text-white" />
+      )}
+    </button>
+  );
+};
+
+/**
  * Master Volume Slider Component
  * Controls global audio output volume
  */
@@ -278,6 +311,11 @@ export const GlobalMusicHeader: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isHardwareModalOpen, setIsHardwareModalOpen] = useState(false);
 
+  // Transport toggle handler (Epic 14, Story 14.2)
+  const handleTogglePlay = useCallback(() => {
+    music.updateTransportState(!music.isPlaying);
+  }, [music]);
+
   // Load menu state from localStorage
   useEffect(() => {
     const savedMenuState = localStorage.getItem('global-music-header-menu-open');
@@ -306,6 +344,12 @@ export const GlobalMusicHeader: React.FC = () => {
           {!isMobile && (
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
+                {/* Epic 14, Story 14.2: Transport Controls */}
+                <TransportControls
+                  isPlaying={music.isPlaying}
+                  onTogglePlay={handleTogglePlay}
+                />
+
                 <TempoControl
                   tempo={music.tempo}
                   onTempoChange={music.updateTempo}
@@ -374,6 +418,12 @@ export const GlobalMusicHeader: React.FC = () => {
                       <Menu className="w-6 h-6 text-white" />
                     )}
                   </button>
+
+                  {/* Epic 14, Story 14.2: Transport Controls (Mobile) */}
+                  <TransportControls
+                    isPlaying={music.isPlaying}
+                    onTogglePlay={handleTogglePlay}
+                  />
 
                   <span className="text-white font-semibold">
                     {music.tempo} BPM • {music.getKeySignature()}

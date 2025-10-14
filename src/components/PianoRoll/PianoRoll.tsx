@@ -12,6 +12,9 @@ import { CHORD_PROGRESSIONS } from '../GuitarFretboard/chordProgressions';
 import { getMIDINoteFromFret } from '../GuitarFretboard/constants';
 import { lumiController } from '../../utils/lumiController';
 import { midiOutputManager } from '../../utils/midiOutputManager';
+import { useModuleContext } from '../../hooks/useModuleContext';
+import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
+import { ledCompositor } from '../../services/LEDCompositor';
 
 interface PianoRollProps {
   onBack: () => void;
@@ -31,7 +34,24 @@ interface PianoRollProps {
  * - Responsive octave view
  */
 export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
-  const [colorMode, setColorMode] = useState<ColorMode>('chromatic');
+  // Module Adapter Pattern - Context Detection (Epic 14, Story 14.3)
+  const context = useModuleContext();
+  const globalMusic = useGlobalMusic();
+  const isStandalone = context === 'standalone';
+
+  // Graceful Degradation - State Resolution
+  // When standalone: use local state
+  // When in Studio/Jam: use global state from GlobalMusicContext
+  const [localColorMode, setLocalColorMode] = useState<ColorMode>('chromatic');
+  const [localSelectedRoot, setLocalSelectedRoot] = useState('C');
+  const [localSelectedScale, setLocalSelectedScale] = useState('major');
+
+  // Resolved state (graceful degradation)
+  const colorMode = isStandalone ? localColorMode : globalMusic.colorMode;
+  const selectedRoot = isStandalone ? localSelectedRoot : globalMusic.key;
+  const selectedScale = isStandalone ? localSelectedScale : globalMusic.scale;
+
+  // Local-only state (not part of global context)
   const [visibleOctaves, setVisibleOctaves] = useState(4);
   const [startOctave, setStartOctave] = useState(3);
   const [wledEnabled, setWledEnabled] = useState(false);
@@ -39,8 +59,6 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
   const [lumiEnabled, setLumiEnabled] = useState(false);
   const [midiOutputDevices, setMidiOutputDevices] = useState<any[]>([]);
   const [selectedOutputId, setSelectedOutputId] = useState<string | null>(null);
-  const [selectedRoot, setSelectedRoot] = useState('C');
-  const [selectedScale, setSelectedScale] = useState('major');
   const [showKeyMenu, setShowKeyMenu] = useState(false);
   const [showScaleMenu, setShowScaleMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -61,6 +79,32 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
   const soundEngineRef = useRef<SoundEngine | null>(null);
   const noteReleaseTimeoutsRef = useRef<Set<NodeJS.Timeout>>(new Set());
   const previousLumiNotesRef = useRef<Set<number>>(new Set());
+
+  // State update helpers (Epic 14 - Module Adapter Pattern)
+  // Updates local state if standalone, global state if embedded
+  const updateColorMode = useCallback((mode: 'chromatic' | 'harmonic') => {
+    if (isStandalone) {
+      setLocalColorMode(mode);
+    } else {
+      globalMusic.updateColorMode(mode);
+    }
+  }, [isStandalone, globalMusic]);
+
+  const updateKey = useCallback((key: string) => {
+    if (isStandalone) {
+      setLocalSelectedRoot(key);
+    } else {
+      globalMusic.updateKey(key);
+    }
+  }, [isStandalone, globalMusic]);
+
+  const updateScale = useCallback((scale: string) => {
+    if (isStandalone) {
+      setLocalSelectedScale(scale);
+    } else {
+      globalMusic.updateScale(scale);
+    }
+  }, [isStandalone, globalMusic]);
 
   // Root note positions (chromatic scale)
   const rootPositions: Record<string, number> = {
@@ -389,36 +433,39 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
   }, [activeNotes, colorMode, getCurrentScale]);
 
   /**
-   * Send LED data to WLED (via UDP)
+   * Send LED data to LED Compositor (Epic 14, Story 14.7)
+   * Replaces direct WLED output with compositor submission
    */
   useEffect(() => {
     if (!wledEnabled) return;
 
-    const sendToWLED = async () => {
+    const sendToCompositor = () => {
       try {
         const ledData = generateLEDData();
 
-        // WARLS protocol: [2, 255, ...RGB data]
-        const packet = new Uint8Array(2 + ledData.length * 3);
-        packet[0] = 2;   // WARLS protocol
-        packet[1] = 255; // Timeout
-
+        // Convert {r, g, b}[] to Uint8ClampedArray [R, G, B, R, G, B, ...]
+        const pixelData = new Uint8ClampedArray(ledData.length * 3);
         ledData.forEach((color, index) => {
-          packet[2 + index * 3 + 0] = color.r;
-          packet[2 + index * 3 + 1] = color.g;
-          packet[2 + index * 3 + 2] = color.b;
+          pixelData[index * 3 + 0] = color.r;
+          pixelData[index * 3 + 1] = color.g;
+          pixelData[index * 3 + 2] = color.b;
         });
 
-        // Send via WebSocket bridge (if available)
-        // In production, this would use the WLED WebSocket bridge
-        console.log('[PianoVisualizer] Would send LED data to WLED:', wledIP);
+        // Submit frame to LED Compositor
+        ledCompositor.submitFrame({
+          moduleId: 'piano-roll',
+          deviceId: `wled-${wledIP.replace(/\./g, '-')}`, // Convert IP to device ID
+          timestamp: performance.now(),
+          pixelData,
+          visualizationMode: 'note-per-led', // 88-key piano = note-per-led addressing
+        });
       } catch (error) {
-        console.error('[PianoVisualizer] Error sending to WLED:', error);
+        console.error('[PianoVisualizer] Error submitting to LED Compositor:', error);
       }
     };
 
-    // Send at 30 FPS
-    const interval = setInterval(sendToWLED, 1000 / 30);
+    // Send at 30 FPS (compositor handles rate limiting internally)
+    const interval = setInterval(sendToCompositor, 1000 / 30);
     return () => clearInterval(interval);
   }, [wledEnabled, wledIP, generateLEDData]);
 
@@ -530,7 +577,8 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
 
               {/* Main Controls */}
               <div className="flex items-center gap-2 flex-wrap">
-                {/* Key Selector */}
+                {/* Key Selector - Only show in standalone mode */}
+                {isStandalone && (
                 <div className="relative">
                   <button
                     onClick={() => {
@@ -551,7 +599,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                         <button
                           key={root}
                           onClick={() => {
-                            setSelectedRoot(root);
+                            updateKey(root);
                             setShowKeyMenu(false);
                           }}
                           className={`px-3 py-2 rounded text-sm hover:bg-gray-700 transition-colors ${
@@ -564,8 +612,10 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                     </div>
                   )}
                 </div>
+                )}
 
-                {/* Scale Selector */}
+                {/* Scale Selector - Only show in standalone mode */}
+                {isStandalone && (
                 <div className="relative">
                   <button
                     onClick={() => {
@@ -586,7 +636,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                         <button
                           key={scale}
                           onClick={() => {
-                            setSelectedScale(scale);
+                            updateScale(scale);
                             setShowScaleMenu(false);
                           }}
                           className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 transition-colors capitalize ${
@@ -599,11 +649,13 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                     </div>
                   )}
                 </div>
+                )}
 
-                {/* Chromatic/Harmonic Mode Toggle */}
+                {/* Chromatic/Harmonic Mode Toggle - Only show in standalone mode */}
+                {isStandalone && (
                 <div className="flex gap-1">
                   <button
-                    onClick={() => setColorMode('chromatic')}
+                    onClick={() => updateColorMode('chromatic')}
                     className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                       colorMode === 'chromatic'
                         ? 'bg-primary-600 text-white'
@@ -613,7 +665,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                     Chromatic
                   </button>
                   <button
-                    onClick={() => setColorMode('harmonic')}
+                    onClick={() => updateColorMode('harmonic')}
                     className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                       colorMode === 'harmonic'
                         ? 'bg-primary-600 text-white'
@@ -623,9 +675,12 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
                     Harmonic
                   </button>
                 </div>
+                )}
 
-                {/* Divider */}
+                {/* Divider - Only show in standalone mode */}
+                {isStandalone && (
                 <div className="w-px h-8 bg-gray-600"></div>
+                )}
 
                 {/* Chord Progression Controls */}
                 {/* Play/Stop Button */}

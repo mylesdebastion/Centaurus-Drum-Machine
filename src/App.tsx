@@ -15,6 +15,7 @@ import { GuitarFretboard } from './components/GuitarFretboard/GuitarFretboard';
 import { LumiTest } from './components/LumiTest/LumiTest';
 import { GlobalMusicHeaderTest } from './components/GlobalMusicHeaderTest';
 import { Studio } from './components/Studio/Studio';
+import { SupabaseConnectionTest } from './components/SupabaseConnectionTest';
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
@@ -153,6 +154,14 @@ function App() {
     navigate('/');
   };
 
+  const handleSupabaseTest = () => {
+    navigate('/supabase-test');
+  };
+
+  const handleExitSupabaseTest = () => {
+    navigate('/');
+  };
+
   return (
     <GlobalMusicProvider>
       <Routes>
@@ -173,6 +182,7 @@ function App() {
               onLumiTest={handleLumiTest}
               onHeaderTest={handleHeaderTest}
               onStudio={handleStudio}
+              onSupabaseTest={handleSupabaseTest}
             />
           }
         />
@@ -272,6 +282,20 @@ function App() {
             <Studio
               onBack={handleExitStudio}
             />
+          }
+        />
+        <Route
+          path="/supabase-test"
+          element={
+            <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
+              <button
+                onClick={handleExitSupabaseTest}
+                className="mb-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              >
+                ← Back
+              </button>
+              <SupabaseConnectionTest />
+            </div>
           }
         />
       </Routes>

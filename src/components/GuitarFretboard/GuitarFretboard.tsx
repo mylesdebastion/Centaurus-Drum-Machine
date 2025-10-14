@@ -17,18 +17,31 @@ import { useMIDIInput } from '../../hooks/useMIDIInput';
 import { useMusicalScale, ROOT_POSITIONS } from '../../hooks/useMusicalScale';
 import { ScaleSelector } from '../Music/ScaleSelector';
 import { GUITAR_TUNINGS, getTuningMIDINotes, type GuitarTuning } from './tunings';
+import { useModuleContext } from '../../hooks/useModuleContext';
+import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
+import { ledCompositor } from '../../services/LEDCompositor';
 
 interface GuitarFretboardProps {
   /**
    * Callback when user clicks the back button
    */
   onBack?: () => void;
+  /**
+   * Whether this module is embedded in Studio (affects layout)
+   */
+  embedded?: boolean;
 }
 
-export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
+export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedded = false }) => {
+  // Module Adapter Pattern - Context Detection (Epic 14, Story 14.4)
+  const context = useModuleContext();
+  const globalMusic = useGlobalMusic();
+  const isStandalone = context === 'standalone';
+
+  // Local state (used when standalone)
   const [currentProgressionIndex, setCurrentProgressionIndex] = useState(0);
   const [currentChord, setCurrentChord] = useState(0);
-  const [colorMode, setColorMode] = useState<ColorMode>('chromatic');
+  const [localColorMode, setLocalColorMode] = useState<ColorMode>('chromatic');
   const [guitarSynth, setGuitarSynth] = useState<Tone.PolySynth | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -39,17 +52,71 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
   // Track clicked notes for interval guide (separate from chord diagram notes)
   const [clickedNotes, setClickedNotes] = useState<Set<number>>(new Set());
 
-  // Musical scale hook
+  // Musical scale hook (for local state when standalone)
   const {
-    selectedRoot,
-    selectedScale,
-    setSelectedRoot,
-    setSelectedScale,
-    getCurrentScale,
+    selectedRoot: localSelectedRoot,
+    selectedScale: localSelectedScale,
+    setSelectedRoot: setLocalSelectedRoot,
+    setSelectedScale: setLocalSelectedScale,
+    getCurrentScale: _getLocalCurrentScale, // Not used - we implement our own getCurrentScale
     getKeySignature,
     rootNotes,
     scaleNames
   } = useMusicalScale({ initialRoot: 'C', initialScale: 'major' });
+
+  // Graceful Degradation - State Resolution
+  const colorMode = isStandalone ? localColorMode : globalMusic.colorMode;
+  const selectedRoot = isStandalone ? localSelectedRoot : globalMusic.key;
+  const selectedScale = isStandalone ? localSelectedScale : globalMusic.scale;
+
+  // Helper to get current scale notes (handles both local and global)
+  const getCurrentScale = useCallback(() => {
+    // Scale interval patterns (semitones from root)
+    const scalePatterns: Record<string, number[]> = {
+      'major': [0, 2, 4, 5, 7, 9, 11],
+      'minor': [0, 2, 3, 5, 7, 8, 10],
+      'dorian': [0, 2, 3, 5, 7, 9, 10],
+      'phrygian': [0, 1, 3, 5, 7, 8, 10],
+      'lydian': [0, 2, 4, 6, 7, 9, 11],
+      'mixolydian': [0, 2, 4, 5, 7, 9, 10],
+      'locrian': [0, 1, 3, 5, 6, 8, 10],
+      'harmonic_minor': [0, 2, 3, 5, 7, 8, 11],
+      'melodic_minor': [0, 2, 3, 5, 7, 9, 11],
+      'pentatonic_major': [0, 2, 4, 7, 9],
+      'pentatonic_minor': [0, 3, 5, 7, 10],
+      'blues': [0, 3, 5, 6, 7, 10],
+      'chromatic': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    };
+
+    const rootPos = ROOT_POSITIONS[selectedRoot];
+    const pattern = scalePatterns[selectedScale] || scalePatterns['major'];
+    return pattern.map(interval => (rootPos + interval) % 12);
+  }, [selectedRoot, selectedScale]);
+
+  // State update helpers (Epic 14 - Module Adapter Pattern)
+  const updateColorMode = useCallback((mode: 'chromatic' | 'harmonic') => {
+    if (isStandalone) {
+      setLocalColorMode(mode);
+    } else {
+      globalMusic.updateColorMode(mode);
+    }
+  }, [isStandalone, globalMusic]);
+
+  const updateKey = useCallback((key: string) => {
+    if (isStandalone) {
+      setLocalSelectedRoot(key);
+    } else {
+      globalMusic.updateKey(key);
+    }
+  }, [isStandalone, globalMusic, setLocalSelectedRoot]);
+
+  const updateScale = useCallback((scale: string) => {
+    if (isStandalone) {
+      setLocalSelectedScale(scale);
+    } else {
+      globalMusic.updateScale(scale);
+    }
+  }, [isStandalone, globalMusic, setLocalSelectedScale]);
 
   // Get current tuning MIDI notes
   const currentTuningMIDI = getTuningMIDINotes(selectedTuning);
@@ -57,8 +124,12 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
 
   // Resolve Roman numeral progression to actual chords based on selected key
   const selectedRomanProgression = ROMAN_NUMERAL_PROGRESSIONS[currentProgressionIndex];
-  const progression = resolveProgression(selectedRomanProgression, selectedRoot);
-  const chord = progression.chords[currentChord];
+  const progression = resolveProgression(selectedRomanProgression, selectedRoot) || {
+    name: 'Loading...',
+    chords: [{ name: 'C', notes: [] }],
+    romanNumerals: ['I']
+  };
+  const chord = progression.chords[currentChord] || { name: 'C', notes: [] };
 
   // Log when tuning changes
   useEffect(() => {
@@ -233,7 +304,7 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'c' || e.key === 'C') {
-        setColorMode(prev => prev === 'chromatic' ? 'harmonic' : 'chromatic');
+        updateColorMode(colorMode === 'chromatic' ? 'harmonic' : 'chromatic');
       } else if (e.key === 'n' || e.key === 'N') {
         setCurrentProgressionIndex(prev => (prev + 1) % ROMAN_NUMERAL_PROGRESSIONS.length);
         setCurrentChord(0);
@@ -245,7 +316,7 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [togglePlayPause]);
+  }, [togglePlayPause, updateColorMode, colorMode]);
 
   // Combine clicked notes with MIDI input notes for interval guide
   const allActiveNotes = useMemo(() => {
@@ -254,9 +325,10 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
     return combined;
   }, [activeMIDINotes, clickedNotes]);
 
-  // Generate LED matrix data (convert to hex strings for WLED)
-  const generateLEDData = useCallback(() => {
-    const ledData: string[] = Array(150).fill('000000');
+  // Generate LED matrix data for LED Compositor (Epic 14, Story 14.4)
+  const generateLEDData = useCallback((): { hex: string[], rgb: Uint8ClampedArray } => {
+    const ledDataHex: string[] = Array(150).fill('000000');
+    const ledDataRGB = new Uint8ClampedArray(150 * 3);
     const currentScaleNotes = getCurrentScale();
 
     for (let string = 0; string < 6; string++) {
@@ -280,16 +352,225 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
         }
 
         const ledIndex = fretboardToLEDIndex(string, fret);
-        const r = Math.round(color.r * brightness).toString(16).padStart(2, '0');
-        const g = Math.round(color.g * brightness).toString(16).padStart(2, '0');
-        const b = Math.round(color.b * brightness).toString(16).padStart(2, '0');
-        ledData[ledIndex] = r + g + b;
+        const r = Math.round(color.r * brightness);
+        const g = Math.round(color.g * brightness);
+        const b = Math.round(color.b * brightness);
+
+        // Hex format for legacy WLED support
+        ledDataHex[ledIndex] = r.toString(16).padStart(2, '0') + g.toString(16).padStart(2, '0') + b.toString(16).padStart(2, '0');
+
+        // RGB format for LED Compositor
+        ledDataRGB[ledIndex * 3 + 0] = r;
+        ledDataRGB[ledIndex * 3 + 1] = g;
+        ledDataRGB[ledIndex * 3 + 2] = b;
       }
     }
 
-    return ledData;
+    return { hex: ledDataHex, rgb: ledDataRGB };
   }, [chord, colorMode, fretboardMatrix, getCurrentScale]);
 
+  // Submit frames to LED Compositor (Epic 14, Story 14.7)
+  // Continuously update LED output at 30 FPS
+  useEffect(() => {
+    const submitToCompositor = () => {
+      const ledData = generateLEDData();
+
+      // Submit to LED Compositor
+      ledCompositor.submitFrame({
+        moduleId: 'guitar-fretboard',
+        deviceId: 'wled-guitar-matrix', // Fixed device ID for guitar LED matrix
+        timestamp: performance.now(),
+        pixelData: ledData.rgb,
+        visualizationMode: 'note-per-led', // Guitar fretboard = 150 note-per-led addressing
+      });
+    };
+
+    // Submit at 30 FPS (compositor handles rate limiting)
+    const interval = setInterval(submitToCompositor, 1000 / 30);
+    return () => clearInterval(interval);
+  }, [generateLEDData]);
+
+  // Embedded mode: compact layout without full-page wrapper
+  if (embedded) {
+    return (
+      <div className="space-y-4">
+        {/* Compact Header */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Guitar className="w-5 h-5 text-primary-500" />
+            <div>
+              <h2 className="text-lg font-bold text-white">Guitar Fretboard</h2>
+              <p className="text-xs text-gray-400">
+                {progression.name} - {chord.name}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+            aria-label="Toggle settings"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Fretboard Canvas */}
+        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+          <FretboardCanvas
+            activeChord={chord.notes}
+            activeMIDINotes={allActiveNotes}
+            colorMode={colorMode}
+            onFretClick={handleFretClick}
+            scaleNotes={getCurrentScale()}
+            rootNote={ROOT_POSITIONS[selectedRoot]}
+          />
+        </div>
+
+        {/* Chord Progression Controls */}
+        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-gray-300">Chord Progression</h3>
+            <button
+              onClick={togglePlayPause}
+              className={`p-2 rounded-lg transition-colors ${
+                isPlaying
+                  ? 'bg-red-600 hover:bg-red-700 text-white'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
+              aria-label={isPlaying ? 'Pause' : 'Play'}
+            >
+              {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+            </button>
+          </div>
+
+          {/* Progression Selector */}
+          <div className="relative mb-3">
+            <button
+              onClick={() => setShowProgressionMenu(!showProgressionMenu)}
+              className="w-full flex items-center justify-between px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+            >
+              <div className="flex flex-col items-start">
+                <span className="font-medium text-sm">{selectedRomanProgression.name}</span>
+                <span className="text-xs text-gray-400">{selectedRomanProgression.romanNumerals.join(' - ')}</span>
+              </div>
+              <span className="text-xs ml-2">▼</span>
+            </button>
+
+            {showProgressionMenu && (
+              <div className="absolute top-full mt-2 left-0 right-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-64 overflow-y-auto">
+                {ROMAN_NUMERAL_PROGRESSIONS.map((prog, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      setCurrentProgressionIndex(index);
+                      setCurrentChord(0);
+                      setShowProgressionMenu(false);
+                      setIsPlaying(false);
+                    }}
+                    className={`w-full px-4 py-3 text-left hover:bg-gray-700 transition-colors border-b border-gray-700 last:border-b-0 ${
+                      currentProgressionIndex === index
+                        ? 'bg-primary-900 text-primary-400'
+                        : 'text-white'
+                    }`}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm">{prog.name}</span>
+                      <span className="text-xs text-gray-400">{prog.romanNumerals.join(' - ')}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Chord List */}
+          <div className="space-y-2">
+            {progression.chords.map((c, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  setCurrentChord(i);
+                  if (guitarSynth) playChord(c.notes);
+                }}
+                className={`w-full p-2 rounded-lg transition-colors text-left ${
+                  i === currentChord
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{c.name}</span>
+                  <span className="text-xs opacity-75">{selectedRomanProgression.romanNumerals[i]}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Settings (when expanded) */}
+        {showSettings && (
+          <>
+            <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+              <h3 className="text-sm font-medium text-gray-300 mb-3">Guitar Tuning</h3>
+              <div className="relative mb-3">
+                <button
+                  onClick={() => setShowTuningMenu(!showTuningMenu)}
+                  className="w-full flex items-center justify-between px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                >
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-sm">{selectedTuning.name}</span>
+                    <span className="text-xs text-gray-400">{selectedTuning.strings.join(' ')}</span>
+                  </div>
+                  <span className="text-xs ml-2">▼</span>
+                </button>
+
+                {showTuningMenu && (
+                  <div className="absolute top-full mt-2 left-0 right-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 max-h-64 overflow-y-auto">
+                    {GUITAR_TUNINGS.map((tuning, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          setSelectedTuning(tuning);
+                          setShowTuningMenu(false);
+                        }}
+                        className={`w-full px-4 py-3 text-left hover:bg-gray-700 transition-colors border-b border-gray-700 last:border-b-0 ${
+                          selectedTuning.name === tuning.name
+                            ? 'bg-primary-900 text-primary-400'
+                            : 'text-white'
+                        }`}
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium text-sm">{tuning.name}</span>
+                          <span className="text-xs text-gray-400">{tuning.strings.join(' ')}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+              <h3 className="text-sm font-medium text-gray-300 mb-3">MIDI Input</h3>
+              <MIDIDeviceSelector />
+            </div>
+
+            <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+              <h3 className="text-sm font-medium text-gray-300 mb-3">WLED LED Matrix</h3>
+              <WLEDDeviceManager
+                ledData={generateLEDData().hex}
+                layout="desktop"
+                storageKey="wled-guitar-fretboard"
+                deviceType="matrix"
+              />
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // Standalone mode: full-page layout
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -322,25 +603,30 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Scale/Key Selector */}
-            <ScaleSelector
-              selectedRoot={selectedRoot}
-              selectedScale={selectedScale}
-              rootNotes={rootNotes}
-              scaleNames={scaleNames}
-              onRootChange={setSelectedRoot}
-              onScaleChange={setSelectedScale}
-              rootColor="blue"
-              scaleColor="indigo"
-              showIcon={false}
-            />
+            {/* Scale/Key Selector - Only show in standalone mode */}
+            {isStandalone && (
+              <ScaleSelector
+                selectedRoot={selectedRoot}
+                selectedScale={selectedScale}
+                rootNotes={rootNotes}
+                scaleNames={scaleNames}
+                onRootChange={updateKey}
+                onScaleChange={updateScale}
+                rootColor="blue"
+                scaleColor="indigo"
+                showIcon={false}
+              />
+            )}
 
-            <button
-              onClick={() => setColorMode(prev => prev === 'chromatic' ? 'harmonic' : 'chromatic')}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors min-h-[44px] text-sm"
-            >
-              {colorMode === 'chromatic' ? 'Chromatic' : 'Harmonic'}
-            </button>
+            {/* Chromatic/Harmonic Toggle - Only show in standalone mode */}
+            {isStandalone && (
+              <button
+                onClick={() => updateColorMode(colorMode === 'chromatic' ? 'harmonic' : 'chromatic')}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors min-h-[44px] text-sm"
+              >
+                {colorMode === 'chromatic' ? 'Chromatic' : 'Harmonic'}
+              </button>
+            )}
             <button
               onClick={() => setShowSettings(!showSettings)}
               className="p-2 hover:bg-gray-700 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
@@ -513,7 +799,7 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack }) => {
                 <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
                   <h3 className="text-sm font-medium text-gray-300 mb-3">WLED LED Matrix</h3>
                   <WLEDDeviceManager
-                    ledData={generateLEDData()}
+                    ledData={generateLEDData().hex}
                     layout="desktop"
                     storageKey="wled-guitar-fretboard"
                     deviceType="matrix"
