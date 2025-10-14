@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ArrowLeft, Music, Settings, Volume2, Play, Square } from 'lucide-react';
 import { PianoCanvas } from './PianoCanvas';
 import { MIDIDeviceSelector } from '../MIDI/MIDIDeviceSelector';
@@ -15,6 +15,7 @@ import { midiOutputManager } from '../../utils/midiOutputManager';
 import { useModuleContext } from '../../hooks/useModuleContext';
 import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
 import { ledCompositor } from '../../services/LEDCompositor';
+import { midiEventBus } from '../../utils/midiEventBus';
 
 interface PianoRollProps {
   onBack: () => void;
@@ -181,6 +182,19 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
       });
     }
 
+    // Emit MIDI events to event bus for cross-module communication (Epic 14)
+    chordNotes.forEach((midiNote) => {
+      const noteForColor = colorMode === 'spectrum' ? midiNote : (midiNote % 12);
+      const noteColor = getNoteColor(noteForColor, colorMode);
+      midiEventBus.emitNoteOn({
+        note: midiNote,
+        velocity: 89, // ~70%
+        timestamp: performance.now(),
+        source: 'piano-roll',
+        color: noteColor
+      });
+    });
+
     // Trigger chord attack with error handling
     chordNotes.forEach((midiNote) => {
       const frequency = 440 * Math.pow(2, (midiNote - 69) / 12);
@@ -209,13 +223,17 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
           }
         });
       }
+      // Emit note-off events
+      chordNotes.forEach((midiNote) => {
+        midiEventBus.emitNoteOff(midiNote, 'piano-roll');
+      });
       // Remove this timeout from tracking set
       noteReleaseTimeoutsRef.current.delete(releaseTimeout);
     }, 1000);
 
     // Track this timeout so we can clear it if needed
     noteReleaseTimeoutsRef.current.add(releaseTimeout);
-  }, [getChordMIDINotes]);
+  }, [getChordMIDINotes, colorMode]);
 
   // Auto-advance chords when playing
   useEffect(() => {
@@ -332,7 +350,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     return 440 * Math.pow(2, (midiNote - 69) / 12);
   }, []);
 
-  const { activeNotes, isKeyboardMode } = useMIDIInput({
+  const { activeNotes: localActiveNotes, isKeyboardMode } = useMIDIInput({
     autoInitialize: true,
     autoSelectFirst: true, // Auto-connect to first available MIDI device
     keyboardFallback: true, // Fallback to keyboard if no MIDI device available
@@ -369,6 +387,49 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     },
   });
 
+  // Cross-module MIDI listening (Epic 14 - Inter-Module Communication)
+  // Listen to MIDI notes from other modules (Guitar, Drums) via MIDI event bus
+  const [crossModuleNotes, setCrossModuleNotes] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    // Subscribe to note-on events
+    const unsubscribeOn = midiEventBus.onNoteOn((event) => {
+      // Ignore notes from piano itself to avoid feedback
+      if (event.source === 'piano-roll') return;
+
+      setCrossModuleNotes(prev => {
+        const next = new Set(prev);
+        next.add(event.note);
+        return next;
+      });
+    });
+
+    // Subscribe to note-off events
+    const unsubscribeOff = midiEventBus.onNoteOff((note, source) => {
+      // Ignore notes from piano itself
+      if (source === 'piano-roll') return;
+
+      setCrossModuleNotes(prev => {
+        const next = new Set(prev);
+        next.delete(note);
+        return next;
+      });
+    });
+
+    // Cleanup on unmount
+    return () => {
+      unsubscribeOn();
+      unsubscribeOff();
+    };
+  }, []);
+
+  // Merge local MIDI input with cross-module MIDI notes
+  const activeNotes = useMemo(() => {
+    const merged = new Set<number>(localActiveNotes);
+    crossModuleNotes.forEach(note => merged.add(note));
+    return merged;
+  }, [localActiveNotes, crossModuleNotes]);
+
   // Initialize audio engine on mount
   useEffect(() => {
     initializeAudio();
@@ -403,6 +464,17 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
       const noteColor = getNoteColor(noteForColor, colorMode);
       sourceManager.addMidiNote(midiNote, 102, noteColor); // velocity ~80% (102/127)
     }
+
+    // Emit MIDI event to event bus for cross-module communication (Epic 14)
+    const noteForColor = colorMode === 'spectrum' ? midiNote : (midiNote % 12);
+    const noteColor = getNoteColor(noteForColor, colorMode);
+    midiEventBus.emitNoteOn({
+      note: midiNote,
+      velocity: 102, // ~80%
+      timestamp: performance.now(),
+      source: 'piano-roll',
+      color: noteColor
+    });
   }, [initializeAudio, midiToFrequency, colorMode]);
 
   /**
@@ -421,8 +493,8 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
     // Keep audioEngine for backwards compatibility
     audioEngine.triggerPianoNoteOff(midiNote);
 
-    // Note: MIDI note-off events are not sent to visualizer
-    // The synthetic frequency generator handles decay automatically
+    // Emit note-off to event bus for cross-module communication (Epic 14)
+    midiEventBus.emitNoteOff(midiNote, 'piano-roll');
   }, [midiToFrequency]);
 
   /**

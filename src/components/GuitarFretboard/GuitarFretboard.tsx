@@ -20,6 +20,7 @@ import { GUITAR_TUNINGS, getTuningMIDINotes, type GuitarTuning } from './tunings
 import { useModuleContext } from '../../hooks/useModuleContext';
 import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
 import { ledCompositor } from '../../services/LEDCompositor';
+import { midiEventBus } from '../../utils/midiEventBus';
 
 interface GuitarFretboardProps {
   /**
@@ -41,6 +42,7 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
   // Local state (used when standalone)
   const [currentProgressionIndex, setCurrentProgressionIndex] = useState(0);
   const [currentChord, setCurrentChord] = useState(0);
+  const [chordProgressionEnabled, setChordProgressionEnabled] = useState(false); // Start with no chord selected
   const [localColorMode, setLocalColorMode] = useState<ColorMode>('chromatic');
   const [guitarSynth, setGuitarSynth] = useState<Tone.PolySynth | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -249,13 +251,35 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
       });
     }
 
+    // Emit MIDI events to event bus for cross-module communication (Epic 14)
+    midiNotes.forEach((midiNote, i) => {
+      const noteForColor = colorMode === 'spectrum' ? midiNote : (midiNote % 12);
+      const noteColor = getNoteColor(noteForColor, colorMode);
+
+      setTimeout(() => {
+        // Note on
+        midiEventBus.emitNoteOn({
+          note: midiNote,
+          velocity: 102, // ~80%
+          timestamp: performance.now(),
+          source: 'guitar-fretboard',
+          color: noteColor
+        });
+
+        // Note off after 2 seconds (matching guitar sustain)
+        setTimeout(() => {
+          midiEventBus.emitNoteOff(midiNote, 'guitar-fretboard');
+        }, 2000);
+      }, i * 50); // Stagger with strum effect
+    });
+
     // Strum effect: play notes slightly offset
     frequencies.forEach((freq, i) => {
       setTimeout(() => {
         guitarSynth.triggerAttackRelease(freq, '2');
       }, i * 50); // 50ms strum delay between notes
     });
-  }, [guitarSynth, currentTuningMIDI]);
+  }, [guitarSynth, currentTuningMIDI, colorMode]);
 
   /**
    * Play current chord when it changes (if playing mode is active)
@@ -274,9 +298,13 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
     const newPlayingState = !localIsPlaying;
     setLocalIsPlaying(newPlayingState);
 
-    // Play chord immediately when starting
-    if (newPlayingState && guitarSynth) {
-      playChord(chord.notes);
+    // Enable chord progression when starting playback
+    if (newPlayingState) {
+      setChordProgressionEnabled(true);
+      // Play chord immediately when starting
+      if (guitarSynth) {
+        playChord(chord.notes);
+      }
     }
   }, [localIsPlaying, guitarSynth, playChord, chord.notes]);
 
@@ -287,27 +315,6 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
     // Calculate MIDI note from fret position
     const midiNote = getMIDINoteFromFret(string, fret, currentTuningMIDI);
     const freq = Tone.Frequency(midiNote, 'midi').toFrequency();
-
-    // Convert MIDI note to note name
-    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const octave = Math.floor(midiNote / 12) - 1;
-    const noteName = noteNames[midiNote % 12];
-    const fullNoteName = `${noteName}${octave}`;
-
-    // Get string names for context
-    const stringNames = ['E (low)', 'A', 'D', 'G', 'B', 'E (high)'];
-    const openStringNote = selectedTuning.strings[string];
-
-    // Log comprehensive debugging info (disabled to reduce console spam)
-    // console.group(`🎸 Fret Click: String ${string + 1}, Fret ${fret}`);
-    // console.log(`📍 Position: ${stringNames[string]} string, fret ${fret}`);
-    // console.log(`🎚️ Tuning: ${selectedTuning.name}`);
-    // console.log(`🎵 Open String: ${openStringNote} (MIDI ${currentTuningMIDI[string]})`);
-    // console.log(`🎹 Calculated Note: ${fullNoteName} (MIDI ${midiNote})`);
-    // console.log(`🔊 Frequency: ${freq.toFixed(2)} Hz`);
-    // console.log(`🎼 Tuning Array: [${selectedTuning.strings.join(', ')}]`);
-    // console.log(`🎯 Interval Guide: Note will be tracked for brightness system`);
-    // console.groupEnd();
 
     // Add note to clicked notes Set for interval guide
     setClickedNotes(prev => new Set(prev).add(midiNote));
@@ -323,6 +330,17 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
       sourceManager.addMidiNote(midiNote, 102, noteColor); // velocity ~80% (102/127)
     }
 
+    // Emit MIDI event to event bus for cross-module communication (Epic 14)
+    const noteForColor = colorMode === 'spectrum' ? midiNote : (midiNote % 12);
+    const noteColor = getNoteColor(noteForColor, colorMode);
+    midiEventBus.emitNoteOn({
+      note: midiNote,
+      velocity: 102, // ~80%
+      timestamp: performance.now(),
+      source: 'guitar-fretboard',
+      color: noteColor
+    });
+
     // Remove note from clicked notes after 2 seconds (matching sustain)
     setTimeout(() => {
       setClickedNotes(prev => {
@@ -330,8 +348,10 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
         next.delete(midiNote);
         return next;
       });
+      // Emit note off
+      midiEventBus.emitNoteOff(midiNote, 'guitar-fretboard');
     }, 2000); // 2 second sustain
-  }, [guitarSynth, currentTuningMIDI, selectedTuning]);
+  }, [guitarSynth, currentTuningMIDI, selectedTuning, colorMode]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -353,12 +373,49 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [togglePlayPause, updateColorMode, colorMode]);
 
-  // Combine clicked notes with MIDI input notes for interval guide
+  // Cross-module MIDI listening (Epic 14 - Inter-Module Communication)
+  // Listen to MIDI notes from other modules (Piano, Drums) via MIDI event bus
+  const [crossModuleNotes, setCrossModuleNotes] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    // Subscribe to note-on events
+    const unsubscribeOn = midiEventBus.onNoteOn((event) => {
+      // Ignore notes from guitar itself to avoid feedback
+      if (event.source === 'guitar-fretboard') return;
+
+      setCrossModuleNotes(prev => {
+        const next = new Set(prev);
+        next.add(event.note);
+        return next;
+      });
+    });
+
+    // Subscribe to note-off events
+    const unsubscribeOff = midiEventBus.onNoteOff((note, source) => {
+      // Ignore notes from guitar itself
+      if (source === 'guitar-fretboard') return;
+
+      setCrossModuleNotes(prev => {
+        const next = new Set(prev);
+        next.delete(note);
+        return next;
+      });
+    });
+
+    // Cleanup on unmount
+    return () => {
+      unsubscribeOn();
+      unsubscribeOff();
+    };
+  }, []);
+
+  // Combine clicked notes with MIDI input notes and cross-module notes for interval guide
   const allActiveNotes = useMemo(() => {
     const combined = new Set(activeMIDINotes);
     clickedNotes.forEach(note => combined.add(note));
+    crossModuleNotes.forEach(note => combined.add(note));
     return combined;
-  }, [activeMIDINotes, clickedNotes]);
+  }, [activeMIDINotes, clickedNotes, crossModuleNotes]);
 
   /**
    * Get unique note colors for a chord based on active color mode
@@ -398,7 +455,8 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
       for (let fret = 0; fret < 25; fret++) {
         const noteClass = fretboardMatrix[string][fret];
         // Convert from guitar string notation (1-6) to array index (0-5)
-        const isActive = chord.notes.some(cn => GUITAR_CONSTANTS.STRINGS - cn.string === string && cn.fret === fret);
+        // Only highlight chord notes if chord progression is enabled
+        const isActive = chordProgressionEnabled && chord.notes.some(cn => GUITAR_CONSTANTS.STRINGS - cn.string === string && cn.fret === fret);
 
         // Spectrum mode: use full MIDI note range (low=red, high=purple)
         // Chromatic/Harmonic: use note class (repeating colors per octave)
@@ -435,7 +493,7 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
     }
 
     return { hex: ledDataHex, rgb: ledDataRGB };
-  }, [chord, colorMode, fretboardMatrix, getCurrentScale]);
+  }, [chord, colorMode, fretboardMatrix, getCurrentScale, chordProgressionEnabled]);
 
   // Submit frames to LED Compositor (Epic 14, Story 14.7)
   // Continuously update LED output at 30 FPS
@@ -485,7 +543,7 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
         {/* Fretboard Canvas */}
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
           <FretboardCanvas
-            activeChord={chord.notes}
+            activeChord={chordProgressionEnabled ? chord.notes : []}
             activeMIDINotes={allActiveNotes}
             colorMode={colorMode}
             onFretClick={handleFretClick}
@@ -554,39 +612,40 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
             )}
           </div>
 
-          {/* Chord List */}
-          <div className="space-y-2">
+          {/* Chord List - Horizontal scrollable row */}
+          <div className="flex gap-2 overflow-x-auto pb-2">
             {progression.chords.map((c, i) => {
               const noteColors = getChordNoteColors(c.notes);
               return (
                 <button
                   key={i}
                   onClick={() => {
+                    setChordProgressionEnabled(true); // Enable chord progression when manually selecting
                     setCurrentChord(i);
                     if (guitarSynth) playChord(c.notes);
                   }}
-                  className={`w-full p-2 rounded-lg transition-colors text-left ${
+                  className={`flex-shrink-0 p-2 rounded-lg transition-colors min-w-[64px] ${
                     i === currentChord
                       ? 'bg-primary-600 text-white'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium">{c.name}</span>
-                    <span className="text-xs opacity-75">{selectedRomanProgression.romanNumerals[i]}</span>
-                  </div>
-                  {/* Color indicators showing notes in the chord */}
-                  <div className="flex gap-1">
-                    {noteColors.map((nc, idx) => (
-                      <div
-                        key={idx}
-                        className="w-3 h-3 rounded-full"
-                        style={{
-                          backgroundColor: `rgb(${nc.color.r}, ${nc.color.g}, ${nc.color.b})`
-                        }}
-                        title={`Note ${nc.noteClass}`}
-                      />
-                    ))}
+                  <div className="flex flex-col items-center">
+                    <span className="font-medium text-sm mb-1">{c.name}</span>
+                    <span className="text-xs opacity-75 mb-2">{selectedRomanProgression.romanNumerals[i]}</span>
+                    {/* Color indicators showing notes in the chord */}
+                    <div className="flex gap-1">
+                      {noteColors.map((nc, idx) => (
+                        <div
+                          key={idx}
+                          className="w-3 h-3 rounded-full"
+                          style={{
+                            backgroundColor: `rgb(${nc.color.r}, ${nc.color.g}, ${nc.color.b})`
+                          }}
+                          title={`Note ${nc.noteClass}`}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </button>
               );
@@ -756,7 +815,7 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
           <div className="lg:col-span-2">
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
               <FretboardCanvas
-                activeChord={chord.notes}
+                activeChord={chordProgressionEnabled ? chord.notes : []}
                 activeMIDINotes={allActiveNotes}
                 colorMode={colorMode}
                 onFretClick={handleFretClick}
@@ -831,38 +890,40 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
                   </div>
                 )}
               </div>
-              <div className="space-y-2">
+              {/* Chord List - Horizontal scrollable row */}
+              <div className="flex gap-2 overflow-x-auto pb-2">
                 {progression.chords.map((c, i) => {
                   const noteColors = getChordNoteColors(c.notes);
                   return (
                     <button
                       key={i}
                       onClick={() => {
+                        setChordProgressionEnabled(true); // Enable chord progression when manually selecting
                         setCurrentChord(i);
                         if (guitarSynth) playChord(c.notes);
                       }}
-                      className={`w-full p-2 rounded-lg transition-colors text-left min-h-[44px] ${
+                      className={`flex-shrink-0 p-2 rounded-lg transition-colors min-w-[64px] ${
                         i === currentChord
                           ? 'bg-primary-600 text-white'
                           : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium">{c.name}</span>
-                        <span className="text-xs opacity-75">{selectedRomanProgression.romanNumerals[i]}</span>
-                      </div>
-                      {/* Color indicators showing notes in the chord */}
-                      <div className="flex gap-1">
-                        {noteColors.map((nc, idx) => (
-                          <div
-                            key={idx}
-                            className="w-3 h-3 rounded-full"
-                            style={{
-                              backgroundColor: `rgb(${nc.color.r}, ${nc.color.g}, ${nc.color.b})`
-                            }}
-                            title={`Note ${nc.noteClass}`}
-                          />
-                        ))}
+                      <div className="flex flex-col items-center">
+                        <span className="font-medium text-sm mb-1">{c.name}</span>
+                        <span className="text-xs opacity-75 mb-2">{selectedRomanProgression.romanNumerals[i]}</span>
+                        {/* Color indicators showing notes in the chord */}
+                        <div className="flex gap-1">
+                          {noteColors.map((nc, idx) => (
+                            <div
+                              key={idx}
+                              className="w-3 h-3 rounded-full"
+                              style={{
+                                backgroundColor: `rgb(${nc.color.r}, ${nc.color.g}, ${nc.color.b})`
+                              }}
+                              title={`Note ${nc.noteClass}`}
+                            />
+                          ))}
+                        </div>
                       </div>
                     </button>
                   );
