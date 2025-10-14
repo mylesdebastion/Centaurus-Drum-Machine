@@ -47,12 +47,20 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
   }
 
   // Render loaded modules with always-mount pattern
+  // Dynamic column count based on number of modules:
+  // 1 module = full width (1 col), 2 modules = 50/50 (2 cols), 3+ modules = 33/33/33 (3 cols)
+  const getGridColumns = () => {
+    if (modules.length === 1) return 'grid-cols-1';
+    if (modules.length === 2) return 'grid-cols-1 lg:grid-cols-2';
+    return 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3'; // 3+ modules
+  };
+
   return (
     <div
       className={
         isMobile
           ? 'space-y-4' // Mobile: stack vertically
-          : 'grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6' // Desktop: CSS Grid
+          : `grid ${getGridColumns()} gap-6` // Desktop: dynamic columns
       }
     >
       {/* 🚨 CRITICAL: All modules always rendered, CSS controls visibility */}
