@@ -556,49 +556,51 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ onBack }) => {
   }, [activeNotes, lumiEnabled]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-700">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Back
-          </button>
+    <div className={isStandalone ? "min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col" : ""}>
+      {/* Header - Only show in standalone mode */}
+      {isStandalone && (
+        <div className="p-4 border-b border-gray-700">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Back
+            </button>
 
-          <div className="flex items-center gap-3">
-            <Music className="w-6 h-6 text-primary-400" />
-            <h1 className="text-xl sm:text-2xl font-bold text-white">
-              Piano Visualizer
-            </h1>
-            <div className="flex items-center gap-2">
-              {isKeyboardMode && (
-                <span className="text-xs bg-primary-600/30 text-primary-300 px-2 py-1 rounded">
-                  Keyboard Mode
-                </span>
-              )}
-              {isAudioReady ? (
-                <span className="text-xs bg-green-600/30 text-green-300 px-2 py-1 rounded flex items-center gap-1">
-                  <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-                  Audio Ready
-                </span>
-              ) : (
-                <span className="text-xs bg-yellow-600/30 text-yellow-300 px-2 py-1 rounded flex items-center gap-1">
-                  <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></span>
-                  Initializing...
-                </span>
-              )}
+            <div className="flex items-center gap-3">
+              <Music className="w-6 h-6 text-primary-400" />
+              <h1 className="text-xl sm:text-2xl font-bold text-white">
+                Piano Visualizer
+              </h1>
+              <div className="flex items-center gap-2">
+                {isKeyboardMode && (
+                  <span className="text-xs bg-primary-600/30 text-primary-300 px-2 py-1 rounded">
+                    Keyboard Mode
+                  </span>
+                )}
+                {isAudioReady ? (
+                  <span className="text-xs bg-green-600/30 text-green-300 px-2 py-1 rounded flex items-center gap-1">
+                    <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                    Audio Ready
+                  </span>
+                ) : (
+                  <span className="text-xs bg-yellow-600/30 text-yellow-300 px-2 py-1 rounded flex items-center gap-1">
+                    <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></span>
+                    Initializing...
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className="w-20" /> {/* Spacer for centering */}
+            <div className="w-20" /> {/* Spacer for centering */}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content */}
-      <div className="flex-1 p-4 overflow-auto">
+      <div className={isStandalone ? "flex-1 p-4 overflow-auto" : ""}>
         <div className="max-w-7xl mx-auto space-y-4">
           {/* Piano Visualizer Container */}
           <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
