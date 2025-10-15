@@ -439,23 +439,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   }, []);
 
   // ModuleRoutingService integration (Epic 15 - Module Routing System)
-  // Register module and subscribe to note events from other modules
+  // Subscribe to note events from other modules
+  // NOTE: Module registration is handled by useModuleManager, not here!
   useEffect(() => {
-    // Register module with routing service when embedded in Studio
-    if (!isStandalone) {
-      routingService.registerModule({
-        instanceId,
-        moduleId: 'piano-roll',
-        name: 'Piano Roll',
-        capabilities: {
-          canReceiveNotes: true,
-          canReceiveChords: false, // Piano Roll displays notes, not chord symbols
-        },
-      });
-      console.log('[PianoRoll] Registered with ModuleRoutingService:', instanceId);
-    }
-
     // Subscribe to note events from ModuleRoutingService
+    // Registration is already handled by useModuleManager when module is added to Studio
     const unsubscribe = routingService.subscribeToNoteEvents(
       instanceId,
       (event: NoteEvent) => {
@@ -478,15 +466,14 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
       }
     );
 
-    // Cleanup on unmount
+    console.log('[PianoRoll] Subscribed to ModuleRoutingService:', instanceId);
+
+    // Cleanup on unmount - only unsubscribe, don't unregister (useModuleManager handles that)
     return () => {
       unsubscribe();
-      if (!isStandalone) {
-        routingService.unregisterModule(instanceId);
-        console.log('[PianoRoll] Unregistered from ModuleRoutingService:', instanceId);
-      }
+      console.log('[PianoRoll] Unsubscribed from ModuleRoutingService:', instanceId);
     };
-  }, [isStandalone, instanceId, routingService]);
+  }, [instanceId, routingService]);
 
   // Merge local MIDI input with cross-module MIDI notes
   const activeNotes = useMemo(() => {

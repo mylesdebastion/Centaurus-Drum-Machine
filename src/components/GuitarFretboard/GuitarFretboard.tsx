@@ -8,10 +8,7 @@ import { FretboardCanvas } from './FretboardCanvas';
 import { MIDIDeviceSelector } from '../MIDI/MIDIDeviceSelector';
 import WLEDDeviceManager from '../WLED/WLEDDeviceManager';
 import { ColorMode, getNoteColor } from '../../utils/colorMapping';
-import {
-  ROMAN_NUMERAL_PROGRESSIONS,
-  resolveProgression
-} from './chordProgressions';
+import { ChordProgressionService } from '@/services/chordProgressionService';
 import { createFretboardMatrix, getMIDINoteFromFret, fretboardToLEDIndex, GUITAR_CONSTANTS } from './constants';
 import { useMIDIInput } from '../../hooks/useMIDIInput';
 import { useMusicalScale, ROOT_POSITIONS } from '../../hooks/useMusicalScale';
@@ -21,6 +18,8 @@ import { useModuleContext } from '../../hooks/useModuleContext';
 import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
 import { ledCompositor } from '../../services/LEDCompositor';
 import { midiEventBus } from '../../utils/midiEventBus';
+import { ModuleRoutingService } from '@/services/moduleRoutingService';
+import type { NoteEvent } from '@/types/moduleRouting';
 
 interface GuitarFretboardProps {
   /**
@@ -31,9 +30,17 @@ interface GuitarFretboardProps {
    * Whether this module is embedded in Studio (affects layout)
    */
   embedded?: boolean;
+  /**
+   * Module instance ID for routing (when embedded in Studio)
+   */
+  instanceId?: string;
 }
 
-export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedded = false }) => {
+export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({
+  onBack,
+  embedded = false,
+  instanceId = 'guitar-fretboard-standalone'
+}) => {
   // Module Adapter Pattern - Context Detection (Epic 14, Story 14.4)
   const context = useModuleContext();
   const globalMusic = useGlobalMusic();
@@ -132,13 +139,15 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
   const currentTuningMIDI = getTuningMIDINotes(selectedTuning);
   const fretboardMatrix = createFretboardMatrix(currentTuningMIDI);
 
+  // Get ChordProgressionService singleton
+  const chordService = ChordProgressionService.getInstance();
+
+  // Get all Roman numeral progressions from service
+  const ROMAN_NUMERAL_PROGRESSIONS = chordService.getAllRomanNumeralProgressions();
+
   // Resolve Roman numeral progression to actual chords based on selected key
   const selectedRomanProgression = ROMAN_NUMERAL_PROGRESSIONS[currentProgressionIndex];
-  const progression = resolveProgression(selectedRomanProgression, selectedRoot) || {
-    name: 'Loading...',
-    chords: [{ name: 'C', notes: [] }],
-    romanNumerals: ['I']
-  };
+  const progression = chordService.resolveRomanNumerals(selectedRomanProgression, selectedRoot as any);
   const chord = progression.chords[currentChord] || { name: 'C', notes: [] };
 
   // Log when tuning changes (disabled to reduce console spam)
@@ -409,13 +418,53 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({ onBack, embedd
     };
   }, []);
 
+  // ModuleRoutingService integration (Epic 15 - Module Routing System)
+  // Subscribe to note events from other modules
+  // NOTE: Module registration is handled by useModuleManager, not here!
+  const [crossModuleRoutedNotes, setCrossModuleRoutedNotes] = useState<Set<number>>(new Set());
+  const routingService = ModuleRoutingService.getInstance();
+
+  useEffect(() => {
+    // Subscribe to note events from ModuleRoutingService
+    // Registration is already handled by useModuleManager when module is added to Studio
+    const unsubscribe = routingService.subscribeToNoteEvents(
+      instanceId,
+      (event: NoteEvent) => {
+        console.log('[GuitarFretboard] Received note event:', event);
+
+        if (event.type === 'note-on') {
+          setCrossModuleRoutedNotes(prev => {
+            const next = new Set(prev);
+            next.add(event.pitch);
+            return next;
+          });
+        } else if (event.type === 'note-off') {
+          setCrossModuleRoutedNotes(prev => {
+            const next = new Set(prev);
+            next.delete(event.pitch);
+            return next;
+          });
+        }
+      }
+    );
+
+    console.log('[GuitarFretboard] Subscribed to ModuleRoutingService:', instanceId);
+
+    // Cleanup on unmount - only unsubscribe, don't unregister (useModuleManager handles that)
+    return () => {
+      unsubscribe();
+      console.log('[GuitarFretboard] Unsubscribed from ModuleRoutingService:', instanceId);
+    };
+  }, [instanceId, routingService]);
+
   // Combine clicked notes with MIDI input notes and cross-module notes for interval guide
   const allActiveNotes = useMemo(() => {
     const combined = new Set(activeMIDINotes);
     clickedNotes.forEach(note => combined.add(note));
     crossModuleNotes.forEach(note => combined.add(note));
+    crossModuleRoutedNotes.forEach(note => combined.add(note));
     return combined;
-  }, [activeMIDINotes, clickedNotes, crossModuleNotes]);
+  }, [activeMIDINotes, clickedNotes, crossModuleNotes, crossModuleRoutedNotes]);
 
   /**
    * Get unique note colors for a chord based on active color mode

@@ -83,7 +83,7 @@ function calculateScaleNotes(key: string, scale: string, octaves: number): numbe
     });
   }
 
-  return notes.sort((a, b) => b - a); // Descending order (high notes at top of UI)
+  return notes.sort((a, b) => a - b); // Ascending order (low notes = lower indices)
 }
 
 /**
@@ -212,13 +212,17 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
   }, [clearUndoState]);
 
   // Step triggering logic - Fires when playback crosses step boundaries
+  // 16-step sequencer loops every 1 bar (4 beats), not over the full progression
   useEffect(() => {
     if (!isPlaying) {
       lastStepRef.current = -1;
       return;
     }
 
-    const currentStep = Math.floor(playbackPosition * 16);
+    // Make the 16-step sequencer loop every 1 bar (instead of full 8-bar progression)
+    // This gives us proper 16th note resolution (4 steps per beat)
+    const loopedPosition = (playbackPosition * 8) % 1; // Loop 8 times (once per bar)
+    const currentStep = Math.floor(loopedPosition * 16);
 
     // Only trigger if we've moved to a new step
     if (currentStep !== lastStepRef.current) {
@@ -253,6 +257,9 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
 
   // Toggle note on/off at given step and pitch
   const toggleNote = useCallback((step: number, pitch: number) => {
+    // Update last interacted pitch for dynamic brightness
+    setLastInteractedPitch(pitch);
+
     setNotes(prevNotes => {
       const existingIndex = prevNotes.findIndex(
         n => n.step === step && n.pitch === pitch
@@ -383,9 +390,16 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
   }, [visibleNotes]);
 
   // Calculate current step for visual indicator
+  // Loop every 1 bar (matches step triggering logic)
   const currentStep = useMemo(() => {
-    return Math.floor(playbackPosition * 16);
+    const loopedPosition = (playbackPosition * 8) % 1; // Loop 8 times (once per bar)
+    return Math.floor(loopedPosition * 16);
   }, [playbackPosition]);
+
+  // Track last interacted note (placed or hovered) for dynamic brightness
+  const [lastInteractedPitch, setLastInteractedPitch] = useState<number | null>(null);
+  // Track hovered cell for white border on specific note
+  const [hoveredCell, setHoveredCell] = useState<{ step: number; pitch: number } | null>(null);
 
   // Get last placed note pitch (for passing tone logic)
   const lastPlacedPitch = useMemo(() => {
@@ -456,8 +470,8 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
       {/* Piano Roll Grid */}
       <div className="relative overflow-x-auto bg-gray-900 rounded-lg p-2">
         <div className="inline-flex flex-col gap-1">
-          {/* Rows (pitches) */}
-          {visibleNotes.map((pitch) => {
+          {/* Rows (pitches) - Display in reverse order (high notes at top) */}
+          {[...visibleNotes].reverse().map((pitch) => {
             const noteName = getNoteNameFromMidi(pitch);
 
             return (
@@ -472,6 +486,7 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
                   {Array.from({ length: 16 }).map((_, step) => {
                     const hasNote = notes.some(n => n.step === step && n.pitch === pitch);
                     const isCurrentStep = currentStep === step && isPlaying;
+                    const isHovered = hoveredCell?.step === step && hoveredCell?.pitch === pitch && hasNote;
 
                     // Get note color based on colorMode (chromatic/harmonic/spectrum)
                     // ALWAYS use colorMode for consistency (Story 15.7 requirement)
@@ -480,40 +495,59 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
                     const noteColor = getNoteColor(noteForColor, colorMode);
 
                     // Calculate brightness using IntelligentMelodyService (Story 15.7)
-                    const brightness = showHarmonicGuidance
+                    // Use lastInteractedPitch for dynamic brightness updates as user interacts
+                    let brightness = showHarmonicGuidance
                       ? melodyService.calculateNoteBrightness(
                           pitch,
                           step,
                           currentChord,
                           scaleNotes,
                           settings,
-                          lastPlacedPitch,
+                          lastInteractedPitch || lastPlacedPitch, // Prioritize last interaction
                           hasNote // Placed notes get 1.0 brightness
                         )
                       : hasNote ? 1.0 : 0.65; // Fallback: full brightness if placed, else in-scale default
 
-                    // Apply brightness multiplier to RGB (PRIMARY visual indicator)
-                    const backgroundColor = `rgb(${Math.floor(noteColor.r * brightness)}, ${Math.floor(noteColor.g * brightness)}, ${Math.floor(noteColor.b * brightness)})`;
+                    // For empty cells (borders only), amplify dimness - make less musical notes much fainter
+                    // This creates stronger visual hierarchy for harmonic guidance
+                    if (!hasNote && showHarmonicGuidance) {
+                      // Map brightness 0.3-1.0 → 0.1-1.0 (make dim notes even dimmer)
+                      brightness = 0.1 + (brightness - 0.3) * (0.9 / 0.7);
+                      brightness = Math.max(0.1, Math.min(1.0, brightness)); // Clamp to range
+                    }
 
-                    // Border color matches background RGB (SECONDARY educational indicator)
-                    // Exception: White border (3px) for placed notes (Story 15.7 requirement)
-                    const borderColor = hasNote
-                      ? 'rgb(255, 255, 255)' // White for active notes
-                      : backgroundColor; // Matches background for suggestions
+                    // Apply brightness multiplier to RGB color
+                    const brightColor = `rgb(${Math.floor(noteColor.r * brightness)}, ${Math.floor(noteColor.g * brightness)}, ${Math.floor(noteColor.b * brightness)})`;
 
-                    const borderWidth = hasNote ? '3px' : '1px';
-
-                    const colorStyle = {
-                      backgroundColor,
-                      borderColor,
-                      borderWidth,
-                      borderStyle: 'solid',
-                    };
+                    // Empty cells: colored border (with brightness), transparent background
+                    // Placed notes: colored background (with brightness), colored border
+                    // Active/playing notes OR hovered notes: white border
+                    const colorStyle = hasNote
+                      ? {
+                          backgroundColor: brightColor, // Colored background for placed notes
+                          borderColor: (isCurrentStep || isHovered) ? 'rgb(255, 255, 255)' : brightColor, // White border when playing or hovered
+                          borderWidth: '2px',
+                          borderStyle: 'solid',
+                        }
+                      : {
+                          backgroundColor: 'transparent', // Transparent background for empty cells
+                          borderColor: brightColor, // Colored border shows harmonic guidance
+                          borderWidth: '2px',
+                          borderStyle: 'solid',
+                        };
 
                     return (
                       <button
                         key={step}
                         onClick={() => toggleNote(step, pitch)}
+                        onMouseEnter={() => {
+                          setLastInteractedPitch(pitch);
+                          setHoveredCell({ step, pitch });
+                        }}
+                        onMouseLeave={() => {
+                          setLastInteractedPitch(lastPlacedPitch);
+                          setHoveredCell(null);
+                        }}
                         className={`
                           w-8 h-8 rounded-md transition-all duration-75
                           ${hasNote
@@ -539,7 +573,8 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
           <div
             className="absolute top-0 bottom-0 w-1 bg-primary-400 pointer-events-none z-10 opacity-75"
             style={{
-              left: `calc(40px + ${playbackPosition * 100}% * (16 * 36px) / 100%)`, // 40px = label width, 36px = cell + gap
+              // Loop cursor every 1 bar (matches step triggering logic)
+              left: `calc(40px + ${((playbackPosition * 8) % 1) * 100}% * (16 * 36px) / 100%)`, // 40px = label width, 36px = cell + gap
               boxShadow: '0 0 8px rgba(168, 85, 247, 0.8)',
             }}
             aria-label="Playback cursor"

@@ -311,11 +311,10 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
           romanNumeral={selectedProgression?.romanNumerals[currentChordIndex] || ''}
         />
       </div>
-    </div>
 
-      {/* Settings Panel - Fixed Bottom Overlay */}
+      {/* Settings Panel - Module Bottom Tray */}
       {showSettings && (
-        <div className="fixed bottom-0 left-0 right-0 border-t border-gray-700 bg-gray-850 p-4 z-50 max-h-[70vh] overflow-y-auto">
+        <div className="border-t border-gray-700 bg-gray-850 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-white">Module Settings</h3>
             <button
@@ -349,6 +348,7 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
           </div>
         </div>
       )}
+    </div>
     </>
   );
 };
