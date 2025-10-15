@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2, Piano, Guitar } from 'lucide-react';
+import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2, Piano, Guitar, Database } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onStartJam: () => void;
@@ -15,6 +15,7 @@ interface WelcomeScreenProps {
   onLumiTest: () => void;
   onHeaderTest?: () => void;
   onStudio?: () => void;
+  onSupabaseTest?: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
@@ -30,7 +31,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onGuitarFretboard,
   onLumiTest,
   onHeaderTest,
-  onStudio
+  onStudio,
+  onSupabaseTest
 }) => {
   const [joinCode, setJoinCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
@@ -301,6 +303,27 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 </p>
                 <div className="flex items-center gap-2 text-sm text-indigo-400 group-hover:text-indigo-300">
                   <span>Launch Studio</span>
+                  <Play className="w-4 h-4" />
+                </div>
+              </button>
+            )}
+
+            {/* Supabase Connection Test */}
+            {onSupabaseTest && (
+              <button
+                onClick={onSupabaseTest}
+                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-teal-500/50 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <Database className="w-6 h-6 text-teal-400" />
+                  <h3 className="font-semibold text-white">Supabase Test</h3>
+                  <span className="text-xs bg-teal-600/30 text-teal-300 px-2 py-1 rounded">Story 7.1</span>
+                </div>
+                <p className="text-sm text-gray-400 mb-4">
+                  Test Supabase Realtime connection and environment setup
+                </p>
+                <div className="flex items-center gap-2 text-sm text-teal-400 group-hover:text-teal-300">
+                  <span>Launch Test</span>
                   <Play className="w-4 h-4" />
                 </div>
               </button>

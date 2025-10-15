@@ -5,9 +5,11 @@ import { GuitarFretboard } from '../GuitarFretboard/GuitarFretboard';
 import { DrumMachineModule } from './modules/DrumMachineModule';
 import { LiveAudioVisualizer } from '../LiveAudioVisualizer/LiveAudioVisualizer';
 import { IsometricSequencer } from '../IsometricSequencer/IsometricSequencer';
+import { ChordMelodyArranger } from './modules/ChordMelodyArranger';
+import type { ModuleCapabilities } from '@/types/moduleRouting';
 
 /**
- * Module Registry for Studio (Story 4.7)
+ * Module Registry for Studio (Story 4.7, Story 15.4)
  * Defines all available modules that can be loaded into the workspace
  */
 
@@ -19,6 +21,7 @@ export interface ModuleDefinition {
   icon: ComponentType<{ className?: string }>;
   color: string; // Tailwind color class (e.g., 'green-400')
   category: 'instrument' | 'sequencer' | 'visualizer';
+  capabilities: ModuleCapabilities; // Story 15.4: Module routing capabilities
 }
 
 export interface ModuleComponentProps {
@@ -27,6 +30,7 @@ export interface ModuleComponentProps {
   onSettingsChange?: (settings: Record<string, any>) => void;
   onBack?: () => void; // For compatibility with existing components
   embedded?: boolean; // For components that support embedded mode
+  instanceId?: string; // Story 15.4: Unique instance ID for module routing
 }
 
 export interface LoadedModule {
@@ -46,6 +50,13 @@ export const AVAILABLE_MODULES: ModuleDefinition[] = [
     icon: Piano,
     color: 'green-400',
     category: 'instrument',
+    capabilities: {
+      canReceiveNotes: true,
+      canReceiveChords: true,
+      canReceiveTempo: false,
+      canEmitNotes: false,
+      canEmitChords: false,
+    },
   },
   {
     id: 'guitar',
@@ -55,6 +66,13 @@ export const AVAILABLE_MODULES: ModuleDefinition[] = [
     icon: Guitar,
     color: 'amber-400',
     category: 'instrument',
+    capabilities: {
+      canReceiveNotes: true,
+      canReceiveChords: true,
+      canReceiveTempo: false,
+      canEmitNotes: false,
+      canEmitChords: false,
+    },
   },
   {
     id: 'drum',
@@ -64,6 +82,13 @@ export const AVAILABLE_MODULES: ModuleDefinition[] = [
     icon: Music,
     color: 'primary-400',
     category: 'sequencer',
+    capabilities: {
+      canReceiveNotes: true,
+      canReceiveChords: false,
+      canReceiveTempo: true,
+      canEmitNotes: true,
+      canEmitChords: false,
+    },
   },
   {
     id: 'visualizer',
@@ -73,6 +98,13 @@ export const AVAILABLE_MODULES: ModuleDefinition[] = [
     icon: Activity,
     color: 'orange-400',
     category: 'visualizer',
+    capabilities: {
+      canReceiveNotes: false,
+      canReceiveChords: false,
+      canReceiveTempo: false,
+      canEmitNotes: false,
+      canEmitChords: false,
+    },
   },
   {
     id: 'isometric',
@@ -82,6 +114,29 @@ export const AVAILABLE_MODULES: ModuleDefinition[] = [
     icon: Boxes,
     color: 'cyan-400',
     category: 'sequencer',
+    capabilities: {
+      canReceiveNotes: true,
+      canReceiveChords: false,
+      canReceiveTempo: false,
+      canEmitNotes: false,
+      canEmitChords: false,
+    },
+  },
+  {
+    id: 'chord-melody-arranger',
+    name: 'Chord & Melody Arranger',
+    description: 'Compose chord progressions and melodies with module routing',
+    component: ChordMelodyArranger,
+    icon: Music,
+    color: 'purple-400',
+    category: 'sequencer',
+    capabilities: {
+      canReceiveNotes: false,
+      canReceiveChords: false,
+      canReceiveTempo: false,
+      canEmitNotes: true,
+      canEmitChords: true,
+    },
   },
 ];
 

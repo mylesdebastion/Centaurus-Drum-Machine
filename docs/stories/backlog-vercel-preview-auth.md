@@ -1,7 +1,7 @@
-# Story 7.1: Fix Vercel Preview Deployment Authentication
+# Backlog: Fix Vercel Preview Deployment Authentication
 
 ## Status
-📝 **BLOCKED** - Awaiting Configuration
+📝 **BACKLOG** - Low Priority
 
 ## Story
 **As a** project maintainer,

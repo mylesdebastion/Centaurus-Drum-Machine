@@ -9,6 +9,8 @@ import { MIDIDeviceSelector } from '../MIDI/MIDIDeviceSelector';
 import WLEDDeviceManager from '../WLED/WLEDDeviceManager';
 import { ColorMode, getNoteColor } from '../../utils/colorMapping';
 import { ChordProgressionService } from '@/services/chordProgressionService';
+import { IntelligentMelodyService } from '@/services/intelligentMelodyService';
+import type { IntelligentMelodySettings } from '@/services/intelligentMelodyService';
 import { createFretboardMatrix, getMIDINoteFromFret, fretboardToLEDIndex, GUITAR_CONSTANTS } from './constants';
 import { useMIDIInput } from '../../hooks/useMIDIInput';
 import { useMusicalScale, ROOT_POSITIONS } from '../../hooks/useMusicalScale';
@@ -60,6 +62,15 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({
 
   // Track clicked notes for interval guide (separate from chord diagram notes)
   const [clickedNotes, setClickedNotes] = useState<Set<number>>(new Set());
+
+  // Harmonic guidance state (Story 16.1)
+  const [showHarmonicGuidance, setShowHarmonicGuidance] = useState(true); // Default: ON
+  const [_intelligentMelodySettings, _setIntelligentMelodySettings] = useState<IntelligentMelodySettings>(
+    IntelligentMelodyService.getDefaultSettings()
+  ); // Reserved for Task 3 brightness calculation and Story 16.6 settings panel
+
+  // Temporal proximity highlighting state (Story 16.2)
+  const [lastInteractedFret, setLastInteractedFret] = useState<{ string: number; fret: number } | null>(null);
 
   // Musical scale hook (for local state when standalone)
   const {
@@ -142,6 +153,10 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({
   // Get ChordProgressionService singleton
   const chordService = ChordProgressionService.getInstance();
 
+  // Get IntelligentMelodyService singleton (Story 16.1)
+  const melodyService = IntelligentMelodyService.getInstance();
+  console.log('[GuitarFretboard] IntelligentMelodyService initialized:', melodyService);
+
   // Get all Roman numeral progressions from service
   const ROMAN_NUMERAL_PROGRESSIONS = chordService.getAllRomanNumeralProgressions();
 
@@ -159,6 +174,147 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({
   //   console.log(`💬 Description: ${selectedTuning.description}`);
   //   console.groupEnd();
   // }, [selectedTuning, currentTuningMIDI]);
+
+  /**
+   * Calculate harmonic brightness for a specific fret position (Story 16.1 - Task 3)
+   * Uses IntelligentMelodyService to determine how harmonically optimal a note is
+   * based on the current chord, scale, and placed notes.
+   *
+   * @param string - Guitar string index (0-5, where 0=low E, 5=high E)
+   * @param fret - Fret number (0-24)
+   * @returns Brightness value (0.2-1.0), where higher = more harmonically optimal
+   */
+  const calculateFretBrightness = useCallback((string: number, fret: number): number => {
+    // Early return if harmonic guidance is disabled
+    if (!showHarmonicGuidance) {
+      // Use existing 3-tier system: chord=1.0, in-scale=0.65, out-of-scale=0.2
+      const midiNote = getMIDINoteFromFret(string, fret, currentTuningMIDI);
+      const noteClass = midiNote % 12;
+      const scaleNotes = getCurrentScale();
+      const isInScale = scaleNotes.includes(noteClass);
+
+      // Check if note is actively placed (clicked notes)
+      const isPlaced = clickedNotes.has(midiNote);
+
+      if (isPlaced) return 1.0;  // Placed notes full brightness
+      if (isInScale) return 0.65; // Scale notes
+      return 0.2;  // Out-of-scale
+    }
+
+    // Calculate MIDI note from fret position
+    const midiNote = getMIDINoteFromFret(string, fret, currentTuningMIDI);
+
+    // Check if note is already placed (clicked)
+    const isPlaced = clickedNotes.has(midiNote);
+
+    // Get current musical context
+    const scaleNotes = getCurrentScale();
+    const currentChordObj = chord; // From progression.chords[currentChord]
+
+    // Use step 0 (strong beat) for maximum chord tone emphasis (per story dev notes)
+    const step = 0;
+
+    // Call IntelligentMelodyService.calculateNoteBrightness()
+    // Pass chord directly - service has getChordTonesFromChord() to extract MIDI notes
+    const brightness = melodyService.calculateNoteBrightness(
+      midiNote,
+      step,
+      currentChordObj,
+      scaleNotes,
+      _intelligentMelodySettings,
+      null,  // lastPlacedPitch - not yet implemented (Story 16.3)
+      isPlaced
+    );
+
+    return brightness;
+  }, [
+    showHarmonicGuidance,
+    getCurrentScale,
+    currentTuningMIDI,
+    clickedNotes,
+    chord,
+    melodyService,
+    _intelligentMelodySettings
+  ]);
+
+  /**
+   * Calculate temporal proximity brightness for hover highlighting (Story 16.2)
+   * Shows harmonically related frets when hovering over a fret position
+   *
+   * @param string - Current string index (0-5)
+   * @param fret - Current fret number (0-24)
+   * @param interactedFret - The fret position being hovered over
+   * @returns Brightness multiplier (0.0-1.0) or null if not temporally close
+   */
+  const calculateTemporalProximityBrightness = useCallback((
+    string: number,
+    fret: number,
+    interactedFret: { string: number; fret: number } | null
+  ): number | null => {
+    if (!interactedFret || !showHarmonicGuidance) return null;
+
+    // Don't highlight the hovered fret itself (it's already highlighted)
+    if (string === interactedFret.string && fret === interactedFret.fret) {
+      return null;
+    }
+
+    // Get MIDI pitches
+    const currentPitch = getMIDINoteFromFret(string, fret, currentTuningMIDI);
+    const lastPitch = getMIDINoteFromFret(
+      interactedFret.string,
+      interactedFret.fret,
+      currentTuningMIDI
+    );
+
+    const pitchDifference = currentPitch - lastPitch;
+    const pitchDistance = Math.abs(pitchDifference);
+
+    // Calculate expected fret offset and proximity multiplier
+    let expectedFretOffset = 0;
+    let proximityMultiplier = 1.0;
+
+    if (pitchDistance >= 6) {
+      // Large interval (6+ semitones) -> 2-3 frets ahead/behind
+      expectedFretOffset = 2;
+      proximityMultiplier = 0.75;
+    } else if (pitchDistance >= 3) {
+      // Medium interval (3-5 semitones) -> 1-2 frets ahead/behind
+      expectedFretOffset = 1;
+      proximityMultiplier = 0.85;
+    }
+    // else: Stepwise motion (0-2 semitones) -> same fret column, no offset
+
+    // Bidirectional support: ascending vs descending
+    const isAscending = pitchDifference > 0;
+    const fretOffset = isAscending ? expectedFretOffset : -expectedFretOffset;
+    const expectedFret = interactedFret.fret + fretOffset;
+
+    // Check if current fret is within tolerance (±1 fret)
+    const isTemporallyClose = Math.abs(fret - expectedFret) <= 1;
+
+    if (!isTemporallyClose) return null;
+
+    // Calculate harmonic brightness using IntelligentMelodyService
+    const scaleNotes = getCurrentScale();
+    const harmonicBrightness = melodyService.calculateNoteBrightness(
+      currentPitch,
+      0, // Use step 0 (strong beat)
+      chord,
+      scaleNotes,
+      _intelligentMelodySettings,
+      lastPitch, // Pass last pitch for interval-based adjustments
+      false // Not a placed note
+    );
+
+    return harmonicBrightness * proximityMultiplier;
+  }, [
+    showHarmonicGuidance,
+    getCurrentScale,
+    currentTuningMIDI,
+    chord,
+    melodyService,
+    _intelligentMelodySettings
+  ]);
 
   // Use the MIDI input hook with auto-connect and keyboard fallback
   const { activeNotes: activeMIDINotes, isKeyboardMode } = useMIDIInput({
@@ -321,6 +477,9 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({
   const handleFretClick = useCallback((string: number, fret: number) => {
     if (!guitarSynth) return;
 
+    // Update last interacted fret for temporal proximity highlighting (Story 16.2)
+    setLastInteractedFret({ string, fret });
+
     // Calculate MIDI note from fret position
     const midiNote = getMIDINoteFromFret(string, fret, currentTuningMIDI);
     const freq = Tone.Frequency(midiNote, 'midi').toFrequency();
@@ -361,6 +520,22 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({
       midiEventBus.emitNoteOff(midiNote, 'guitar-fretboard');
     }, 2000); // 2 second sustain
   }, [guitarSynth, currentTuningMIDI, selectedTuning, colorMode]);
+
+  /**
+   * Handle fret hover for temporal proximity highlighting (Story 16.2)
+   */
+  const handleFretHover = useCallback((string: number, fret: number) => {
+    setLastInteractedFret({ string, fret });
+  }, []);
+
+  /**
+   * Handle fret hover leave (Story 16.2)
+   * Note: We intentionally DON'T clear lastInteractedFret here,
+   * so the temporal proximity highlighting persists after hover leaves
+   */
+  const handleFretHoverLeave = useCallback(() => {
+    // Intentionally empty - highlighting persists
+  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -598,6 +773,11 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({
             onFretClick={handleFretClick}
             scaleNotes={getCurrentScale()}
             rootNote={ROOT_POSITIONS[selectedRoot]}
+            calculateBrightness={calculateFretBrightness}
+            hoveredFret={lastInteractedFret}
+            onFretHover={handleFretHover}
+            onFretHoverLeave={handleFretHoverLeave}
+            calculateTemporalProximity={calculateTemporalProximityBrightness}
           />
         </div>
 
@@ -870,9 +1050,14 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({
                 onFretClick={handleFretClick}
                 scaleNotes={getCurrentScale()}
                 rootNote={ROOT_POSITIONS[selectedRoot]}
+                calculateBrightness={calculateFretBrightness}
+                hoveredFret={lastInteractedFret}
+                onFretHover={handleFretHover}
+                onFretHoverLeave={handleFretHoverLeave}
+                calculateTemporalProximity={calculateTemporalProximityBrightness}
               />
               <p className="text-sm text-gray-400 mt-2 text-center">
-                Click frets to see interval guide | Press 'C' for color mode | Press 'N' for next progression | Press 'Space' to play/pause
+                Click or hover frets to see melodic pathways | Press 'C' for color mode | Press 'N' for next progression | Press 'Space' to play/pause
               </p>
             </div>
           </div>
@@ -983,6 +1168,23 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({
             {/* Settings Panels */}
             {showSettings && (
               <>
+                {/* Harmonic Guidance Toggle (Story 16.1) */}
+                <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+                  <h3 className="text-sm font-medium text-gray-300 mb-3">Harmonic Guidance</h3>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showHarmonicGuidance}
+                      onChange={(e) => setShowHarmonicGuidance(e.target.checked)}
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-sm text-white">Show Harmonic Guidance</span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Highlight harmonically optimal fret positions based on current chord and scale
+                  </p>
+                </div>
+
                 {/* Tuning Selector */}
                 <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
                   <h3 className="text-sm font-medium text-gray-300 mb-3">Guitar Tuning</h3>

@@ -195,7 +195,7 @@ export class MIDIInputManager {
    */
   public addListener(listener: MIDIMessageListener): void {
     this.listeners.add(listener);
-    console.log(`[MIDIInputManager] Listener added (total: ${this.listeners.size})`);
+    // console.log(`[MIDIInputManager] Listener added (total: ${this.listeners.size})`);
   }
 
   /**
@@ -203,7 +203,7 @@ export class MIDIInputManager {
    */
   public removeListener(listener: MIDIMessageListener): void {
     this.listeners.delete(listener);
-    console.log(`[MIDIInputManager] Listener removed (total: ${this.listeners.size})`);
+    // console.log(`[MIDIInputManager] Listener removed (total: ${this.listeners.size})`);
   }
 
   /**

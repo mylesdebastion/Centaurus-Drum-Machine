@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { RefreshCw } from 'lucide-react';
 import { DrumTrack, ColorMode } from '../../types';
 import { TrackRow } from './TrackRow';
 import { TransportControls } from './TransportControls';
 import { TrackManager } from './TrackManager';
-import { CompactDrumMachine } from './CompactDrumMachine';
 import { audioEngine } from '../../utils/audioEngine';
 
 interface DrumMachineProps {
@@ -26,7 +25,6 @@ interface DrumMachineProps {
   onAddTrack: (track: DrumTrack) => void;
   onRemoveTrack: (trackId: string) => void;
   onLoadDefaultPattern: () => void;
-  embedded?: boolean; // When embedded in Studio with limited width
 }
 
 export const DrumMachine: React.FC<DrumMachineProps> = ({
@@ -44,57 +42,11 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
   onStop,
   onTempoChange,
   onClearTrack,
-  onClearAll,
+ onClearAll,
   onAddTrack,
   onRemoveTrack,
-  onLoadDefaultPattern,
-  embedded = false
+  onLoadDefaultPattern
 }) => {
-  // Responsive layout: use compact view when container width is constrained
-  const [isCompact, setIsCompact] = useState(false);
-  const containerRef = React.useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    // Use ResizeObserver to measure actual container width
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const containerWidth = entry.contentRect.width;
-        // Switch to compact layout if container width < 900px
-        // This handles both mobile screens AND Studio 2/3 column layouts
-        const shouldBeCompact = containerWidth < 900;
-        setIsCompact(shouldBeCompact);
-      }
-    });
-
-    resizeObserver.observe(containerRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, []);
-
-  // Use compact drum machine for narrow layouts
-  if (isCompact) {
-    return (
-      <div ref={containerRef}>
-        <CompactDrumMachine
-          tracks={tracks}
-          currentStep={currentStep}
-          isPlaying={isPlaying}
-          tempo={tempo}
-          colorMode={colorMode}
-          onStepToggle={onStepToggle}
-          onPlay={onPlay}
-          onStop={onStop}
-          onTempoChange={onTempoChange}
-          onAddTrack={onAddTrack}
-          onLoadDefaultPattern={onLoadDefaultPattern}
-        />
-      </div>
-    );
-  }
   // Initialize audio engine on play (requires user interaction for Tone.js)
   const handlePlay = async () => {
     try {
@@ -127,9 +79,8 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
     });
   }, [currentStep, isPlaying, tracks]);
 
-  // Desktop layout with full grid
   return (
-    <div ref={containerRef} className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+    <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold">Drum Machine</h2>
         <div className="flex items-center gap-4">

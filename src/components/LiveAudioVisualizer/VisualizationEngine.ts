@@ -56,6 +56,9 @@ export class VisualizationEngine {
     // Extract sourceManager if adapter is available (for MIDI color support)
     const sourceManager = 'getSourceManager' in audioManager ? audioManager.getSourceManager() : undefined;
 
+    // Debug logging (remove after testing)
+    // console.log('[VizEngine] Has sourceManager:', !!sourceManager, 'Mode:', mode);
+
     switch (mode) {
       case 'spectrum': {
         const frequencyData = audioManager.getFrequencyData();
@@ -67,17 +70,17 @@ export class VisualizationEngine {
         const peakFreq = audioManager.getPeakFrequency();
         if (stereo) {
           const { left, right } = audioManager.getStereoWaveformData();
-          this.waveformViz.renderStereo(ctx, left, right, width, height, peakFreq.frequency);
+          this.waveformViz.renderStereo(ctx, left, right, width, height, peakFreq.frequency, sourceManager);
         } else {
           const timeData = audioManager.getWaveformData();
-          this.waveformViz.render(ctx, timeData, width, height, peakFreq.frequency);
+          this.waveformViz.render(ctx, timeData, width, height, peakFreq.frequency, sourceManager);
         }
         break;
       }
 
       case 'ripple': {
         const frequencyData = audioManager.getFrequencyData();
-        this.rippleViz.render(ctx, frequencyData, width, height);
+        this.rippleViz.render(ctx, frequencyData, width, height, sourceManager);
         break;
       }
     }

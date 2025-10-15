@@ -58,6 +58,11 @@ export class SyntheticFrequencyGenerator {
       midiNote,
       color
     });
+
+    // Debug: Log when notes with colors are added
+    if (color) {
+      console.log('[SyntheticFreqGen] Added MIDI note', midiNote, 'with color:', color, 'freq:', frequency.toFixed(1), 'Hz');
+    }
   }
 
   /**
@@ -196,8 +201,24 @@ export class SyntheticFrequencyGenerator {
       }
     }
 
+    // Debug: Log color queries for debugging
+    if (bin % 100 === 0) {
+      console.log('[SyntheticFreqGen] getColorForBin', bin, '(', binFrequency.toFixed(1), 'Hz)',
+                  '-> activeNotes:', this.activeNotes.length,
+                  '-> closestNote:', closestNote ? closestNote.frequency.toFixed(1) + 'Hz' : 'none',
+                  '-> minDist:', closestNote ? minDistance.toFixed(3) : 'N/A',
+                  '-> hasColor:', closestNote ? !!closestNote.color : false);
+    }
+
     // Return color if found a close note (within 1 semitone)
-    return (closestNote && minDistance < 0.1) ? closestNote.color || null : null;
+    const result = (closestNote && minDistance < 0.1) ? closestNote.color || null : null;
+
+    // Debug: Log when we actually return a color
+    if (result && bin % 20 === 0) {
+      console.log('[SyntheticFreqGen] 🎨 Returning color for bin', bin, ':', result);
+    }
+
+    return result;
   }
 
   /**

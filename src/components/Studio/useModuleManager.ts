@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { LoadedModule, createModuleInstance } from './moduleRegistry';
+import { LoadedModule, createModuleInstance, getModuleDefinition } from './moduleRegistry';
+import { ModuleRoutingService } from '@/services/moduleRoutingService';
 
 /**
- * Module Manager Hook (Story 4.7)
- * Manages loaded modules, active module (mobile), and localStorage persistence
+ * Module Manager Hook (Story 4.7, Story 15.6)
+ * Manages loaded modules, active module (mobile), localStorage persistence,
+ * and ModuleRoutingService registration
  */
 
 const STORAGE_KEY = 'studio-loaded-modules';
@@ -18,6 +20,7 @@ interface StoredModules {
 export function useModuleManager() {
   const [loadedModules, setLoadedModules] = useState<LoadedModule[]>([]);
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
+  const routingService = ModuleRoutingService.getInstance();
 
   // Load modules from localStorage on mount
   useEffect(() => {
@@ -31,12 +34,25 @@ export function useModuleManager() {
           if (data.modules.length > 0) {
             setActiveModuleId(data.modules[0].instanceId);
           }
+
+          // Register modules with routing service (Story 15.6)
+          data.modules.forEach((module) => {
+            const definition = getModuleDefinition(module.moduleId);
+            if (definition) {
+              routingService.registerModule({
+                instanceId: module.instanceId,
+                moduleId: module.moduleId,
+                name: module.label,
+                capabilities: definition.capabilities,
+              });
+            }
+          });
         }
       }
     } catch (error) {
       console.error('[Studio] Failed to load modules from localStorage:', error);
     }
-  }, []);
+  }, [routingService]);
 
   // Save modules to localStorage whenever they change
   useEffect(() => {
@@ -58,7 +74,7 @@ export function useModuleManager() {
   }, [loadedModules]);
 
   /**
-   * Add a new module to the workspace
+   * Add a new module to the workspace (Story 15.6: register with routing service)
    */
   const addModule = useCallback((moduleId: string) => {
     const newModule = createModuleInstance(moduleId, loadedModules);
@@ -67,18 +83,32 @@ export function useModuleManager() {
       return;
     }
 
+    // Register with routing service (Story 15.6)
+    const definition = getModuleDefinition(moduleId);
+    if (definition) {
+      routingService.registerModule({
+        instanceId: newModule.instanceId,
+        moduleId: newModule.moduleId,
+        name: newModule.label,
+        capabilities: definition.capabilities,
+      });
+    }
+
     setLoadedModules((prev) => [...prev, newModule]);
 
     // Set as active module for mobile
     setActiveModuleId(newModule.instanceId);
 
     console.log('[Studio] Added module:', newModule);
-  }, [loadedModules]);
+  }, [loadedModules, routingService]);
 
   /**
-   * Remove a module from the workspace
+   * Remove a module from the workspace (Story 15.6: unregister from routing service)
    */
   const removeModule = useCallback((instanceId: string) => {
+    // Unregister from routing service (Story 15.6)
+    routingService.unregisterModule(instanceId);
+
     setLoadedModules((prev) => {
       const filtered = prev.filter((m) => m.instanceId !== instanceId);
 
@@ -93,7 +123,7 @@ export function useModuleManager() {
     });
 
     console.log('[Studio] Removed module:', instanceId);
-  }, [activeModuleId]);
+  }, [activeModuleId, routingService]);
 
   /**
    * Update settings for a specific module instance

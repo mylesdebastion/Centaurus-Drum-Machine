@@ -13,6 +13,11 @@ interface FretboardCanvasProps {
   onFretClick: (string: number, fret: number) => void;
   scaleNotes?: number[];  // Optional: scale notes for highlighting (0-11)
   rootNote?: number;      // Optional: root note of the scale (0-11)
+  calculateBrightness?: (string: number, fret: number) => number; // Story 16.1: Harmonic guidance brightness
+  hoveredFret?: { string: number; fret: number } | null; // Story 16.2: Temporal proximity highlighting
+  onFretHover?: (string: number, fret: number) => void; // Story 16.2: Hover handler
+  onFretHoverLeave?: () => void; // Story 16.2: Hover leave handler
+  calculateTemporalProximity?: (string: number, fret: number, interactedFret: { string: number; fret: number } | null) => number | null; // Story 16.2: Temporal proximity brightness
 }
 
 export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
@@ -21,7 +26,12 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
   colorMode,
   onFretClick,
   scaleNotes = [],
-  rootNote
+  rootNote,
+  calculateBrightness, // Story 16.1: Optional brightness calculation from parent
+  hoveredFret = null, // Story 16.2: Temporal proximity highlighting
+  onFretHover, // Story 16.2: Hover handler
+  onFretHoverLeave, // Story 16.2: Hover leave handler
+  calculateTemporalProximity // Story 16.2: Temporal proximity brightness
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fretboardMatrix = createFretboardMatrix();
@@ -42,141 +52,14 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, width, height);
 
-    // Collect all currently active note classes (0-11) for interval-based brightness
-    const activeNoteClasses = new Set<number>();
-
-    // Only track MIDI notes (clicked/played notes), not chord diagram notes
-    // This ensures the interval guide only activates when actually playing
-    activeMIDINotes.forEach(midiNote => {
-      activeNoteClasses.add(midiNote % 12);
-    });
-
     /**
-     * Calculate harmonic brightness based on scale degree importance
-     * @param noteClass - Note class (0-11)
-     * @returns brightness value (0-1)
+     * Simple fallback brightness when no harmonic guidance is provided
+     * Returns basic in-scale vs out-of-scale brightness
      */
-    const getHarmonicBrightness = (noteClass: number): number => {
-      // If no scale or root info, use default
-      if (scaleNotes.length === 0 || rootNote === undefined) {
-        return 0.5; // Medium brightness for unknown scales
-      }
-
+    const getSimpleBrightness = (noteClass: number): number => {
       // Check if note is in scale
-      if (!scaleNotes.includes(noteClass)) {
-        return 0.1; // Out of scale - very dim
-      }
-
-      // Calculate scale degree (interval from root)
-      const interval = (noteClass - rootNote + 12) % 12;
-
-      // Map scale degree to brightness based on harmonic importance
-      switch (interval) {
-        case 0:  // Root (1st) - Tonic
-          return 0.8;
-        case 7:  // Perfect 5th - Dominant
-          return 0.7;
-        case 4:  // Major 3rd - Mediant
-        case 3:  // Minor 3rd
-          return 0.6;
-        case 11: // Major 7th - Leading tone
-        case 10: // Minor 7th
-          return 0.5;
-        case 2:  // Major 2nd
-        case 5:  // Perfect 4th
-        case 9:  // Major 6th
-          return 0.45;
-        default:
-          return 0.4; // Other scale tones
-      }
-    };
-
-    /**
-     * Calculate COMBINED brightness based on both interval and harmonic importance
-     * This helps guide players toward musical intervals in real-time
-     * ONLY works with a single active note (clicking/playing one note at a time)
-     * ONLY lights up notes that are IN THE CURRENT SCALE
-     * Uses MAXIMUM of interval brightness and harmonic brightness to ensure
-     * important scale degrees (root, 5th, 3rd) stay visible
-     * @param noteClass - Note class (0-11)
-     * @returns brightness value (0-1)
-     */
-    const getIntervalBasedBrightness = (noteClass: number): number => {
-      // Only use interval guide for single active notes
-      // With multiple notes, every fretboard note would relate consonantly to something
-      if (activeNoteClasses.size !== 1) {
-        return getHarmonicBrightness(noteClass); // Fallback to scale-based
-      }
-
-      // CRITICAL: Check if note is in scale first!
-      // Out-of-scale notes should stay very dim regardless of interval
-      if (scaleNotes.length > 0 && !scaleNotes.includes(noteClass)) {
-        return 0.1; // Out of scale - keep very dim (same as harmonic brightness)
-      }
-
-      // Get harmonic brightness (based on scale degree importance)
-      const harmonicBright = getHarmonicBrightness(noteClass);
-
-      // Get the single active note
-      const activeNote = Array.from(activeNoteClasses)[0];
-      const interval = (noteClass - activeNote + 12) % 12;
-
-      // Calculate interval brightness (emphasizing consonance/dissonance)
-      // Lower values for dissonant intervals to DIM them below baseline
-      let intervalBright: number;
-      switch (interval) {
-        case 0:  // Unison/Octave - Perfect consonance
-          intervalBright = 1.0;
-          break;
-        case 7:  // Perfect 5th - Very consonant
-          intervalBright = 0.95;
-          break;
-        case 5:  // Perfect 4th - Consonant (brighter than 2nd)
-          intervalBright = 0.85;
-          break;
-        case 4:  // Major 3rd - Consonant
-          intervalBright = 0.9;
-          break;
-        case 3:  // Minor 3rd - Consonant
-          intervalBright = 0.85;
-          break;
-        case 9:  // Major 6th - Consonant
-          intervalBright = 0.8;
-          break;
-        case 8:  // Minor 6th - Somewhat consonant
-          intervalBright = 0.7;
-          break;
-        case 2:  // Major 2nd - DIM (quite a bit below baseline)
-          intervalBright = 0.3;
-          break;
-        case 10: // Minor 7th - Somewhat dissonant
-          intervalBright = 0.5;
-          break;
-        case 11: // Major 7th - Dissonant
-          intervalBright = 0.35;
-          break;
-        case 6:  // Tritone - Very dissonant
-          intervalBright = 0.25;
-          break;
-        case 1:  // Minor 2nd - Very dissonant
-          intervalBright = 0.2;
-          break;
-        default:
-          intervalBright = 0.3;
-      }
-
-      // Use interval brightness as primary guide
-      // BUT apply a floor for harmonically important notes (root, 5th, 3rd)
-      // so they don't get as dim as out-of-scale notes
-      const isHarmonicallyImportant = harmonicBright >= 0.6; // Root (0.8), 5th (0.7), 3rd (0.6)
-
-      if (isHarmonicallyImportant && intervalBright < 0.4) {
-        // Important notes have a brightness floor of 0.4
-        // This keeps them visible but still noticeably dimmer than consonant intervals
-        return 0.4;
-      }
-
-      return intervalBright;
+      const isInScale = scaleNotes.length > 0 && scaleNotes.includes(noteClass);
+      return isInScale ? 0.5 : 0.2; // In-scale: medium, out-of-scale: dim
     };
 
     // Draw fretboard grid
@@ -201,24 +84,28 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
         const noteForColor = colorMode === 'spectrum' ? midiNote : noteClass;
         const color = getNoteColor(noteForColor, colorMode);
 
-        // Real-time interval guide brightness system:
-        // When a SINGLE note is clicked/played (not chords):
-        //   Uses interval brightness to DIM dissonant notes and BRIGHTEN consonant ones
-        //   Examples when playing C in C major:
-        //     - C (octave): 1.0 (brightest)
-        //     - G (5th): 0.95 (very bright)
-        //     - E (3rd): 0.9 (bright)
-        //     - F (4th): 0.85 (bright, more than 2nd)
-        //     - D (2nd): 0.3 (quite dim, below baseline)
-        //   Important scale degrees (root, 5th, 3rd) have brightness floor of 0.4
-        //   so they don't get as dim as out-of-scale notes (0.1)
-        // Otherwise (no notes or multiple notes), uses scale-based harmonic brightness
+        // Story 16.1 & 16.2: Brightness calculation with temporal proximity support
         let brightness: number;
 
         if (isChordNote || isMIDIActive) {
           brightness = 1.0; // Active notes at full brightness
+        } else if (calculateTemporalProximity && hoveredFret) {
+          // Story 16.2: Check for temporal proximity first (hover highlighting takes priority)
+          const temporalBrightness = calculateTemporalProximity(string, fret, hoveredFret);
+          if (temporalBrightness !== null) {
+            brightness = temporalBrightness;
+          } else if (calculateBrightness) {
+            // Fall back to base harmonic guidance if not temporally close
+            brightness = calculateBrightness(string, fret);
+          } else {
+            brightness = getSimpleBrightness(noteClass);
+          }
+        } else if (calculateBrightness) {
+          // Use harmonic guidance brightness from parent (Story 16.1)
+          brightness = calculateBrightness(string, fret);
         } else {
-          brightness = getIntervalBasedBrightness(noteClass);
+          // Simple fallback: in-scale (0.5) vs out-of-scale (0.2)
+          brightness = getSimpleBrightness(noteClass);
         }
 
         const x = fret * fretWidth + fretWidth / 2;
@@ -295,7 +182,7 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
       ctx.fillText(STRING_NAMES[string], 30, (string + 1) * stringHeight + 5);
     }
 
-  }, [activeChord, activeMIDINotes, colorMode, fretboardMatrix, scaleNotes, rootNote]);
+  }, [activeChord, activeMIDINotes, colorMode, fretboardMatrix, scaleNotes, rootNote, calculateBrightness, hoveredFret, calculateTemporalProximity]);
 
   // Handle fret clicks
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -348,12 +235,50 @@ export const FretboardCanvas: React.FC<FretboardCanvasProps> = ({
     }
   };
 
+  // Handle mouse move for hover highlighting (Story 16.2)
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!onFretHover) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const displayX = e.clientX - rect.left;
+    const displayY = e.clientY - rect.top;
+
+    // Scale from displayed size to internal canvas size
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    const x = displayX * scaleX;
+    const y = displayY * scaleY;
+
+    const fretWidth = canvas.width / GUITAR_CONSTANTS.FRETS;
+    const stringHeight = canvas.height / (GUITAR_CONSTANTS.STRINGS + 1);
+
+    const fret = Math.floor(x / fretWidth);
+    const string = Math.round(y / stringHeight) - 1;
+
+    if (string >= 0 && string < GUITAR_CONSTANTS.STRINGS && fret >= 0 && fret < GUITAR_CONSTANTS.FRETS) {
+      onFretHover(string, fret);
+    }
+  };
+
+  // Handle mouse leave for hover highlighting (Story 16.2)
+  const handleMouseLeave = () => {
+    if (onFretHoverLeave) {
+      onFretHoverLeave();
+    }
+  };
+
   return (
     <canvas
       ref={canvasRef}
       width={1200}
       height={400}
       onClick={handleCanvasClick}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       className="w-full h-auto cursor-pointer"
     />
   );

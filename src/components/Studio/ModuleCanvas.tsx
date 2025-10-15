@@ -101,6 +101,7 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
                   onUpdateSettings(module.instanceId, newSettings)
                 }
                 embedded={true} // For components that support embedded mode (like LiveAudioVisualizer)
+                instanceId={module.instanceId} // Story 15.6: Pass instanceId for module routing
               />
             </ModuleWrapper>
           </div>

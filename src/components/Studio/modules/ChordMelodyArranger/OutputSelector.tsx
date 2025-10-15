@@ -13,7 +13,7 @@
  * - Real-time count of selected targets
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Music, ChevronDown, X } from 'lucide-react';
 import { ModuleRoutingService } from '@/services/moduleRoutingService';
 import type { LoadedModule } from '@/types/moduleRouting';

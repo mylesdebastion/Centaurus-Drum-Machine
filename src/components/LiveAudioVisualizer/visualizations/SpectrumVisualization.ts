@@ -33,6 +33,7 @@ export class SpectrumVisualization {
   private config: SpectrumConfig;
   private peakValues: number[] = [];
   private peakTimestamps: number[] = [];
+  private lastSourceManagerLog: number = 0; // Debug logging timestamp
 
   constructor(config: SpectrumConfig = DEFAULT_SPECTRUM_CONFIG) {
     this.config = config;
@@ -53,6 +54,12 @@ export class SpectrumVisualization {
     const { numBars, peakHold, peakFallSpeed, minOpacity, minBrightness } = this.config;
     const bufferLength = frequencyData.length;
     const barWidth = width / numBars;
+
+    // Debug: Log if sourceManager is available (only once per second)
+    if (!this.lastSourceManagerLog || Date.now() - this.lastSourceManagerLog > 1000) {
+      console.log('[SpectrumViz] Has sourceManager:', !!sourceManager);
+      this.lastSourceManagerLog = Date.now();
+    }
 
     // Logarithmic frequency scaling for musical range
     const sampleRate = 44100;
@@ -119,13 +126,19 @@ export class SpectrumVisualization {
 
       // Try to get MIDI color for this bin if sourceManager is available
       let color: { r: number; g: number; b: number };
-      const midiColor = sourceManager?.getMidiColorForBin(binIndex);
 
-      if (midiColor) {
-        // Use note-based color from MIDI notes (Piano/Guitar)
-        color = midiColor;
+      // Query MIDI color only if we have a sourceManager
+      if (sourceManager) {
+        const midiColor = sourceManager.getMidiColorForBin(binIndex);
+        if (midiColor) {
+          // Use note-based color from MIDI notes (Piano/Guitar)
+          color = midiColor;
+        } else {
+          // Fall back to frequency-based color mapping
+          color = getFrequencyColor(normalizedFrequency, 'spectrum', this.config.scaleType);
+        }
       } else {
-        // Fall back to frequency-based color mapping
+        // No sourceManager - use frequency-based color mapping
         color = getFrequencyColor(normalizedFrequency, 'spectrum', this.config.scaleType);
       }
 

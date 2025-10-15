@@ -481,6 +481,71 @@ export class AudioEngine {
     }
   }
 
+  /**
+   * Start global transport (play)
+   * Epic 14, Story 14.2 - Transport control integration
+   * Idempotent - safe to call multiple times
+   */
+  public startTransport(): void {
+    if (!this.isInitialized) {
+      console.warn('[AudioEngine] Not initialized, cannot start transport');
+      return;
+    }
+
+    try {
+      if (Tone.Transport.state !== 'started') {
+        Tone.Transport.start();
+        console.log('[AudioEngine] Transport started');
+      } else {
+        console.log('[AudioEngine] Transport already started');
+      }
+    } catch (error) {
+      console.error('[AudioEngine] Error starting transport:', error);
+    }
+  }
+
+  /**
+   * Stop global transport (pause)
+   * Epic 14, Story 14.2 - Transport control integration
+   * Uses pause() instead of stop() to maintain Transport position
+   * Idempotent - safe to call multiple times
+   */
+  public stopTransport(): void {
+    if (!this.isInitialized) {
+      console.warn('[AudioEngine] Not initialized, cannot stop transport');
+      return;
+    }
+
+    try {
+      if (Tone.Transport.state === 'started') {
+        Tone.Transport.pause();
+        console.log('[AudioEngine] Transport paused');
+      } else {
+        console.log('[AudioEngine] Transport already stopped');
+      }
+    } catch (error) {
+      console.error('[AudioEngine] Error stopping transport:', error);
+    }
+  }
+
+  /**
+   * Get current transport playing state
+   * Epic 14, Story 14.2 - Transport control integration
+   * @returns true if transport is playing, false otherwise
+   */
+  public isTransportPlaying(): boolean {
+    if (!this.isInitialized) {
+      return false;
+    }
+
+    try {
+      return Tone.Transport.state === 'started';
+    } catch (error) {
+      console.error('[AudioEngine] Error checking transport state:', error);
+      return false;
+    }
+  }
+
   public async dispose(): Promise<void> {
     if (!this.isInitialized) return;
 

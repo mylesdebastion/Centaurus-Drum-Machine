@@ -64,30 +64,37 @@ export class RippleVisualization {
     ctx: CanvasRenderingContext2D,
     frequencyData: Uint8Array,
     width: number,
-    height: number
+    height: number,
+    sourceManager?: any // FrequencySourceManager for MIDI color support
   ): void {
     // Extract dominant frequency and amplitude
-    const { frequency, amplitude } = this.extractDominantFreqAndAmp(frequencyData);
+    const { frequency, amplitude, dominantBin } = this.extractDominantFreqAndAmp(frequencyData);
 
     // Smooth inputs (running average)
     const smoothedAmp = this.smooth(this.smoothingAmp, amplitude, this.config.smoothingLength);
     const smoothedFreq = this.smooth(this.smoothingFreq, frequency, this.config.smoothingLength);
 
-    // Frequency to hue mapping - quadratic for quadratic scale, linear otherwise
-    let hue;
-    if (this.config.scaleType === 'quadratic') {
-      // Quadratic color mapping - emphasizes bass frequencies with smooth transitions
-      hue = Math.pow(smoothedFreq, 2) * 192; // Quadratic curve (0 = red, 192 = cyan)
+    let newColor: RGB;
+
+    // MIDI mode: Use note colors from sourceManager if available
+    if (sourceManager && dominantBin !== null) {
+      const midiColor = sourceManager.getMidiColorForBin(dominantBin);
+      if (midiColor) {
+        // Use MIDI note color with amplitude-based brightness
+        const brightness = smoothedAmp; // 0-1
+        newColor = {
+          r: Math.round(midiColor.r * brightness),
+          g: Math.round(midiColor.g * brightness),
+          b: Math.round(midiColor.b * brightness),
+        };
+      } else {
+        // Fallback to frequency-based color
+        newColor = this.getFrequencyBasedColor(smoothedFreq, smoothedAmp);
+      }
     } else {
-      // Linear color mapping for log and linear scales (AudioLux original)
-      hue = 192 * smoothedFreq; // 0 (red) to 192 (cyan)
+      // Standard frequency-based color mapping
+      newColor = this.getFrequencyBasedColor(smoothedFreq, smoothedAmp);
     }
-
-    const val = 255 * smoothedAmp; // brightness
-    const sat = 255; // full saturation
-
-    // Convert HSV to RGB
-    const newColor = this.hsvToRgb(hue, sat, val);
 
     // PushQueue: Add new color to history (creates ripple effect)
     this.colorHistory.unshift(newColor);
@@ -105,6 +112,27 @@ export class RippleVisualization {
         this.drawOriginIndicator(ctx, width, height, timeSinceChange);
       }
     }
+  }
+
+  /**
+   * Get frequency-based color (original AudioLux algorithm)
+   */
+  private getFrequencyBasedColor(smoothedFreq: number, smoothedAmp: number): RGB {
+    // Frequency to hue mapping - quadratic for quadratic scale, linear otherwise
+    let hue;
+    if (this.config.scaleType === 'quadratic') {
+      // Quadratic color mapping - emphasizes bass frequencies with smooth transitions
+      hue = Math.pow(smoothedFreq, 2) * 192; // Quadratic curve (0 = red, 192 = cyan)
+    } else {
+      // Linear color mapping for log and linear scales (AudioLux original)
+      hue = 192 * smoothedFreq; // 0 (red) to 192 (cyan)
+    }
+
+    const val = 255 * smoothedAmp; // brightness
+    const sat = 255; // full saturation
+
+    // Convert HSV to RGB
+    return this.hsvToRgb(hue, sat, val);
   }
 
   /**
@@ -180,6 +208,7 @@ export class RippleVisualization {
   private extractDominantFreqAndAmp(frequencyData: Uint8Array): {
     frequency: number;
     amplitude: number;
+    dominantBin: number;
   } {
     let maxAmplitude = 0;
     let maxIndex = 0;
@@ -225,7 +254,7 @@ export class RippleVisualization {
 
     const normalizedAmp = maxAmplitude / 255;
 
-    return { frequency: normalizedFreq, amplitude: normalizedAmp };
+    return { frequency: normalizedFreq, amplitude: normalizedAmp, dominantBin: maxIndex };
   }
 
   /**
