@@ -16,10 +16,11 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import * as Tone from 'tone';
-import { Trash2, AlertCircle, Undo2, Wand2 } from 'lucide-react';
+import { Trash2, AlertCircle, Undo2, Wand2, Settings, Info } from 'lucide-react';
 import { useGlobalMusic } from '@/contexts/GlobalMusicContext';
 import { getNoteColor } from '@/utils/colorMapping';
-import { audioEngine } from '@/utils/audioEngine';
+import { IntelligentMelodyService, type IntelligentMelodySettings } from '@/services/intelligentMelodyService';
+import type { Chord } from '@/types/chordProgression';
 
 /**
  * MelodyNote interface
@@ -39,6 +40,8 @@ export interface MelodySequencerProps {
   onNoteEvent?: (note: MelodyNote) => void; // For module routing (Story 15.4)
   instanceId?: string; // Module instance ID for routing
   outputTargets?: string[]; // Connected output modules
+  currentChord?: Chord | null; // Active chord from ChordTimeline (Story 15.7)
+  romanNumeral?: string; // Current Roman numeral (for educational display)
 }
 
 /**
@@ -96,16 +99,28 @@ function getNoteNameFromMidi(midiNote: number): string {
 export const MelodySequencer: React.FC<MelodySequencerProps> = ({
   playbackPosition,
   isPlaying,
-  tempo,
+  tempo: _tempo,
   onNoteEvent,
-  instanceId = 'melody-sequencer',
-  outputTargets = [],
+  instanceId: _instanceId = 'melody-sequencer',
+  outputTargets: _outputTargets = [],
+  currentChord = null,
+  romanNumeral = '',
 }) => {
   const { key, scale, colorMode } = useGlobalMusic();
+  const melodyService = IntelligentMelodyService.getInstance();
+
   const [notes, setNotes] = useState<MelodyNote[]>([]);
   const [visibleNotes, setVisibleNotes] = useState<number[]>([]);
+  const [scaleNotes, setScaleNotes] = useState<number[]>([]);
   const lastStepRef = useRef<number>(-1);
   const synthRef = useRef<Tone.PolySynth | null>(null);
+
+  // Intelligent melody settings (Story 15.7)
+  const [settings, setSettings] = useState<IntelligentMelodySettings>(
+    IntelligentMelodyService.getDefaultSettings()
+  );
+  const [showSettings, setShowSettings] = useState(false);
+  const [showHarmonicGuidance, setShowHarmonicGuidance] = useState(true);
 
   // Inline warning state (anti-modal pattern)
   const [outOfScaleWarning, setOutOfScaleWarning] = useState<{
@@ -145,11 +160,21 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
 
   // Calculate scale notes when key/scale changes (2 octaves)
   useEffect(() => {
-    const scaleNotes = calculateScaleNotes(key, scale, 2);
-    setVisibleNotes(scaleNotes);
+    const calculatedScaleNotes = calculateScaleNotes(key, scale, 2);
+    setVisibleNotes(calculatedScaleNotes);
+
+    // Store full scale notes (all octaves) for brightness calculations
+    const fullScaleNotes: number[] = [];
+    for (let octave = 0; octave < 10; octave++) {
+      calculatedScaleNotes.forEach(note => {
+        const noteClass = note % 12;
+        fullScaleNotes.push(noteClass + (octave * 12));
+      });
+    }
+    setScaleNotes(fullScaleNotes);
 
     // Check for out-of-scale notes - Show inline warning (anti-modal pattern)
-    const outOfScaleNotes = notes.filter(note => !scaleNotes.includes(note.pitch));
+    const outOfScaleNotes = notes.filter(note => !calculatedScaleNotes.includes(note.pitch));
 
     if (outOfScaleNotes.length > 0) {
       // Show inline warning instead of blocking modal
@@ -362,15 +387,53 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
     return Math.floor(playbackPosition * 16);
   }, [playbackPosition]);
 
+  // Get last placed note pitch (for passing tone logic)
+  const lastPlacedPitch = useMemo(() => {
+    if (notes.length === 0) return null;
+    const sortedNotes = [...notes].sort((a, b) => b.step - a.step);
+    return sortedNotes[0]?.pitch || null;
+  }, [notes]);
+
+  // Educational feedback message
+  const settingsFeedback = useMemo(() => {
+    return melodyService.getSettingsFeedbackMessage(settings);
+  }, [settings, melodyService]);
+
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+    <div className="relative bg-gray-800 rounded-lg border border-gray-700 p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white">Melody Sequencer</h3>
+        <div>
+          <h3 className="text-lg font-semibold text-white">Melody Sequencer</h3>
+          {currentChord && romanNumeral && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              Current chord: {romanNumeral} ({currentChord.name})
+            </p>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-400">
             {notes.length} {notes.length === 1 ? 'note' : 'notes'}
           </span>
+          <button
+            onClick={() => setShowHarmonicGuidance(!showHarmonicGuidance)}
+            className={`p-2 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${
+              showHarmonicGuidance
+                ? 'bg-primary-600 hover:bg-primary-700 text-white'
+                : 'hover:bg-gray-700 text-gray-400'
+            }`}
+            aria-label="Toggle harmonic guidance"
+            title="Toggle harmonic guidance (brightness suggestions)"
+          >
+            <Info className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="p-2 hover:bg-gray-700 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Toggle settings"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
           <button
             onClick={generateMelody}
             className="flex items-center gap-1.5 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-medium rounded-lg transition-colors min-h-[44px]"
@@ -411,25 +474,53 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
                     const isCurrentStep = currentStep === step && isPlaying;
 
                     // Get note color based on colorMode (chromatic/harmonic/spectrum)
-                    const noteColor = getNoteColor(pitch, colorMode);
-                    const colorStyle = hasNote
-                      ? {
-                          backgroundColor: `rgb(${noteColor.r}, ${noteColor.g}, ${noteColor.b})`,
-                          borderColor: `rgb(${Math.min(noteColor.r + 40, 255)}, ${Math.min(noteColor.g + 40, 255)}, ${Math.min(noteColor.b + 40, 255)})`,
-                        }
-                      : {};
+                    // ALWAYS use colorMode for consistency (Story 15.7 requirement)
+                    // For spectrum mode: use full MIDI pitch, for others: use pitch class (0-11)
+                    const noteForColor = (colorMode as string) === 'spectrum' ? pitch : (pitch % 12);
+                    const noteColor = getNoteColor(noteForColor, colorMode);
+
+                    // Calculate brightness using IntelligentMelodyService (Story 15.7)
+                    const brightness = showHarmonicGuidance
+                      ? melodyService.calculateNoteBrightness(
+                          pitch,
+                          step,
+                          currentChord,
+                          scaleNotes,
+                          settings,
+                          lastPlacedPitch,
+                          hasNote // Placed notes get 1.0 brightness
+                        )
+                      : hasNote ? 1.0 : 0.65; // Fallback: full brightness if placed, else in-scale default
+
+                    // Apply brightness multiplier to RGB (PRIMARY visual indicator)
+                    const backgroundColor = `rgb(${Math.floor(noteColor.r * brightness)}, ${Math.floor(noteColor.g * brightness)}, ${Math.floor(noteColor.b * brightness)})`;
+
+                    // Border color matches background RGB (SECONDARY educational indicator)
+                    // Exception: White border (3px) for placed notes (Story 15.7 requirement)
+                    const borderColor = hasNote
+                      ? 'rgb(255, 255, 255)' // White for active notes
+                      : backgroundColor; // Matches background for suggestions
+
+                    const borderWidth = hasNote ? '3px' : '1px';
+
+                    const colorStyle = {
+                      backgroundColor,
+                      borderColor,
+                      borderWidth,
+                      borderStyle: 'solid',
+                    };
 
                     return (
                       <button
                         key={step}
                         onClick={() => toggleNote(step, pitch)}
                         className={`
-                          w-8 h-8 rounded-md transition-all duration-75 border-2
+                          w-8 h-8 rounded-md transition-all duration-75
                           ${hasNote
                             ? 'shadow-md hover:brightness-110'
-                            : 'bg-gray-700 hover:bg-gray-600 border-gray-600'
+                            : 'hover:brightness-125'
                           }
-                          ${isCurrentStep ? 'ring-2 ring-white scale-105' : ''}
+                          ${isCurrentStep ? 'ring-2 ring-primary-400 scale-105' : ''}
                           min-h-[32px] min-w-[32px]
                         `}
                         style={colorStyle}
@@ -522,12 +613,182 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
       {/* Instructions */}
       <div className="mt-3 text-xs text-gray-500 text-center">
         Click cells to toggle notes • Notes auto-filter to {key} {scale} scale
+        {showHarmonicGuidance && ' • Brightness shows harmonic recommendation'}
       </div>
 
       {/* Empty state */}
       {notes.length === 0 && !clearUndoState && (
         <div className="mt-4 text-center text-gray-400 py-4">
           <p className="text-sm">Click any cell to add a note</p>
+        </div>
+      )}
+
+      {/* Intelligent Melody Settings Panel (Story 15.7) - Overlay Tray */}
+      {showSettings && (
+        <div className="absolute bottom-0 left-0 right-0 bg-gray-850/95 backdrop-blur-sm border-t border-gray-700 rounded-b-lg shadow-2xl max-h-[50vh] overflow-y-auto z-10">
+          <div className="sticky top-0 bg-gray-850 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-white">Intelligent Melody Settings</h4>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSettings(IntelligentMelodyService.getDefaultSettings())}
+                className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
+              >
+                Reset
+              </button>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="text-xs text-gray-400 hover:text-white transition-colors px-2 py-1 hover:bg-gray-700 rounded"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+          <div className="p-4 space-y-3">
+            {/* Educational Feedback */}
+            <div className="flex items-start gap-2 p-3 bg-blue-900/20 border border-blue-700/50 rounded-lg">
+              <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-300">{settingsFeedback}</p>
+            </div>
+
+            {/* Chord Tone Density */}
+            <div>
+              <label className="block text-xs font-medium text-gray-300 mb-2">
+                Chord Tone Density
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                How often chord tones appear vs scale notes (affects brightness gap)
+              </p>
+              <div className="flex gap-2">
+                {(['high', 'medium', 'low'] as const).map((density) => (
+                  <button
+                    key={density}
+                    onClick={() => setSettings({ ...settings, chordToneDensity: density })}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      settings.chordToneDensity === density
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    {density.charAt(0).toUpperCase() + density.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Melodic Contour */}
+            <div>
+              <label className="block text-xs font-medium text-gray-300 mb-2">
+                Melodic Contour
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Overall shape of the generated melody
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {(['arch', 'valley', 'ascending', 'descending', 'wave', 'random'] as const).map((contour) => (
+                  <button
+                    key={contour}
+                    onClick={() => setSettings({ ...settings, melodicContour: contour })}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      settings.melodicContour === contour
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    {contour.charAt(0).toUpperCase() + contour.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Passing Tones */}
+            <div>
+              <label className="flex items-center justify-between">
+                <div>
+                  <span className="block text-xs font-medium text-gray-300">Passing Tones</span>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Favor stepwise motion over leaps (brighter stepwise notes)
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSettings({ ...settings, passingTones: !settings.passingTones })}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    settings.passingTones ? 'bg-primary-600' : 'bg-gray-600'
+                  }`}
+                >
+                  <div
+                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                      settings.passingTones ? 'transform translate-x-6' : ''
+                    }`}
+                  />
+                </button>
+              </label>
+            </div>
+
+            {/* Rhythmic Pattern */}
+            <div>
+              <label className="block text-xs font-medium text-gray-300 mb-2">
+                Rhythmic Pattern (for generation)
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['groove1', 'groove2', 'groove3', 'triplet', 'sparse', 'mixed'] as const).map((pattern) => (
+                  <button
+                    key={pattern}
+                    onClick={() => setSettings({ ...settings, rhythmicPattern: pattern })}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      settings.rhythmicPattern === pattern
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    {pattern.charAt(0).toUpperCase() + pattern.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Velocity Shaping */}
+            <div>
+              <label className="block text-xs font-medium text-gray-300 mb-2">
+                Velocity Shaping (for generation)
+              </label>
+              <div className="flex gap-2">
+                {(['arc', 'crescendo', 'decrescendo', 'uniform'] as const).map((shaping) => (
+                  <button
+                    key={shaping}
+                    onClick={() => setSettings({ ...settings, velocityShaping: shaping })}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      settings.velocityShaping === shaping
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    {shaping.charAt(0).toUpperCase() + shaping.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Note Density */}
+            <div>
+              <label className="block text-xs font-medium text-gray-300 mb-2">
+                Note Density: {Math.round(settings.noteDensity * 100)}%
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                How many steps have notes when generating
+              </p>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value={settings.noteDensity * 100}
+                onChange={(e) =>
+                  setSettings({ ...settings, noteDensity: parseInt(e.target.value) / 100 })
+                }
+                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-primary"
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>

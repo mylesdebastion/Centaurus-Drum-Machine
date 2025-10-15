@@ -24,7 +24,7 @@ import { MelodySequencer } from './MelodySequencer';
 import { OutputSelector } from './OutputSelector';
 import type { RomanNumeralProgression, Chord } from '@/types/chordProgression';
 import type { MelodyNote } from './MelodySequencer';
-import type { NoteEvent, ChordEvent } from '@/types/moduleRouting';
+import type { NoteEvent } from '@/types/moduleRouting';
 
 /**
  * ModuleComponentProps interface (will be defined in Story 15.6)
@@ -40,9 +40,9 @@ export interface ModuleComponentProps {
 }
 
 export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
-  layout = 'desktop',
-  settings = {},
-  onSettingsChange,
+  layout: _layout = 'desktop',
+  settings: _settings = {},
+  onSettingsChange: _onSettingsChange,
   onBack,
   embedded = false,
   instanceId = 'chord-melody-arranger-test', // Default for standalone testing
@@ -61,6 +61,9 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
   const [outputTargets, setOutputTargets] = useState<string[]>([]); // Module routing (Story 15.4)
   const [routeNotes, setRouteNotes] = useState(true); // Route melody notes to output modules
   const [routeChords, setRouteChords] = useState(true); // Route chord events to output modules
+
+  // Current chord tracking for MelodySequencer (Story 15.7)
+  const [currentChordIndex, setCurrentChordIndex] = useState<number>(0);
 
   // Automatically resolve chords when progression or key changes
   useEffect(() => {
@@ -96,6 +99,13 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
       const position = (elapsed % totalDuration) / totalDuration; // Loop within 0-1
       setPlaybackPosition(position);
 
+      // Update current chord index based on playback position (Story 15.7)
+      if (currentChords.length > 0) {
+        const barsPerChord = barCount / currentChords.length;
+        const chordIndex = Math.floor((position * barCount) / barsPerChord);
+        setCurrentChordIndex(Math.min(chordIndex, currentChords.length - 1));
+      }
+
       animationFrame = requestAnimationFrame(updatePosition);
     };
 
@@ -106,7 +116,7 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
         cancelAnimationFrame(animationFrame);
       }
     };
-  }, [isPlaying, tempo, barCount]);
+  }, [isPlaying, tempo, barCount, currentChords.length]);
 
   // Transport control handlers
   const handlePlay = useCallback(() => {
@@ -198,9 +208,10 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
   }, [outputTargets, instanceId, routingService, service, routeChords]);
 
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-white">
-      {/* Module Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-700">
+    <>
+      <div className="flex flex-col h-full bg-gray-900 text-white">
+        {/* Module Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-700">
         <div className="flex items-center gap-3">
           <Music className="w-6 h-6 text-purple-400" />
           <div>
@@ -288,7 +299,7 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
           />
         )}
 
-        {/* Melody Sequencer (Story 15.3, 15.5) */}
+        {/* Melody Sequencer (Story 15.3, 15.5, 15.7) */}
         <MelodySequencer
           playbackPosition={playbackPosition}
           isPlaying={isPlaying}
@@ -296,13 +307,24 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
           onNoteEvent={handleMelodyNote}
           instanceId={instanceId}
           outputTargets={outputTargets}
+          currentChord={currentChords[currentChordIndex] || null}
+          romanNumeral={selectedProgression?.romanNumerals[currentChordIndex] || ''}
         />
       </div>
+    </div>
 
-      {/* Settings Panel (Collapsible) */}
+      {/* Settings Panel - Fixed Bottom Overlay */}
       {showSettings && (
-        <div className="border-t border-gray-700 bg-gray-850 p-4">
-          <h3 className="text-sm font-semibold text-white mb-3">Settings</h3>
+        <div className="fixed bottom-0 left-0 right-0 border-t border-gray-700 bg-gray-850 p-4 z-50 max-h-[70vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-white">Module Settings</h3>
+            <button
+              onClick={() => setShowSettings(false)}
+              className="text-xs text-gray-400 hover:text-white transition-colors"
+            >
+              Close
+            </button>
+          </div>
           <div className="space-y-3">
             <div>
               <label className="block text-xs text-gray-400 mb-1">Timeline Length</label>
@@ -327,6 +349,6 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
