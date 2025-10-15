@@ -18,7 +18,7 @@ class BitArray {
   private num_bits: number = 0;
 
   append(value: number, size: number = 7) {
-    let current = Math.floor(this.num_bits / 7);
+    // let current = Math.floor(this.num_bits / 7); // Reserved for array indexing optimization
     let used_bits = Math.floor(this.num_bits % 7);
     let packed = 0;
 
@@ -39,7 +39,7 @@ class BitArray {
     }
   }
 
-  get(size: number = 32): number[] {
+  get(_size: number = 32): number[] { // Reserved for variable-length message support
     while (this.values.length < 8) {
       this.values.push(0);
     }
@@ -106,8 +106,8 @@ export const LumiTest: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           // Set up MIDI message listener
           input.onmidimessage = (message: any) => {
             if (midiMonitoring) {
-              const data = Array.from(message.data);
-              const hex = data.map((b: number) => '0x' + b.toString(16).padStart(2, '0')).join(' ');
+              const data = Array.from(message.data) as number[];
+              const hex = data.map((b) => '0x' + b.toString(16).padStart(2, '0')).join(' ');
               addLog(`📨 MIDI IN: ${hex}`);
             }
           };

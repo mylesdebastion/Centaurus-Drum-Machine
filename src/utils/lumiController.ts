@@ -381,7 +381,7 @@ class BitArray {
   private num_bits: number = 0;
 
   append(value: number, size: number = 7) {
-    let current = Math.floor(this.num_bits / 7);
+    // let current = Math.floor(this.num_bits / 7); // Reserved for array indexing optimization
     let used_bits = Math.floor(this.num_bits % 7);
     let packed = 0;
 
@@ -402,7 +402,7 @@ class BitArray {
     }
   }
 
-  get(size: number = 32): number[] {
+  get(_size: number = 32): number[] { // Reserved for variable-length message support
     while (this.values.length < 8) {
       this.values.push(0);
     }

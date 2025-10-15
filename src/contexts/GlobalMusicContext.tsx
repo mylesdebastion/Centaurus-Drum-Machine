@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
 import { RootNote, ScaleName, useMusicalScale } from '../hooks/useMusicalScale';
 import { audioEngine } from '../utils/audioEngine';
+import { ColorMode } from '../utils/colorMapping';
 
 /**
  * Global Music State Interface
@@ -14,7 +15,7 @@ export interface GlobalMusicState {
   /** Scale pattern */
   scale: ScaleName;
   /** Visualization mode */
-  colorMode: 'chromatic' | 'harmonic';
+  colorMode: ColorMode;
   /** Master volume (0-1) */
   masterVolume: number;
   /**
@@ -53,7 +54,7 @@ export interface GlobalMusicContextValue extends GlobalMusicState {
   updateTempo: (tempo: number) => void;
   updateKey: (key: RootNote) => void;
   updateScale: (scale: ScaleName) => void;
-  updateColorMode: (mode: 'chromatic' | 'harmonic') => void;
+  updateColorMode: (mode: ColorMode) => void;
   updateMasterVolume: (volume: number) => void;
   /**
    * Update global transport state (Epic 14, Story 14.2)
@@ -275,7 +276,7 @@ export const GlobalMusicProvider: React.FC<GlobalMusicProviderProps> = ({ childr
   /**
    * Update color mode
    */
-  const updateColorMode = useCallback((mode: 'chromatic' | 'harmonic') => {
+  const updateColorMode = useCallback((mode: ColorMode) => {
     setState(prev => ({ ...prev, colorMode: mode }));
   }, []);
 

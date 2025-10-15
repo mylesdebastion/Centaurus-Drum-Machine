@@ -18,6 +18,7 @@ import { ScaleSelector } from '../Music/ScaleSelector';
 import { HardwareStatusIndicator } from '../../hardware/ui/HardwareStatusIndicator';
 import { HardwareSettingsModal } from './HardwareSettingsModal';
 import { audioEngine } from '../../utils/audioEngine';
+import { ColorMode } from '../../utils/colorMapping';
 
 /**
  * Tempo Control Component
@@ -155,25 +156,38 @@ const TempoControl: React.FC<TempoControlProps> = ({ tempo, onTempoChange, isCom
 
 /**
  * Color Mode Toggle Component
- * Toggles between chromatic and harmonic visualization modes
+ * Cycles through spectrum, chromatic, and harmonic visualization modes
  */
 interface ColorModeToggleProps {
-  mode: 'chromatic' | 'harmonic';
-  onModeChange: (mode: 'chromatic' | 'harmonic') => void;
+  mode: ColorMode;
+  onModeChange: (mode: ColorMode) => void;
 }
 
 const ColorModeToggle: React.FC<ColorModeToggleProps> = ({ mode, onModeChange }) => {
   const [showTooltip, setShowTooltip] = useState(false);
 
+  // Cycle through modes: spectrum → chromatic → harmonic → spectrum
+  const handleCycleMode = () => {
+    if (mode === 'spectrum') {
+      onModeChange('chromatic');
+    } else if (mode === 'chromatic') {
+      onModeChange('harmonic');
+    } else {
+      onModeChange('spectrum');
+    }
+  };
+
   const tooltipText =
-    mode === 'chromatic'
+    mode === 'spectrum'
+      ? 'Spectrum: Full rainbow spectrum (Red to Violet)'
+      : mode === 'chromatic'
       ? 'Chromatic: Colors by pitch (C=Red, D=Orange, etc.)'
       : 'Harmonic: Colors by scale degree (Tonic=Blue, Dominant=Purple)';
 
   return (
     <div className="relative">
       <button
-        onClick={() => onModeChange(mode === 'chromatic' ? 'harmonic' : 'chromatic')}
+        onClick={handleCycleMode}
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
         className="p-2 rounded-lg bg-accent-600 hover:bg-accent-700 transition-all transform hover:scale-105"

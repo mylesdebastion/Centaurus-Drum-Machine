@@ -228,9 +228,10 @@ function App() {
     navigate('/');
   };
 
-  const _handleChordMelodyTest = () => {
-    navigate('/chord-melody-test');
-  };
+  // Reserved for future WelcomeScreen button
+  // const handleChordMelodyTest = () => {
+  //   navigate('/chord-melody-test');
+  // };
 
   const handleExitChordMelodyTest = () => {
     navigate('/');
