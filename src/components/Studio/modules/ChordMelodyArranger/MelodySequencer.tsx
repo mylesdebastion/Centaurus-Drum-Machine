@@ -15,7 +15,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Trash2, AlertCircle, Undo2, Wand2, Settings, Info, Volume2, ChevronDown } from 'lucide-react';
+import { Trash2, AlertCircle, Undo2, Wand2, Settings, Info, Volume2, ChevronDown, Sparkles, Square } from 'lucide-react';
 import { useGlobalMusic } from '@/contexts/GlobalMusicContext';
 import { getNoteColor } from '@/utils/colorMapping';
 import { IntelligentMelodyService, type IntelligentMelodySettings } from '@/services/intelligentMelodyService';
@@ -148,6 +148,23 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
   );
   const [showSettings, setShowSettings] = useState(false);
   const [showHarmonicGuidance, setShowHarmonicGuidance] = useState(true);
+
+  // Auto-melody generation state
+  const [isAutoGenerating, setIsAutoGenerating] = useState(false);
+  const autoGenerateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sparkle animation state (moth flying to the light)
+  const [sparkleParticles, setSparkleParticles] = useState<Array<{
+    id: number;
+    fromStep: number;
+    fromPitch: number;
+    toStep: number;
+    toPitch: number;
+    progress: number; // 0-1
+    startTime: number;
+    duration: number; // Animation duration in milliseconds (synced to step duration)
+  }>>([]);
+  const sparkleAnimationRef = useRef<number | null>(null);
 
   // Inline warning state (anti-modal pattern)
   const [outOfScaleWarning, setOutOfScaleWarning] = useState<{
@@ -585,6 +602,374 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
     };
   }, [handleCellMouseUp]);
 
+  /**
+   * Pick a starting note based on scale degree weights
+   * Priority: Root (1), 5th (5), 4th (4), 7th (7), 3rd (3), 6th (6), 2nd (2)
+   */
+  const pickStartingNote = useCallback((): MelodyNote => {
+    if (visibleNotes.length === 0) {
+      throw new Error('No visible notes available');
+    }
+
+    // Scale degree weights (0-indexed, so degree 0 = root)
+    // Root=5, 5th=4, 4th=3, 7th=2.5, 3rd=2, 6th=1.5, 2nd=1
+    const degreeWeights = [5, 1, 2, 1.5, 3, 4, 1.5, 2.5]; // For 7-note scales
+
+    // Calculate weighted probabilities for each visible note
+    const weightedNotes = visibleNotes.map((pitch, index) => {
+      const scaleDegree = index % degreeWeights.length;
+      const weight = degreeWeights[scaleDegree];
+      return { pitch, weight };
+    });
+
+    // Pick random note based on weights
+    const totalWeight = weightedNotes.reduce((sum, n) => sum + n.weight, 0);
+    let random = Math.random() * totalWeight;
+    let selectedPitch = weightedNotes[0].pitch;
+
+    for (const note of weightedNotes) {
+      random -= note.weight;
+      if (random <= 0) {
+        selectedPitch = note.pitch;
+        break;
+      }
+    }
+
+    // Create starting note at step 0 of current page
+    const startingNote: MelodyNote = {
+      step: currentPage * STEPS_PER_PAGE,
+      pitch: selectedPitch,
+      velocity: 90 + Math.floor(Math.random() * 20), // 90-110
+      duration: stepDuration,
+    };
+
+    console.log('[Auto-Melody] Picked starting note:', getNoteNameFromMidi(selectedPitch), 'at step', startingNote.step);
+    return startingNote;
+  }, [visibleNotes, currentPage, STEPS_PER_PAGE, stepDuration]);
+
+  /**
+   * Auto-melody generation - Intelligently walks through harmonic suggestions
+   * Two modes:
+   * 1. Playing mode: Continuously overwrites, loops back to start when reaching end
+   * 2. Paused mode: Generates once from start to end, then stays there
+   */
+  const startAutoMelodyGeneration = useCallback(() => {
+    if (isAutoGenerating) return;
+    if (visibleNotes.length === 0) return; // Need scale notes
+
+    console.log('[Auto-Melody] Starting generation, isPlaying:', isPlaying);
+    setIsAutoGenerating(true);
+
+    // Create or use existing starting note
+    let lastNote: MelodyNote;
+    const existingNotes = notes.filter(n => {
+      const pageRelativeStep = n.step - currentPage * STEPS_PER_PAGE;
+      return pageRelativeStep >= 0 && pageRelativeStep < STEPS_PER_PAGE;
+    });
+
+    if (existingNotes.length > 0 && !isPlaying) {
+      // Paused mode: Continue from last note on current page
+      const sortedNotes = [...existingNotes].sort((a, b) => b.step - a.step);
+      lastNote = sortedNotes[0];
+      console.log('[Auto-Melody] Paused mode: Continuing from existing note');
+    } else {
+      // Playing mode OR no existing notes: Start from beginning with weighted random note
+      lastNote = pickStartingNote();
+
+      // Clear all notes on current page if in playing mode
+      if (isPlaying) {
+        setNotes(prevNotes => prevNotes.filter(n => {
+          const notePage = Math.floor(n.step / STEPS_PER_PAGE);
+          return notePage !== currentPage;
+        }));
+      }
+
+      // Add starting note
+      setNotes(prevNotes => [...prevNotes, lastNote]);
+      scheduleNote(lastNote);
+      if (onNoteEvent) onNoteEvent(lastNote);
+
+      console.log('[Auto-Melody] Starting from new note:', lastNote);
+    }
+
+    const generateNextNote = () => {
+      console.log('[Auto-Melody] generateNextNote called, lastNote:', lastNote);
+
+      // Check if the last note is on the current page
+      const lastNotePageRelativeStep = lastNote.step - currentPage * STEPS_PER_PAGE;
+
+      // If the last note is not on the current page, stop generation
+      if (lastNotePageRelativeStep < 0 || lastNotePageRelativeStep >= STEPS_PER_PAGE) {
+        console.log('[Auto-Melody] Last note not on current page, stopping');
+        setIsAutoGenerating(false);
+        if (autoGenerateIntervalRef.current) {
+          clearInterval(autoGenerateIntervalRef.current);
+          autoGenerateIntervalRef.current = null;
+        }
+        return;
+      }
+
+      let nextStep = lastNotePageRelativeStep + 1;
+      console.log('[Auto-Melody] Next step:', nextStep);
+
+      // If we've reached the end of the current page
+      if (nextStep >= STEPS_PER_PAGE) {
+        console.log('[Auto-Melody] Reached end of page');
+
+        // Paused mode: Stop generation when reaching the end
+        if (!isPlaying) {
+          console.log('[Auto-Melody] Paused mode: Stopping at end of page');
+          setIsAutoGenerating(false);
+          if (autoGenerateIntervalRef.current) {
+            clearInterval(autoGenerateIntervalRef.current);
+            autoGenerateIntervalRef.current = null;
+          }
+          return;
+        }
+
+        // Playing mode: Loop back to beginning
+        console.log('[Auto-Melody] Playing mode: Looping back to start');
+        nextStep = 0; // Reset to first step
+
+        // Clear all notes on current page and start fresh
+        setNotes(prevNotes => prevNotes.filter(n => {
+          const notePage = Math.floor(n.step / STEPS_PER_PAGE);
+          return notePage !== currentPage;
+        }));
+
+        // Pick new starting note
+        lastNote = pickStartingNote();
+        setNotes(prevNotes => [...prevNotes, lastNote]);
+        scheduleNote(lastNote);
+        if (onNoteEvent) onNoteEvent(lastNote);
+
+        console.log('[Auto-Melody] Restarted from new note:', lastNote);
+        return; // Wait for next interval to continue from new starting note
+      }
+
+      const nextAbsoluteStep = currentPage * STEPS_PER_PAGE + nextStep;
+
+      // Check if there's already a note at this step (skip it)
+      const existingNoteAtStep = notes.some(n => n.step === nextAbsoluteStep);
+      if (existingNoteAtStep) {
+        // Find the note at this step to continue from
+        const noteAtStep = notes.find(n => n.step === nextAbsoluteStep);
+        if (noteAtStep) {
+          lastNote = noteAtStep;
+        }
+        return;
+      }
+
+      // Calculate brightness for all visible notes at this step
+      const suggestions: { pitch: number; brightness: number }[] = visibleNotes.map(pitch => {
+        // Calculate diagonal stagger position
+        const pitchDistance = Math.abs(pitch - lastNote.pitch);
+        let timeOffset = 0;
+        if (pitchDistance >= 6) {
+          timeOffset = 2;
+        } else if (pitchDistance >= 3) {
+          timeOffset = 1;
+        }
+
+        const forwardStepOffset = pitch > lastNote.pitch ? timeOffset : -timeOffset;
+        const backwardStepOffset = pitch < lastNote.pitch ? timeOffset : -timeOffset;
+
+        const forwardExpectedStep = lastNotePageRelativeStep + forwardStepOffset;
+        const backwardExpectedStep = lastNotePageRelativeStep + backwardStepOffset;
+
+        const isForwardClose = Math.abs(nextStep - forwardExpectedStep) <= 1;
+        const isBackwardClose = Math.abs(nextStep - backwardExpectedStep) <= 1;
+        const isTemporallyClose = isForwardClose || isBackwardClose;
+
+        // Only consider notes that are within the diagonal pattern
+        if (!isTemporallyClose) {
+          return { pitch, brightness: 0 };
+        }
+
+        // Calculate harmonic brightness
+        const brightness = melodyService.calculateNoteBrightness(
+          pitch,
+          nextAbsoluteStep,
+          currentChord,
+          scaleNotes,
+          settings,
+          lastNote.pitch,
+          false
+        );
+
+        // Apply distance-based dimming
+        let proximityMultiplier = 1.0;
+        if (pitchDistance >= 6) {
+          proximityMultiplier = 0.75;
+        } else if (pitchDistance >= 3) {
+          proximityMultiplier = 0.85;
+        }
+
+        // Penalize same pitch (repetitive notes)
+        const isSamePitch = pitch === lastNote.pitch;
+        const finalBrightness = isSamePitch ? brightness * proximityMultiplier * 0.5 : brightness * proximityMultiplier;
+
+        return { pitch, brightness: finalBrightness };
+      });
+
+      // Log all suggestions with their brightness values
+      const sortedSuggestions = [...suggestions].sort((a, b) => b.brightness - a.brightness);
+      console.log('[Auto-Melody] Top 5 suggestions:', sortedSuggestions.slice(0, 5));
+
+      // Filter to only bright suggestions (above threshold)
+      // Using 0.4 threshold instead of 0.6 to be less restrictive
+      const brightSuggestions = suggestions.filter(s => s.brightness >= 0.4);
+      console.log('[Auto-Melody] Bright suggestions (>= 0.4):', brightSuggestions.length, 'out of', suggestions.length);
+
+      if (brightSuggestions.length === 0) {
+        // No good suggestions, stop generation
+        console.log('[Auto-Melody] No bright suggestions found, stopping');
+        setIsAutoGenerating(false);
+        if (autoGenerateIntervalRef.current) {
+          clearInterval(autoGenerateIntervalRef.current);
+          autoGenerateIntervalRef.current = null;
+        }
+        return;
+      }
+
+      // Pick a random note from the brightest suggestions (weighted by brightness)
+      const totalBrightness = brightSuggestions.reduce((sum, s) => sum + s.brightness, 0);
+      let random = Math.random() * totalBrightness;
+      let selectedPitch = brightSuggestions[0].pitch;
+
+      for (const suggestion of brightSuggestions) {
+        random -= suggestion.brightness;
+        if (random <= 0) {
+          selectedPitch = suggestion.pitch;
+          break;
+        }
+      }
+
+      // Create the new note
+      const newNote: MelodyNote = {
+        step: nextAbsoluteStep,
+        pitch: selectedPitch,
+        velocity: 90 + Math.floor(Math.random() * 20), // 90-110
+        duration: stepDuration,
+      };
+
+      console.log('[Auto-Melody] Created new note:', newNote);
+
+      // Create sparkle trail animation from last note to new note
+      // lastNotePageRelativeStep already calculated above
+      const newNotePageRelativeStep = newNote.step - currentPage * STEPS_PER_PAGE;
+
+      // Calculate animation duration based on step timing (sync to musical tempo)
+      const secondsPerBeat = 60 / _tempo;
+      const intervalMs = stepDuration * secondsPerBeat * 1000;
+
+      // Create trail of sparkle particles crossing intermediate notes
+      // Calculate total distance (Manhattan distance: steps + pitch)
+      const stepDistance = Math.abs(newNotePageRelativeStep - lastNotePageRelativeStep);
+      const pitchDistance = Math.abs(newNote.pitch - lastNote.pitch);
+      const totalDistance = stepDistance + pitchDistance;
+
+      // Create multiple sparkle particles along the path
+      // More particles for longer distances, minimum 3, maximum 8
+      const numParticles = Math.max(3, Math.min(8, Math.ceil(totalDistance / 2)));
+
+      const now = performance.now();
+      const newParticles = Array.from({ length: numParticles }, (_, i) => ({
+        id: now + i, // Unique ID for each particle
+        fromStep: lastNotePageRelativeStep,
+        fromPitch: lastNote.pitch,
+        toStep: newNotePageRelativeStep,
+        toPitch: newNote.pitch,
+        progress: 0,
+        startTime: now + (i * intervalMs * 0.15), // Stagger start times (15% of interval per particle)
+        duration: intervalMs, // All particles take same duration once started
+      }));
+
+      setSparkleParticles(prev => [...prev, ...newParticles]);
+
+      // Add note to the sequence
+      setNotes(prevNotes => [...prevNotes, newNote]);
+
+      // Play the note immediately
+      scheduleNote(newNote);
+
+      // Route to output
+      if (onNoteEvent) {
+        onNoteEvent(newNote);
+      }
+
+      // Update last note for next iteration
+      lastNote = newNote;
+      console.log('[Auto-Melody] Updated lastNote for next iteration:', lastNote);
+    };
+
+    // Generate notes in sync with step duration (moth drawn to the light)
+    // Calculate interval based on step duration and tempo
+    const secondsPerBeat = 60 / _tempo;
+    const intervalMs = stepDuration * secondsPerBeat * 1000; // Convert to milliseconds
+    console.log('[Auto-Melody] Generation interval:', intervalMs, 'ms (based on step duration:', stepDuration, 'beats @ tempo:', _tempo, 'BPM)');
+
+    autoGenerateIntervalRef.current = setInterval(generateNextNote, intervalMs);
+  }, [isAutoGenerating, notes, currentPage, STEPS_PER_PAGE, visibleNotes, melodyService, currentChord, scaleNotes, settings, stepDuration, scheduleNote, onNoteEvent, _tempo]);
+
+  /**
+   * Stop auto-melody generation
+   */
+  const stopAutoMelodyGeneration = useCallback(() => {
+    setIsAutoGenerating(false);
+    if (autoGenerateIntervalRef.current) {
+      clearInterval(autoGenerateIntervalRef.current);
+      autoGenerateIntervalRef.current = null;
+    }
+    // Clear sparkle particles
+    setSparkleParticles([]);
+  }, []);
+
+  // Sparkle animation loop - Updates particle positions
+  useEffect(() => {
+    if (sparkleParticles.length === 0) return;
+
+    const animateSparkles = () => {
+      const now = performance.now();
+
+      setSparkleParticles(prevParticles => {
+        const updatedParticles = prevParticles.map(particle => {
+          const elapsed = now - particle.startTime;
+          // Use particle-specific duration (synced to step timing)
+          const progress = Math.min(elapsed / particle.duration, 1);
+
+          return { ...particle, progress };
+        }).filter(particle => particle.progress < 1); // Remove completed particles
+
+        return updatedParticles;
+      });
+
+      if (sparkleParticles.some(p => p.progress < 1)) {
+        sparkleAnimationRef.current = requestAnimationFrame(animateSparkles);
+      }
+    };
+
+    sparkleAnimationRef.current = requestAnimationFrame(animateSparkles);
+
+    return () => {
+      if (sparkleAnimationRef.current) {
+        cancelAnimationFrame(sparkleAnimationRef.current);
+      }
+    };
+  }, [sparkleParticles.length]); // Re-run when particles are added
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (autoGenerateIntervalRef.current) {
+        clearInterval(autoGenerateIntervalRef.current);
+      }
+      if (sparkleAnimationRef.current) {
+        cancelAnimationFrame(sparkleAnimationRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div className="relative bg-gray-800 rounded-lg border border-gray-700 p-4">
       {/* Header */}
@@ -682,6 +1067,24 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
             aria-label="Toggle settings"
           >
             <Settings className="w-4 h-4" />
+          </button>
+
+          {/* Auto-Melody Generation Button (Moth drawn to the light) */}
+          <button
+            onClick={isAutoGenerating ? stopAutoMelodyGeneration : startAutoMelodyGeneration}
+            className={`p-2 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${
+              isAutoGenerating
+                ? 'bg-red-600 hover:bg-red-700 text-white'
+                : 'bg-green-600 hover:bg-green-700 text-white'
+            }`}
+            aria-label={isAutoGenerating ? 'Stop auto-melody generation' : 'Start auto-melody generation (moth to the light)'}
+            title={
+              isAutoGenerating
+                ? 'Stop auto-melody generation'
+                : 'Moth to the Light - Auto-generate melody with intelligent weighted starting note selection'
+            }
+          >
+            {isAutoGenerating ? <Square className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
           </button>
 
           {/* Generate Button with Dropdown */}
@@ -1082,6 +1485,109 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
               />
             );
           })}
+
+        {/* Sparkle Dust Particles - Moth flying to the light */}
+        {sparkleParticles.map(particle => {
+          const fromPitchIndex = [...visibleNotes].reverse().findIndex(p => p === particle.fromPitch);
+          const toPitchIndex = [...visibleNotes].reverse().findIndex(p => p === particle.toPitch);
+
+          if (fromPitchIndex === -1 || toPitchIndex === -1) return null;
+
+          // Constants (same as tied notes)
+          const CELL_SIZE = 32;
+          const GAP_SIZE = 4;
+          const LABEL_WIDTH = 40;
+          const ROW_HEIGHT = CELL_SIZE + GAP_SIZE;
+          const CELL_WIDTH = CELL_SIZE + GAP_SIZE;
+
+          // Calculate from/to positions (center of cells)
+          const fromX = LABEL_WIDTH + particle.fromStep * CELL_WIDTH + (CELL_SIZE / 2);
+          const fromY = fromPitchIndex * ROW_HEIGHT + (CELL_SIZE / 2);
+          const toX = LABEL_WIDTH + particle.toStep * CELL_WIDTH + (CELL_SIZE / 2);
+          const toY = toPitchIndex * ROW_HEIGHT + (CELL_SIZE / 2);
+
+          // Interpolate position based on progress (with easing)
+          const easeProgress = particle.progress < 0.5
+            ? 2 * particle.progress * particle.progress
+            : 1 - Math.pow(-2 * particle.progress + 2, 2) / 2;
+
+          const currentX = fromX + (toX - fromX) * easeProgress;
+          const currentY = fromY + (toY - fromY) * easeProgress;
+
+          // Get note color for sparkle
+          const noteForColor = colorMode === 'spectrum' ? particle.toPitch : (particle.toPitch % 12);
+          const noteColor = getNoteColor(noteForColor, colorMode);
+
+          // Trail fade-out effect:
+          // - Particles that started earlier should be dimmer (trail effect)
+          // - Calculate time since this particle started relative to the first particle
+          const now = performance.now();
+          const timeSinceStart = now - particle.startTime;
+          const trailFade = timeSinceStart > 0 ? Math.max(0.3, 1 - (timeSinceStart / (particle.duration * 1.5))) : 1;
+
+          // Fade in then out (standard particle lifecycle)
+          let opacity = particle.progress < 0.5
+            ? particle.progress * 2 // Fade in
+            : (1 - particle.progress) * 2; // Fade out
+
+          // Apply trail fade-out multiplier (creates smooth dissipation behind leading edge)
+          opacity = opacity * trailFade;
+
+          return (
+            <div
+              key={particle.id}
+              className="absolute pointer-events-none"
+              style={{
+                left: `${currentX}px`,
+                top: `${currentY}px`,
+                width: '12px',
+                height: '12px',
+                transform: 'translate(-50%, -50%)',
+                zIndex: 15, // Above everything
+              }}
+              aria-label="Sparkle animation"
+            >
+              {/* Multiple sparkles for dust effect */}
+              {[0, 1, 2, 3].map(i => {
+                const angle = (i / 4) * Math.PI * 2 + (particle.progress * Math.PI * 4);
+                const distance = 6 + Math.sin(particle.progress * Math.PI * 2) * 3;
+                const offsetX = Math.cos(angle) * distance;
+                const offsetY = Math.sin(angle) * distance;
+
+                return (
+                  <div
+                    key={i}
+                    className="absolute rounded-full"
+                    style={{
+                      left: `${6 + offsetX}px`,
+                      top: `${6 + offsetY}px`,
+                      width: '4px',
+                      height: '4px',
+                      backgroundColor: `rgb(${noteColor.r}, ${noteColor.g}, ${noteColor.b})`,
+                      opacity: opacity * 0.9,
+                      boxShadow: `0 0 8px rgba(${noteColor.r}, ${noteColor.g}, ${noteColor.b}, ${opacity})`,
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                  />
+                );
+              })}
+              {/* Central bright spark */}
+              <div
+                className="absolute rounded-full"
+                style={{
+                  left: '6px',
+                  top: '6px',
+                  width: '6px',
+                  height: '6px',
+                  backgroundColor: '#ffffff',
+                  opacity: opacity,
+                  boxShadow: `0 0 12px rgba(255, 255, 255, ${opacity}), 0 0 6px rgba(${noteColor.r}, ${noteColor.g}, ${noteColor.b}, ${opacity})`,
+                  transform: 'translate(-50%, -50%)',
+                }}
+              />
+            </div>
+          );
+        })}
       </div>
 
       {/* Instructions */}
