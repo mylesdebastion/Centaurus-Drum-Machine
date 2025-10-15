@@ -250,6 +250,13 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
             onRouteChordsChange={setRouteChords}
           />
           <button
+            onClick={isPlaying ? handlePause : handlePlay}
+            className="p-3 bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label={isPlaying ? 'Pause progression' : 'Play progression'}
+          >
+            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+          </button>
+          <button
             onClick={() => setShowSettings(!showSettings)}
             className="p-2 hover:bg-gray-700 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Toggle settings"
@@ -265,50 +272,6 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
             </button>
           )}
         </div>
-      </div>
-
-      {/* Transport Controls */}
-      <div className="flex items-center gap-3 p-4 border-b border-gray-700 bg-gray-850">
-        <button
-          onClick={isPlaying ? handlePause : handlePlay}
-          className="p-3 bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-          aria-label={isPlaying ? 'Pause chord progression' : 'Play chord progression'}
-        >
-          {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-        </button>
-
-        {/* Step Duration Controls */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">Step:</span>
-          {[
-            { value: 0.125, label: '32nd' },
-            { value: 0.25, label: '16th' },
-            { value: 0.5, label: '8th' },
-            { value: 1, label: 'Quarter' },
-            { value: 2, label: 'Half' },
-            { value: 4, label: 'Whole' }
-          ].map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => setStepDuration(value)}
-              className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-colors min-h-[36px] ${
-                stepDuration === value
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-              aria-label={`${label} note step duration`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {isPlaying && (
-          <div className="ml-auto flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-xs text-gray-400">Playing</span>
-          </div>
-        )}
       </div>
 
       {/* Main Content Area */}
@@ -339,6 +302,7 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
           isPlaying={isPlaying}
           tempo={tempo}
           stepDuration={stepDuration}
+          setStepDuration={setStepDuration}
           onNoteEvent={handleMelodyNote}
           instanceId={instanceId}
           outputTargets={outputTargets}

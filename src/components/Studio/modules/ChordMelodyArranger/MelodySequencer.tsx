@@ -15,7 +15,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Trash2, AlertCircle, Undo2, Wand2, Settings, Info, Volume2 } from 'lucide-react';
+import { Trash2, AlertCircle, Undo2, Wand2, Settings, Info, Volume2, ChevronDown } from 'lucide-react';
 import { useGlobalMusic } from '@/contexts/GlobalMusicContext';
 import { getNoteColor } from '@/utils/colorMapping';
 import { IntelligentMelodyService, type IntelligentMelodySettings } from '@/services/intelligentMelodyService';
@@ -39,6 +39,7 @@ export interface MelodySequencerProps {
   isPlaying: boolean;
   tempo: number;
   stepDuration: number; // Story 15.9: Duration of each step in beats (0.25 = 16th, 0.5 = 8th, 1 = quarter, 2 = half, 4 = whole)
+  setStepDuration?: (duration: number) => void; // Allow MelodySequencer to control step duration
   onNoteEvent?: (note: MelodyNote) => void; // For module routing (Story 15.4)
   instanceId?: string; // Module instance ID for routing
   outputTargets?: string[]; // Connected output modules
@@ -103,6 +104,7 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
   isPlaying,
   tempo: _tempo,
   stepDuration,
+  setStepDuration,
   onNoteEvent,
   instanceId: _instanceId = 'melody-sequencer',
   outputTargets: _outputTargets = [],
@@ -123,6 +125,7 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
   // Sound engine selection
   const [selectedSoundEngine, setSelectedSoundEngine] = useState<SoundEngineType>('keys');
   const [showSoundMenu, setShowSoundMenu] = useState(false);
+  const [showGenerateMenu, setShowGenerateMenu] = useState(false);
 
   // Story 15.9: Multi-page sequencer state
   const [currentPage, setCurrentPage] = useState<number>(0); // 0-3 (pages 1-4)
@@ -307,13 +310,16 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
     try {
       const frequency = 440 * Math.pow(2, (note.pitch - 69) / 12); // MIDI to frequency
       const velocity = note.velocity / 127; // Normalize 0-1
-      const duration = note.duration; // In beats
 
-      soundEngine.playNote(frequency, velocity, duration);
+      // Convert duration from beats to seconds
+      const secondsPerBeat = 60 / _tempo;
+      const durationInSeconds = note.duration * secondsPerBeat;
+
+      soundEngine.playNote(frequency, velocity, durationInSeconds);
     } catch (error) {
       console.error('[MelodySequencer] Error playing note:', error);
     }
-  }, []);
+  }, [_tempo]);
 
   // Handle mouse down on cell - Start drag or toggle note
   const handleCellMouseDown = useCallback((pageRelativeStep: number, pitch: number) => {
@@ -483,9 +489,8 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
           const noteIndex = Math.min(patternIndex, visibleNotes.length - 1);
           const pitch = visibleNotes[noteIndex];
 
-          // Vary note durations
-          const durations = [0.25, 0.5, 0.25, 0.25]; // Mix of 16th and 8th notes
-          const duration = durations[pageRelativeStep % durations.length];
+          // Use current step duration setting for all generated notes
+          const duration = stepDuration;
 
           // Vary velocities slightly
           const velocity = 80 + Math.floor(Math.random() * 30); // 80-110
@@ -552,6 +557,7 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
 
   // Track last interacted note (placed or hovered) for dynamic brightness
   const [lastInteractedPitch, setLastInteractedPitch] = useState<number | null>(null);
+  const [lastInteractedStep, setLastInteractedStep] = useState<number | null>(null);
   // Track hovered cell for white border on specific note
   const [hoveredCell, setHoveredCell] = useState<{ step: number; pitch: number } | null>(null);
 
@@ -630,6 +636,34 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
             )}
           </div>
 
+          {/* Step Duration Controls */}
+          {setStepDuration && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-400">Step:</span>
+              {[
+                { value: 0.125, label: '32nd' },
+                { value: 0.25, label: '16th' },
+                { value: 0.5, label: '8th' },
+                { value: 1, label: 'Quarter' },
+                { value: 2, label: 'Half' },
+                { value: 4, label: 'Whole' }
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setStepDuration(value)}
+                  className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-colors min-h-[36px] ${
+                    stepDuration === value
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                  aria-label={`${label} note step duration`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
           <button
             onClick={() => setShowHarmonicGuidance(!showHarmonicGuidance)}
             className={`p-2 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${
@@ -649,24 +683,62 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
           >
             <Settings className="w-4 h-4" />
           </button>
-          {/* Generation scope dropdown */}
-          <select
-            value={generateScope}
-            onChange={(e) => setGenerateScope(e.target.value as 'current' | 'all')}
-            className="px-2 py-1.5 bg-gray-700 text-white text-xs rounded-lg border border-gray-600 hover:bg-gray-600 transition-colors min-h-[44px]"
-            aria-label="Generation scope"
-          >
-            <option value="current">Current Page</option>
-            <option value="all">All Active</option>
-          </select>
-          <button
-            onClick={generateMelody}
-            className="flex items-center gap-1.5 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-medium rounded-lg transition-colors min-h-[44px]"
-            aria-label="Generate melody"
-          >
-            <Wand2 className="w-4 h-4" />
-            Generate
-          </button>
+
+          {/* Generate Button with Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                generateMelody();
+                setShowGenerateMenu(false);
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-medium rounded-lg transition-colors min-h-[44px]"
+              aria-label={`Generate melody on ${generateScope === 'current' ? 'current page' : 'all active pages'}`}
+            >
+              <Wand2 className="w-4 h-4" />
+              Generate ({generateScope === 'current' ? 'Current' : 'All Active'})
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowGenerateMenu(!showGenerateMenu);
+                }}
+                className="ml-1 hover:bg-primary-800 rounded p-0.5 transition-colors"
+                aria-label="Toggle generation scope"
+              >
+                <ChevronDown className="w-3 h-3" />
+              </button>
+            </button>
+
+            {showGenerateMenu && (
+              <div className="absolute top-full mt-2 right-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 min-w-[180px]">
+                <button
+                  onClick={() => {
+                    setGenerateScope('current');
+                    setShowGenerateMenu(false);
+                  }}
+                  className={`w-full px-4 py-2 text-left text-sm transition-colors ${
+                    generateScope === 'current'
+                      ? 'bg-primary-600 text-white'
+                      : 'text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
+                  Current Page
+                </button>
+                <button
+                  onClick={() => {
+                    setGenerateScope('all');
+                    setShowGenerateMenu(false);
+                  }}
+                  className={`w-full px-4 py-2 text-left text-sm transition-colors ${
+                    generateScope === 'all'
+                      ? 'bg-primary-600 text-white'
+                      : 'text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
+                  All Active Pages
+                </button>
+              </div>
+            )}
+          </div>
           <button
             onClick={clearAllNotes}
             disabled={notes.length === 0}
@@ -760,8 +832,98 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
                     const noteColor = getNoteColor(noteForColor, colorMode);
 
                     // Calculate brightness using IntelligentMelodyService (Story 15.7)
-                    // Use lastInteractedPitch for dynamic brightness updates as user interacts
-                    let brightness = showHarmonicGuidance
+                    // Staggered temporal proximity - notes further away in pitch are highlighted at different time offsets
+                    // This creates a diagonal highlighting pattern
+
+                    // Check for hover-based highlighting (bright)
+                    let isTemporallyClose = false;
+                    let proximityMultiplier = 1.0; // Dim notes that are further away
+                    if (lastInteractedStep !== null && lastInteractedPitch !== null) {
+                      // Calculate pitch distance in semitones
+                      const pitchDistance = Math.abs(pitch - lastInteractedPitch);
+
+                      // Map pitch distance to time offset (diagonal stagger)
+                      // Closer pitches (0-2 semitones) = same step (±1)
+                      // Further pitches (3-5 semitones) = offset by 1 step
+                      // Even further (6+ semitones) = offset by 2 steps
+                      let timeOffset = 0;
+                      if (pitchDistance >= 6) {
+                        timeOffset = 2;
+                        proximityMultiplier = 0.75; // Dim notes that are far away (6+ semitones)
+                      } else if (pitchDistance >= 3) {
+                        timeOffset = 1;
+                        proximityMultiplier = 0.85; // Slightly dim medium distance notes (3-5 semitones)
+                      }
+
+                      // Calculate temporal window based on pitch distance
+                      // Support BOTH forward and backward diagonal patterns
+                      const forwardStepOffset = pitch > lastInteractedPitch ? timeOffset : -timeOffset;
+                      const backwardStepOffset = pitch < lastInteractedPitch ? timeOffset : -timeOffset;
+
+                      const forwardExpectedStep = lastInteractedStep + forwardStepOffset;
+                      const backwardExpectedStep = lastInteractedStep + backwardStepOffset;
+
+                      // Check if this cell is within ±1 step of either expected position
+                      const isForwardClose = Math.abs(pageRelativeStep - forwardExpectedStep) <= 1;
+                      const isBackwardClose = Math.abs(pageRelativeStep - backwardExpectedStep) <= 1;
+
+                      isTemporallyClose = isForwardClose || isBackwardClose;
+                    }
+
+                    // Check for "ghost" imprints from already placed notes (faint)
+                    let ghostBrightness = 0;
+                    if (showHarmonicGuidance && !hasNote && !isTemporallyClose) {
+                      // Check if this empty cell is suggested by any placed note on current page
+                      const pageNotes = notes.filter(n => {
+                        const notePageRelativeStep = n.step - currentPage * STEPS_PER_PAGE;
+                        return notePageRelativeStep >= 0 && notePageRelativeStep < STEPS_PER_PAGE;
+                      });
+
+                      let maxGhostBrightness = 0;
+                      for (const placedNote of pageNotes) {
+                        const notePageRelativeStep = placedNote.step - currentPage * STEPS_PER_PAGE;
+                        const pitchDistance = Math.abs(pitch - placedNote.pitch);
+
+                        // Calculate expected time offset for this placed note
+                        let timeOffset = 0;
+                        if (pitchDistance >= 6) {
+                          timeOffset = 2;
+                        } else if (pitchDistance >= 3) {
+                          timeOffset = 1;
+                        }
+
+                        // Support BOTH forward and backward diagonal patterns for ghost imprints
+                        const forwardStepOffset = pitch > placedNote.pitch ? timeOffset : -timeOffset;
+                        const backwardStepOffset = pitch < placedNote.pitch ? timeOffset : -timeOffset;
+
+                        const forwardExpectedStep = notePageRelativeStep + forwardStepOffset;
+                        const backwardExpectedStep = notePageRelativeStep + backwardStepOffset;
+
+                        // Check if this cell matches either ghost pattern
+                        const isForwardMatch = Math.abs(pageRelativeStep - forwardExpectedStep) <= 1;
+                        const isBackwardMatch = Math.abs(pageRelativeStep - backwardExpectedStep) <= 1;
+
+                        if (isForwardMatch || isBackwardMatch) {
+                          // Calculate harmonic brightness for this ghost suggestion
+                          const ghostHarmonicBrightness = melodyService.calculateNoteBrightness(
+                            pitch,
+                            absoluteStep,
+                            currentChord,
+                            scaleNotes,
+                            settings,
+                            placedNote.pitch,
+                            false // Not a placed note
+                          );
+
+                          // Reduce brightness for ghost effect (multiply by 0.7 to make it fainter but still visible)
+                          const faintGhostBrightness = ghostHarmonicBrightness * 0.7;
+                          maxGhostBrightness = Math.max(maxGhostBrightness, faintGhostBrightness);
+                        }
+                      }
+                      ghostBrightness = maxGhostBrightness;
+                    }
+
+                    let brightness = showHarmonicGuidance && isTemporallyClose
                       ? melodyService.calculateNoteBrightness(
                           pitch,
                           absoluteStep,
@@ -770,8 +932,20 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
                           settings,
                           lastInteractedPitch || lastPlacedPitch, // Prioritize last interaction
                           hasNote // Placed notes get 1.0 brightness
-                        )
-                      : hasNote ? 1.0 : 0.65; // Fallback: full brightness if placed, else in-scale default
+                        ) * proximityMultiplier // Dim notes that are further away in pitch
+                      : hasNote ? 1.0
+                      : ghostBrightness > 0 ? ghostBrightness // Faint ghost imprint with harmonic logic
+                      : 0.40; // Base dim brightness for non-highlighted notes
+
+                    // Dim repetitive notes (same pitch in temporally adjacent cells) - less musical
+                    // BUT exclude the hovered cell itself (it should be brightest as the reference point)
+                    const isHoveredCell = lastInteractedStep === pageRelativeStep && pitch === (lastInteractedPitch || lastPlacedPitch);
+                    if (showHarmonicGuidance && isTemporallyClose && !hasNote && !isHoveredCell) {
+                      const isSamePitchAsInteracted = pitch === (lastInteractedPitch || lastPlacedPitch);
+                      if (isSamePitchAsInteracted) {
+                        brightness = brightness * 0.5; // Reduce brightness by 50% for repetitive notes
+                      }
+                    }
 
                     // For empty cells (borders only), amplify dimness - make less musical notes much fainter
                     // This creates stronger visual hierarchy for harmonic guidance
@@ -813,11 +987,13 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
                         onMouseDown={() => handleCellMouseDown(pageRelativeStep, pitch)}
                         onMouseEnter={() => {
                           setLastInteractedPitch(pitch);
+                          setLastInteractedStep(pageRelativeStep);
                           setHoveredCell({ step: pageRelativeStep, pitch });
                           handleCellMouseEnter(pageRelativeStep, pitch);
                         }}
                         onMouseLeave={() => {
                           setLastInteractedPitch(lastPlacedPitch);
+                          setLastInteractedStep(null);
                           setHoveredCell(null);
                         }}
                         className={`
@@ -856,7 +1032,7 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
           />
         )}
 
-        {/* Tied Note Overlays - Render sustained notes as stretched rectangles */}
+        {/* Tied Note Overlays - Render sustained notes as thin horizontal lines */}
         {notes
           .filter(note => {
             // Only render tied notes (tiedSteps > 1) on the current page
@@ -877,9 +1053,10 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
             const ROW_HEIGHT = CELL_SIZE + GAP_SIZE;
             const CELL_WIDTH = CELL_SIZE + GAP_SIZE;
 
-            const left = LABEL_WIDTH + notePageRelativeStep * CELL_WIDTH;
-            const top = pitchIndex * ROW_HEIGHT;
-            const width = (note.tiedSteps || 1) * CELL_WIDTH - GAP_SIZE; // Subtract last gap
+            // Position line inside the cells (centered vertically)
+            const left = LABEL_WIDTH + notePageRelativeStep * CELL_WIDTH + 4; // +4px padding from left edge
+            const top = pitchIndex * ROW_HEIGHT + (CELL_SIZE / 2) - 1; // Center vertically (line is 2px tall)
+            const width = (note.tiedSteps || 1) * CELL_WIDTH - GAP_SIZE - 8; // -8px padding (4px each side)
 
             // Get note color
             const noteForColor = (colorMode as string) === 'spectrum' ? note.pitch : (note.pitch % 12);
@@ -889,16 +1066,17 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
             return (
               <div
                 key={`tied-${note.step}-${note.pitch}`}
-                className="absolute pointer-events-none rounded-md shadow-lg"
+                className="absolute pointer-events-none"
                 style={{
                   left: `${left}px`,
                   top: `${top}px`,
                   width: `${width}px`,
-                  height: `${CELL_SIZE}px`,
+                  height: '3px', // Thin horizontal line
                   backgroundColor: colorStr,
-                  border: `2px solid ${colorStr}`,
-                  opacity: 0.9,
+                  borderRadius: '1.5px', // Rounded caps
+                  opacity: 0.85,
                   zIndex: 5, // Above grid cells but below playback cursor
+                  boxShadow: `0 0 4px ${colorStr}`, // Subtle glow
                 }}
                 aria-label={`Tied note: ${getNoteNameFromMidi(note.pitch)}, ${note.tiedSteps} steps`}
               />
