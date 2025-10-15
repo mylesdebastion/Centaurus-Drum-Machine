@@ -228,7 +228,7 @@ function App() {
     navigate('/');
   };
 
-  const handleChordMelodyTest = () => {
+  const _handleChordMelodyTest = () => {
     navigate('/chord-melody-test');
   };
 
