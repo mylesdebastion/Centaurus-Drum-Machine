@@ -14,7 +14,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { Music, Play, Pause, Square, Settings } from 'lucide-react';
+import { Music, Play, Pause, Settings } from 'lucide-react';
 import { useGlobalMusic } from '@/contexts/GlobalMusicContext';
 import { ChordProgressionService } from '@/services/chordProgressionService';
 import { ModuleRoutingService } from '@/services/moduleRoutingService';
@@ -22,6 +22,7 @@ import { ChordBuilder } from './ChordBuilder';
 import { ChordTimeline } from './ChordTimeline';
 import { MelodySequencer } from './MelodySequencer';
 import { OutputSelector } from './OutputSelector';
+import { getNoteColor } from '@/utils/colorMapping';
 import type { RomanNumeralProgression, Chord } from '@/types/chordProgression';
 import type { MelodyNote } from './MelodySequencer';
 import type { NoteEvent } from '@/types/moduleRouting';
@@ -48,7 +49,7 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
   instanceId = 'chord-melody-arranger-test', // Default for standalone testing
 }) => {
   // GlobalMusicContext integration (Story 15.5)
-  const { key, scale, tempo, isPlaying, updateTransportState } = useGlobalMusic();
+  const { key, scale, tempo, isPlaying, updateTransportState, colorMode } = useGlobalMusic();
   const service = ChordProgressionService.getInstance();
   const routingService = ModuleRoutingService.getInstance();
 
@@ -57,7 +58,7 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
   const [currentChords, setCurrentChords] = useState<Chord[]>([]);
   const [playbackPosition, setPlaybackPosition] = useState<number>(0);
   const [showSettings, setShowSettings] = useState(false);
-  const [barCount] = useState(8); // Configurable via settings (future enhancement)
+  const [stepDuration, setStepDuration] = useState(0.25); // Story 15.9: Step duration in beats (0.25 = 16th, 0.5 = 8th, 1 = quarter, 2 = half, 4 = whole)
   const [outputTargets, setOutputTargets] = useState<string[]>([]); // Module routing (Story 15.4)
   const [routeNotes, setRouteNotes] = useState(true); // Route melody notes to output modules
   const [routeChords, setRouteChords] = useState(true); // Route chord events to output modules
@@ -87,9 +88,10 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
       return;
     }
 
+    // Chord progression plays over 8 bars
     const beatsPerSecond = tempo / 60;
-    const secondsPerBar = 4 / beatsPerSecond; // Assuming 4/4 time signature
-    const totalDuration = barCount * secondsPerBar; // Total duration in seconds
+    const secondsPerBeat = 1 / beatsPerSecond;
+    const totalDuration = 8 * 4 * secondsPerBeat; // 8 bars = 32 beats
 
     let startTime = performance.now();
     let animationFrame: number;
@@ -101,8 +103,9 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
 
       // Update current chord index based on playback position (Story 15.7)
       if (currentChords.length > 0) {
-        const barsPerChord = barCount / currentChords.length;
-        const chordIndex = Math.floor((position * barCount) / barsPerChord);
+        const totalBars = 8;
+        const barsPerChord = totalBars / currentChords.length;
+        const chordIndex = Math.floor((position * totalBars) / barsPerChord);
         setCurrentChordIndex(Math.min(chordIndex, currentChords.length - 1));
       }
 
@@ -116,7 +119,7 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
         cancelAnimationFrame(animationFrame);
       }
     };
-  }, [isPlaying, tempo, barCount, currentChords.length]);
+  }, [isPlaying, tempo, currentChords.length]);
 
   // Transport control handlers
   const handlePlay = useCallback(() => {
@@ -125,11 +128,6 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
 
   const handlePause = useCallback(() => {
     updateTransportState(false);
-  }, [updateTransportState]);
-
-  const handleStop = useCallback(() => {
-    updateTransportState(false);
-    setPlaybackPosition(0);
   }, [updateTransportState]);
 
   // Memoize progression display name with current key/scale (Story 15.5)
@@ -145,7 +143,16 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
 
   // Handle melody note events - Route to selected output modules (Story 15.4)
   const handleMelodyNote = useCallback((note: MelodyNote) => {
-    // If no output targets selected or notes routing disabled, just play locally
+    // Send to FrequencySourceManager for DJ Visualizer (MIDI mode)
+    const sourceManager = (window as any).frequencySourceManager;
+    if (sourceManager) {
+      const noteForColor = colorMode === 'spectrum' ? note.pitch : (note.pitch % 12);
+      const noteColor = getNoteColor(noteForColor, colorMode);
+      sourceManager.addMidiNote(note.pitch, note.velocity, noteColor);
+      console.log('[ChordMelodyArranger] Sent note to frequencySourceManager:', note.pitch, 'color:', noteColor);
+    }
+
+    // If no output targets selected or notes routing disabled, skip module routing
     if (outputTargets.length === 0 || !routeNotes) return;
 
     // Emit note-on event
@@ -171,14 +178,25 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
       };
       routingService.routeNoteEvent(noteOffEvent, outputTargets);
     }, durationMs);
-  }, [outputTargets, instanceId, routingService, tempo, routeNotes]);
+  }, [outputTargets, instanceId, routingService, tempo, routeNotes, colorMode]);
 
   // Handle chord events - Route chord notes to selected output modules
   const handleChordEvent = useCallback((chord: Chord) => {
-    // If no output targets selected or chords routing disabled, skip routing
-    if (outputTargets.length === 0 || !routeChords) return;
-
     const midiNotes = service.getChordNotes(chord);
+
+    // Send to FrequencySourceManager for DJ Visualizer (MIDI mode)
+    const sourceManager = (window as any).frequencySourceManager;
+    if (sourceManager) {
+      midiNotes.forEach(pitch => {
+        const noteForColor = colorMode === 'spectrum' ? pitch : (pitch % 12);
+        const noteColor = getNoteColor(noteForColor, colorMode);
+        sourceManager.addMidiNote(pitch, 80, noteColor);
+      });
+      console.log('[ChordMelodyArranger] Sent chord to frequencySourceManager:', chord.name, midiNotes);
+    }
+
+    // If no output targets selected or chords routing disabled, skip module routing
+    if (outputTargets.length === 0 || !routeChords) return;
 
     // Emit note-on events for all chord notes
     midiNotes.forEach(pitch => {
@@ -205,7 +223,7 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
         routingService.routeNoteEvent(noteOffEvent, outputTargets);
       });
     }, 1000); // 1 second chord duration
-  }, [outputTargets, instanceId, routingService, service, routeChords]);
+  }, [outputTargets, instanceId, routingService, service, routeChords, colorMode]);
 
   return (
     <>
@@ -258,17 +276,33 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
         >
           {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
         </button>
-        <button
-          onClick={handleStop}
-          className="p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-          aria-label="Stop chord progression"
-        >
-          <Square className="w-5 h-5" />
-        </button>
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-gray-400">Tempo:</span>
-          <span className="font-semibold text-white">{tempo} BPM</span>
+
+        {/* Step Duration Controls */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400">Step:</span>
+          {[
+            { value: 0.125, label: '32nd' },
+            { value: 0.25, label: '16th' },
+            { value: 0.5, label: '8th' },
+            { value: 1, label: 'Quarter' },
+            { value: 2, label: 'Half' },
+            { value: 4, label: 'Whole' }
+          ].map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setStepDuration(value)}
+              className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-colors min-h-[36px] ${
+                stepDuration === value
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+              aria-label={`${label} note step duration`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
+
         {isPlaying && (
           <div className="ml-auto flex items-center gap-2">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
@@ -294,16 +328,17 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
             playbackPosition={playbackPosition}
             tempo={tempo}
             isPlaying={isPlaying}
-            barCount={barCount}
+            barCount={8}
             onChordEvent={handleChordEvent}
           />
         )}
 
-        {/* Melody Sequencer (Story 15.3, 15.5, 15.7) */}
+        {/* Melody Sequencer (Story 15.3, 15.5, 15.7, 15.9) */}
         <MelodySequencer
           playbackPosition={playbackPosition}
           isPlaying={isPlaying}
           tempo={tempo}
+          stepDuration={stepDuration}
           onNoteEvent={handleMelodyNote}
           instanceId={instanceId}
           outputTargets={outputTargets}
@@ -324,27 +359,8 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
               Close
             </button>
           </div>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Timeline Length</label>
-              <div className="flex gap-2">
-                {[4, 8, 16].map((count) => (
-                  <button
-                    key={count}
-                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                      barCount === count
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
-                  >
-                    {count} bars
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="text-xs text-gray-500">
-              More settings coming in future stories (chord voicing, loop controls, etc.)
-            </div>
+          <div className="text-xs text-gray-500 text-center py-4">
+            Additional module settings coming in future stories (chord voicing, loop controls, etc.)
           </div>
         </div>
       )}

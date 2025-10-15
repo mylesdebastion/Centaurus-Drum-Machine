@@ -27,16 +27,18 @@ import type { Chord } from '@/types/chordProgression';
  * Represents a single note in the melody sequence
  */
 export interface MelodyNote {
-  step: number;        // 0-15 (16 steps)
+  step: number;        // 0-63 (64 steps across 4 pages) - Story 15.9
   pitch: number;       // MIDI note number (21-108)
   velocity: number;    // 0-127
-  duration: number;    // In beats (0.25 = 1/16th note)
+  duration: number;    // In beats (0.25 = 1/16th note, can be > 0.25 for tied/sustained notes)
+  tiedSteps?: number;  // Number of grid cells this note spans (for visual rendering of sustained notes)
 }
 
 export interface MelodySequencerProps {
   playbackPosition: number; // 0-1 (normalized position through sequence)
   isPlaying: boolean;
   tempo: number;
+  stepDuration: number; // Story 15.9: Duration of each step in beats (0.25 = 16th, 0.5 = 8th, 1 = quarter, 2 = half, 4 = whole)
   onNoteEvent?: (note: MelodyNote) => void; // For module routing (Story 15.4)
   instanceId?: string; // Module instance ID for routing
   outputTargets?: string[]; // Connected output modules
@@ -100,6 +102,7 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
   playbackPosition,
   isPlaying,
   tempo: _tempo,
+  stepDuration,
   onNoteEvent,
   instanceId: _instanceId = 'melody-sequencer',
   outputTargets: _outputTargets = [],
@@ -114,6 +117,21 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
   const [scaleNotes, setScaleNotes] = useState<number[]>([]);
   const lastStepRef = useRef<number>(-1);
   const synthRef = useRef<Tone.PolySynth | null>(null);
+
+  // Story 15.9: Multi-page sequencer state
+  const [currentPage, setCurrentPage] = useState<number>(0); // 0-3 (pages 1-4)
+  const [activePages, setActivePages] = useState<boolean[]>([true, false, false, false]); // Page 1 active by default
+  const [generateScope, setGenerateScope] = useState<'current' | 'all'>('current'); // Current page or all active pages
+  const STEPS_PER_PAGE = 16;
+  const TOTAL_PAGES = 4;
+
+  // Drag state for note tying/sustain (click + drag to create long notes)
+  const [dragState, setDragState] = useState<{
+    isDragging: boolean;
+    startStep: number;
+    startPitch: number;
+    currentStep: number;
+  } | null>(null);
 
   // Intelligent melody settings (Story 15.7)
   const [settings, setSettings] = useState<IntelligentMelodySettings>(
@@ -212,17 +230,44 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
   }, [clearUndoState]);
 
   // Step triggering logic - Fires when playback crosses step boundaries
-  // 16-step sequencer loops every 1 bar (4 beats), not over the full progression
+  // Story 15.9: 64-step sequencer loops based on stepDuration setting
   useEffect(() => {
     if (!isPlaying) {
       lastStepRef.current = -1;
       return;
     }
 
-    // Make the 16-step sequencer loop every 1 bar (instead of full 8-bar progression)
-    // This gives us proper 16th note resolution (4 steps per beat)
-    const loopedPosition = (playbackPosition * 8) % 1; // Loop 8 times (once per bar)
-    const currentStep = Math.floor(loopedPosition * 16);
+    // Calculate loop position based on step duration
+    // Total sequence duration = (number of active steps) × stepDuration × secondsPerBeat
+    const secondsPerBeat = 60 / _tempo;
+    const progressionDuration = 8 * 4 * secondsPerBeat; // Full 8-bar progression = 32 beats
+
+    // Calculate effective loop length based on active pages
+    const activePageCount = activePages.filter(active => active).length;
+    const totalActiveSteps = activePageCount * STEPS_PER_PAGE;
+    const sequencerDuration = totalActiveSteps * stepDuration * secondsPerBeat; // Total sequence duration in seconds
+
+    // How many times does the sequencer loop fit in the full progression?
+    const loopsPerProgression = progressionDuration / sequencerDuration;
+
+    // Map playback position to sequencer loop position (0-1)
+    const loopedPosition = (playbackPosition * loopsPerProgression) % 1;
+
+    // Map to step index (0-63) but only within active pages
+    const rawStep = Math.floor(loopedPosition * totalActiveSteps);
+
+    // Convert raw step to actual page + step by skipping inactive pages
+    let currentStep = 0;
+    let activePagesSeen = 0;
+    for (let pageIndex = 0; pageIndex < TOTAL_PAGES; pageIndex++) {
+      if (activePages[pageIndex]) {
+        if (activePagesSeen * STEPS_PER_PAGE + STEPS_PER_PAGE > rawStep) {
+          currentStep = pageIndex * STEPS_PER_PAGE + (rawStep - activePagesSeen * STEPS_PER_PAGE);
+          break;
+        }
+        activePagesSeen++;
+      }
+    }
 
     // Only trigger if we've moved to a new step
     if (currentStep !== lastStepRef.current) {
@@ -237,7 +282,7 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
         onNoteEvent?.(note); // Emit for module routing (Story 15.4)
       });
     }
-  }, [playbackPosition, isPlaying, notes, onNoteEvent]);
+  }, [playbackPosition, isPlaying, notes, onNoteEvent, stepDuration, _tempo, activePages, STEPS_PER_PAGE, TOTAL_PAGES]);
 
   // Schedule note playback via Tone.js
   const scheduleNote = useCallback((note: MelodyNote) => {
@@ -255,40 +300,79 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
     }
   }, []);
 
-  // Toggle note on/off at given step and pitch
-  const toggleNote = useCallback((step: number, pitch: number) => {
+  // Handle mouse down on cell - Start drag or toggle note
+  const handleCellMouseDown = useCallback((pageRelativeStep: number, pitch: number) => {
     // Update last interacted pitch for dynamic brightness
     setLastInteractedPitch(pitch);
 
+    // Convert page-relative step to absolute step (0-63)
+    const absoluteStep = currentPage * STEPS_PER_PAGE + pageRelativeStep;
+
+    // Check if clicking on existing note
+    const existingNote = notes.find(n => n.step === absoluteStep && n.pitch === pitch);
+
+    if (existingNote) {
+      // Clicking existing note - remove it
+      setNotes(prevNotes => prevNotes.filter(n => !(n.step === absoluteStep && n.pitch === pitch)));
+    } else {
+      // Start drag to create tied note
+      setDragState({
+        isDragging: true,
+        startStep: pageRelativeStep,
+        startPitch: pitch,
+        currentStep: pageRelativeStep,
+      });
+    }
+  }, [currentPage, STEPS_PER_PAGE, notes]);
+
+  // Handle mouse enter on cell during drag
+  const handleCellMouseEnter = useCallback((pageRelativeStep: number, pitch: number) => {
+    if (dragState?.isDragging && pitch === dragState.startPitch) {
+      // Only allow horizontal dragging on same pitch
+      setDragState(prev => prev ? { ...prev, currentStep: pageRelativeStep } : null);
+    }
+  }, [dragState]);
+
+  // Handle mouse up - Complete drag and create tied note
+  const handleCellMouseUp = useCallback(() => {
+    if (!dragState?.isDragging) return;
+
+    const startStep = Math.min(dragState.startStep, dragState.currentStep);
+    const endStep = Math.max(dragState.startStep, dragState.currentStep);
+    const tiedSteps = endStep - startStep + 1; // Number of cells spanned
+    const absoluteStartStep = currentPage * STEPS_PER_PAGE + startStep;
+
+    // Remove any existing notes in the range being tied
     setNotes(prevNotes => {
-      const existingIndex = prevNotes.findIndex(
-        n => n.step === step && n.pitch === pitch
-      );
+      const filteredNotes = prevNotes.filter(n => {
+        if (n.pitch !== dragState.startPitch) return true;
+        const notePageRelativeStep = n.step - currentPage * STEPS_PER_PAGE;
+        return notePageRelativeStep < startStep || notePageRelativeStep > endStep;
+      });
 
-      if (existingIndex >= 0) {
-        // Remove note - no audio feedback
-        return prevNotes.filter((_, i) => i !== existingIndex);
-      } else {
-        // Add note with default velocity and duration
-        const newNote: MelodyNote = {
-          step,
-          pitch,
-          velocity: 100, // Default velocity (~80%)
-          duration: 0.25 // 1/16th note
-        };
+      // Create new tied note
+      const newNote: MelodyNote = {
+        step: absoluteStartStep,
+        pitch: dragState.startPitch,
+        velocity: 100,
+        duration: tiedSteps * stepDuration, // Duration = number of cells × step duration
+        tiedSteps, // Store for visual rendering
+      };
 
-        // Play audio immediately when adding note
-        scheduleNote(newNote);
+      // Play audio immediately
+      scheduleNote(newNote);
 
-        // Route to connected visualizers/modules
-        if (onNoteEvent) {
-          onNoteEvent(newNote);
-        }
-
-        return [...prevNotes, newNote];
+      // Route to connected visualizers/modules
+      if (onNoteEvent) {
+        onNoteEvent(newNote);
       }
+
+      return [...filteredNotes, newNote];
     });
-  }, [scheduleNote, onNoteEvent]);
+
+    // Clear drag state
+    setDragState(null);
+  }, [dragState, currentPage, STEPS_PER_PAGE, stepDuration, scheduleNote, onNoteEvent]);
 
   // Remove out-of-scale notes (triggered by inline warning button)
   const removeOutOfScaleNotes = useCallback(() => {
@@ -337,10 +421,9 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
   }, [clearUndoState]);
 
   // Generate melodic pattern based on current key/scale
+  // Story 15.9: Support generating on current page or all active pages
   const generateMelody = useCallback(() => {
     if (visibleNotes.length === 0) return;
-
-    const generatedNotes: MelodyNote[] = [];
 
     // Simple melodic algorithm:
     // 1. Use notes from visible scale
@@ -359,42 +442,98 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
       [0, 7, 1, 6, 2, 5, 3, 4],
     ];
 
-    // Randomly choose a pattern
-    const pattern = patterns[Math.floor(Math.random() * patterns.length)];
+    // Determine which pages to generate on
+    const pagesToGenerate = generateScope === 'current'
+      ? [currentPage]
+      : activePages.map((active, index) => active ? index : -1).filter(i => i >= 0);
 
-    // Map pattern to 16 steps with rhythmic variation
-    for (let step = 0; step < 16; step++) {
-      // Not every step has a note (create rhythmic variety)
-      if (Math.random() > 0.3) { // 70% chance of note
-        const patternIndex = pattern[step % pattern.length];
-        const noteIndex = Math.min(patternIndex, visibleNotes.length - 1);
-        const pitch = visibleNotes[noteIndex];
+    // Keep existing notes on pages we're not regenerating
+    const existingNotes = notes.filter(note => {
+      const notePage = Math.floor(note.step / STEPS_PER_PAGE);
+      return !pagesToGenerate.includes(notePage);
+    });
 
-        // Vary note durations
-        const durations = [0.25, 0.5, 0.25, 0.25]; // Mix of 16th and 8th notes
-        const duration = durations[step % durations.length];
+    const generatedNotes: MelodyNote[] = [...existingNotes];
 
-        // Vary velocities slightly
-        const velocity = 80 + Math.floor(Math.random() * 30); // 80-110
+    // Generate for each target page
+    pagesToGenerate.forEach(pageIndex => {
+      // Randomly choose a pattern for this page
+      const pattern = patterns[Math.floor(Math.random() * patterns.length)];
 
-        generatedNotes.push({
-          step,
-          pitch,
-          velocity,
-          duration,
-        });
+      // Map pattern to 16 steps with rhythmic variation
+      for (let pageRelativeStep = 0; pageRelativeStep < STEPS_PER_PAGE; pageRelativeStep++) {
+        // Not every step has a note (create rhythmic variety)
+        if (Math.random() > 0.3) { // 70% chance of note
+          const patternIndex = pattern[pageRelativeStep % pattern.length];
+          const noteIndex = Math.min(patternIndex, visibleNotes.length - 1);
+          const pitch = visibleNotes[noteIndex];
+
+          // Vary note durations
+          const durations = [0.25, 0.5, 0.25, 0.25]; // Mix of 16th and 8th notes
+          const duration = durations[pageRelativeStep % durations.length];
+
+          // Vary velocities slightly
+          const velocity = 80 + Math.floor(Math.random() * 30); // 80-110
+
+          // Convert to absolute step
+          const absoluteStep = pageIndex * STEPS_PER_PAGE + pageRelativeStep;
+
+          generatedNotes.push({
+            step: absoluteStep,
+            pitch,
+            velocity,
+            duration,
+          });
+        }
+      }
+    });
+
+    setNotes(generatedNotes);
+  }, [visibleNotes, currentPage, generateScope, activePages, notes, STEPS_PER_PAGE]);
+
+  // Calculate current step for visual indicator (Story 15.9)
+  // Maps playback position to absolute step based on active pages
+  const currentStepInfo = useMemo(() => {
+    const secondsPerBeat = 60 / _tempo;
+    const progressionDuration = 8 * 4 * secondsPerBeat; // 8 bars = 32 beats
+
+    // Calculate based on active pages
+    const activePageCount = activePages.filter(active => active).length;
+    const totalActiveSteps = activePageCount * STEPS_PER_PAGE;
+    const sequencerDuration = totalActiveSteps * stepDuration * secondsPerBeat; // Total sequence duration in seconds
+    const loopsPerProgression = progressionDuration / sequencerDuration;
+    const loopedPosition = (playbackPosition * loopsPerProgression) % 1;
+
+    // Calculate continuous step position (for smooth cursor animation)
+    const continuousStep = loopedPosition * totalActiveSteps;
+    const rawStep = Math.floor(continuousStep);
+    const fractionalProgress = continuousStep - rawStep; // 0-1 progress within current step
+
+    // Convert raw step to actual page + step by skipping inactive pages
+    let absoluteStep = 0;
+    let pageRelativeStep = 0;
+    let playbackPage = 0;
+    let activePagesSeen = 0;
+
+    for (let pageIndex = 0; pageIndex < TOTAL_PAGES; pageIndex++) {
+      if (activePages[pageIndex]) {
+        if (activePagesSeen * STEPS_PER_PAGE + STEPS_PER_PAGE > rawStep) {
+          absoluteStep = pageIndex * STEPS_PER_PAGE + (rawStep - activePagesSeen * STEPS_PER_PAGE);
+          pageRelativeStep = rawStep - activePagesSeen * STEPS_PER_PAGE;
+          playbackPage = pageIndex;
+          break;
+        }
+        activePagesSeen++;
       }
     }
 
-    setNotes(generatedNotes);
-  }, [visibleNotes]);
-
-  // Calculate current step for visual indicator
-  // Loop every 1 bar (matches step triggering logic)
-  const currentStep = useMemo(() => {
-    const loopedPosition = (playbackPosition * 8) % 1; // Loop 8 times (once per bar)
-    return Math.floor(loopedPosition * 16);
-  }, [playbackPosition]);
+    return {
+      absoluteStep,
+      pageRelativeStep,
+      playbackPage,
+      fractionalProgress, // 0-1 smooth progress within current step
+    };
+  }, [playbackPosition, stepDuration, _tempo, STEPS_PER_PAGE, activePages, TOTAL_PAGES]);
 
   // Track last interacted note (placed or hovered) for dynamic brightness
   const [lastInteractedPitch, setLastInteractedPitch] = useState<number | null>(null);
@@ -413,12 +552,24 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
     return melodyService.getSettingsFeedbackMessage(settings);
   }, [settings, melodyService]);
 
+  // Add global mouse up listener for drag completion
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      handleCellMouseUp();
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [handleCellMouseUp]);
+
   return (
     <div className="relative bg-gray-800 rounded-lg border border-gray-700 p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-white">Melody Sequencer</h3>
+          <h3 className="text-lg font-semibold text-white">Melody Sequencer (64 steps)</h3>
           {currentChord && romanNumeral && (
             <p className="text-xs text-gray-400 mt-0.5">
               Current chord: {romanNumeral} ({currentChord.name})
@@ -448,6 +599,16 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
           >
             <Settings className="w-4 h-4" />
           </button>
+          {/* Generation scope dropdown */}
+          <select
+            value={generateScope}
+            onChange={(e) => setGenerateScope(e.target.value as 'current' | 'all')}
+            className="px-2 py-1.5 bg-gray-700 text-white text-xs rounded-lg border border-gray-600 hover:bg-gray-600 transition-colors min-h-[44px]"
+            aria-label="Generation scope"
+          >
+            <option value="current">Current Page</option>
+            <option value="all">All Active</option>
+          </select>
           <button
             onClick={generateMelody}
             className="flex items-center gap-1.5 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-medium rounded-lg transition-colors min-h-[44px]"
@@ -467,6 +628,57 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
         </div>
       </div>
 
+      {/* Page Navigation (Story 15.9) */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs text-gray-400">Page:</span>
+        {Array.from({ length: TOTAL_PAGES }, (_, pageIndex) => {
+          // Check if this page has any notes
+          const pageStartStep = pageIndex * STEPS_PER_PAGE;
+          const pageEndStep = pageStartStep + STEPS_PER_PAGE;
+          const hasNotes = notes.some(note =>
+            note.step >= pageStartStep && note.step < pageEndStep
+          );
+
+          // Check if playback is on this page
+          const isPlayingPage = currentStepInfo.playbackPage === pageIndex && isPlaying;
+          const isActive = activePages[pageIndex];
+
+          return (
+            <div key={pageIndex} className="flex flex-col items-center gap-1">
+              {/* Active/inactive toggle */}
+              <button
+                onClick={() => {
+                  const newActivePages = [...activePages];
+                  newActivePages[pageIndex] = !newActivePages[pageIndex];
+                  setActivePages(newActivePages);
+                }}
+                className={`w-3 h-3 rounded-full border-2 transition-colors ${
+                  isActive
+                    ? 'bg-green-500 border-green-500'
+                    : 'bg-transparent border-gray-500'
+                }`}
+                aria-label={`Toggle page ${pageIndex + 1} ${isActive ? 'inactive' : 'active'}`}
+                title={isActive ? 'Page active (click to disable)' : 'Page inactive (click to enable)'}
+              />
+              {/* Page select button */}
+              <button
+                onClick={() => setCurrentPage(pageIndex)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors min-h-[32px] min-w-[32px] ${
+                  currentPage === pageIndex
+                    ? 'bg-primary-600 text-white'
+                    : hasNotes
+                    ? 'bg-gray-700 text-white hover:bg-gray-600'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                } ${isPlayingPage ? 'ring-2 ring-green-500' : ''} ${!isActive ? 'opacity-50' : ''}`}
+                aria-label={`Page ${pageIndex + 1}`}
+              >
+                {pageIndex + 1}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Piano Roll Grid */}
       <div className="relative overflow-x-auto bg-gray-900 rounded-lg p-2">
         <div className="inline-flex flex-col gap-1">
@@ -483,10 +695,13 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
 
                 {/* Step cells */}
                 <div className="flex gap-1">
-                  {Array.from({ length: 16 }).map((_, step) => {
-                    const hasNote = notes.some(n => n.step === step && n.pitch === pitch);
-                    const isCurrentStep = currentStep === step && isPlaying;
-                    const isHovered = hoveredCell?.step === step && hoveredCell?.pitch === pitch && hasNote;
+                  {Array.from({ length: STEPS_PER_PAGE }).map((_, pageRelativeStep) => {
+                    // Convert page-relative step to absolute step for note lookup
+                    const absoluteStep = currentPage * STEPS_PER_PAGE + pageRelativeStep;
+                    const hasNote = notes.some(n => n.step === absoluteStep && n.pitch === pitch);
+                    const isCurrentStep = currentStepInfo.pageRelativeStep === pageRelativeStep &&
+                                         currentStepInfo.playbackPage === currentPage && isPlaying;
+                    const isHovered = hoveredCell?.step === pageRelativeStep && hoveredCell?.pitch === pitch && hasNote;
 
                     // Get note color based on colorMode (chromatic/harmonic/spectrum)
                     // ALWAYS use colorMode for consistency (Story 15.7 requirement)
@@ -499,7 +714,7 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
                     let brightness = showHarmonicGuidance
                       ? melodyService.calculateNoteBrightness(
                           pitch,
-                          step,
+                          absoluteStep,
                           currentChord,
                           scaleNotes,
                           settings,
@@ -536,13 +751,20 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
                           borderStyle: 'solid',
                         };
 
+                    // Check if this cell is being dragged over
+                    const isDraggedOver = dragState?.isDragging &&
+                                         pitch === dragState.startPitch &&
+                                         ((dragState.startStep <= dragState.currentStep && pageRelativeStep >= dragState.startStep && pageRelativeStep <= dragState.currentStep) ||
+                                          (dragState.startStep > dragState.currentStep && pageRelativeStep >= dragState.currentStep && pageRelativeStep <= dragState.startStep));
+
                     return (
                       <button
-                        key={step}
-                        onClick={() => toggleNote(step, pitch)}
+                        key={pageRelativeStep}
+                        onMouseDown={() => handleCellMouseDown(pageRelativeStep, pitch)}
                         onMouseEnter={() => {
                           setLastInteractedPitch(pitch);
-                          setHoveredCell({ step, pitch });
+                          setHoveredCell({ step: pageRelativeStep, pitch });
+                          handleCellMouseEnter(pageRelativeStep, pitch);
                         }}
                         onMouseLeave={() => {
                           setLastInteractedPitch(lastPlacedPitch);
@@ -555,10 +777,11 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
                             : 'hover:brightness-125'
                           }
                           ${isCurrentStep ? 'ring-2 ring-primary-400 scale-105' : ''}
+                          ${isDraggedOver ? 'ring-2 ring-white' : ''}
                           min-h-[32px] min-w-[32px]
                         `}
                         style={colorStyle}
-                        aria-label={`${noteName}, step ${step + 1}`}
+                        aria-label={`${noteName}, page ${currentPage + 1}, step ${pageRelativeStep + 1}`}
                       />
                     );
                   })}
@@ -568,18 +791,75 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
           })}
         </div>
 
-        {/* Vertical playback cursor */}
-        {isPlaying && (
+        {/* Vertical playback cursor - Only show on currently visible page */}
+        {isPlaying && currentStepInfo.playbackPage === currentPage && (
           <div
             className="absolute top-0 bottom-0 w-1 bg-primary-400 pointer-events-none z-10 opacity-75"
             style={{
-              // Loop cursor every 1 bar (matches step triggering logic)
-              left: `calc(40px + ${((playbackPosition * 8) % 1) * 100}% * (16 * 36px) / 100%)`, // 40px = label width, 36px = cell + gap
+              // Position cursor based on continuous playback position within current step
+              // Formula: label_width + (step_index * cell_width) + (fractional_progress * cell_width)
+              // This creates smooth animation that aligns with the step cells
+              left: `${40 + (currentStepInfo.pageRelativeStep * 36) + (currentStepInfo.fractionalProgress * 36)}px`,
               boxShadow: '0 0 8px rgba(168, 85, 247, 0.8)',
             }}
             aria-label="Playback cursor"
           />
         )}
+
+        {/* Tied Note Overlays - Render sustained notes as stretched rectangles */}
+        {notes
+          .filter(note => {
+            // Only render tied notes (tiedSteps > 1) on the current page
+            const notePageRelativeStep = note.step - currentPage * STEPS_PER_PAGE;
+            return note.tiedSteps && note.tiedSteps > 1 &&
+                   notePageRelativeStep >= 0 && notePageRelativeStep < STEPS_PER_PAGE;
+          })
+          .map(note => {
+            const notePageRelativeStep = note.step - currentPage * STEPS_PER_PAGE;
+            const pitchIndex = [...visibleNotes].reverse().findIndex(p => p === note.pitch);
+
+            if (pitchIndex === -1) return null; // Note pitch not visible (out of scale)
+
+            // Calculate position
+            const CELL_SIZE = 32; // w-8 h-8 = 32px
+            const GAP_SIZE = 4; // gap-1 = 4px
+            const LABEL_WIDTH = 40; // w-10 = 40px
+            const ROW_HEIGHT = CELL_SIZE + GAP_SIZE;
+            const CELL_WIDTH = CELL_SIZE + GAP_SIZE;
+
+            const left = LABEL_WIDTH + notePageRelativeStep * CELL_WIDTH;
+            const top = pitchIndex * ROW_HEIGHT;
+            const width = (note.tiedSteps || 1) * CELL_WIDTH - GAP_SIZE; // Subtract last gap
+
+            // Get note color
+            const noteForColor = (colorMode as string) === 'spectrum' ? note.pitch : (note.pitch % 12);
+            const noteColor = getNoteColor(noteForColor, colorMode);
+            const colorStr = `rgb(${noteColor.r}, ${noteColor.g}, ${noteColor.b})`;
+
+            return (
+              <div
+                key={`tied-${note.step}-${note.pitch}`}
+                className="absolute pointer-events-none rounded-md shadow-lg"
+                style={{
+                  left: `${left}px`,
+                  top: `${top}px`,
+                  width: `${width}px`,
+                  height: `${CELL_SIZE}px`,
+                  backgroundColor: colorStr,
+                  border: `2px solid ${colorStr}`,
+                  opacity: 0.9,
+                  zIndex: 5, // Above grid cells but below playback cursor
+                }}
+                aria-label={`Tied note: ${getNoteNameFromMidi(note.pitch)}, ${note.tiedSteps} steps`}
+              />
+            );
+          })}
+      </div>
+
+      {/* Instructions */}
+      <div className="mt-3 text-xs text-gray-500 text-center">
+        Click cells to toggle notes • Drag horizontally to create tied/sustained notes • Notes auto-filter to {key} {scale} scale
+        {showHarmonicGuidance && ' • Brightness shows harmonic recommendation'}
       </div>
 
       {/* Inline Warning: Out-of-Scale Notes (Anti-Modal Pattern) */}
@@ -644,12 +924,6 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
           </button>
         </div>
       )}
-
-      {/* Instructions */}
-      <div className="mt-3 text-xs text-gray-500 text-center">
-        Click cells to toggle notes • Notes auto-filter to {key} {scale} scale
-        {showHarmonicGuidance && ' • Brightness shows harmonic recommendation'}
-      </div>
 
       {/* Empty state */}
       {notes.length === 0 && !clearUndoState && (
