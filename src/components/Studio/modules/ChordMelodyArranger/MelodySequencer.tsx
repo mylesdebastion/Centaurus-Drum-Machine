@@ -15,11 +15,11 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import * as Tone from 'tone';
-import { Trash2, AlertCircle, Undo2, Wand2, Settings, Info } from 'lucide-react';
+import { Trash2, AlertCircle, Undo2, Wand2, Settings, Info, Volume2 } from 'lucide-react';
 import { useGlobalMusic } from '@/contexts/GlobalMusicContext';
 import { getNoteColor } from '@/utils/colorMapping';
 import { IntelligentMelodyService, type IntelligentMelodySettings } from '@/services/intelligentMelodyService';
+import { createSoundEngine, SoundEngine, SoundEngineType, soundEngineNames } from '@/utils/soundEngines';
 import type { Chord } from '@/types/chordProgression';
 
 /**
@@ -116,7 +116,13 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
   const [visibleNotes, setVisibleNotes] = useState<number[]>([]);
   const [scaleNotes, setScaleNotes] = useState<number[]>([]);
   const lastStepRef = useRef<number>(-1);
-  const synthRef = useRef<Tone.PolySynth | null>(null);
+  const soundEngineRef = useRef<SoundEngine | null>(null);
+  const audioContextRef = useRef<AudioContext>();
+  const masterGainRef = useRef<GainNode>();
+
+  // Sound engine selection
+  const [selectedSoundEngine, setSelectedSoundEngine] = useState<SoundEngineType>('keys');
+  const [showSoundMenu, setShowSoundMenu] = useState(false);
 
   // Story 15.9: Multi-page sequencer state
   const [currentPage, setCurrentPage] = useState<number>(0); // 0-3 (pages 1-4)
@@ -154,27 +160,36 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
     timestamp: number;
   } | null>(null);
 
-  // Initialize Tone.js synth on mount
+  // Initialize audio context and sound engine on mount
   useEffect(() => {
-    // Create a simple polyphonic synth for melody playback
-    const synth = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: 'triangle' },
-      envelope: {
-        attack: 0.005,
-        decay: 0.1,
-        sustain: 0.3,
-        release: 0.5,
-      },
-    }).toDestination();
+    audioContextRef.current = new AudioContext();
+    masterGainRef.current = audioContextRef.current.createGain();
+    masterGainRef.current.connect(audioContextRef.current.destination);
+    masterGainRef.current.gain.value = 0.5;
 
-    synth.volume.value = -10; // dB
-
-    synthRef.current = synth;
+    // Initialize sound engine
+    if (audioContextRef.current && masterGainRef.current) {
+      soundEngineRef.current = createSoundEngine(selectedSoundEngine, audioContextRef.current, masterGainRef.current);
+      console.log('[MelodySequencer] Sound engine initialized:', selectedSoundEngine);
+    }
 
     return () => {
-      synth.dispose();
+      soundEngineRef.current?.dispose();
+      audioContextRef.current?.close();
     };
   }, []);
+
+  // Update sound engine when selection changes
+  useEffect(() => {
+    if (!audioContextRef.current || !masterGainRef.current) return;
+
+    // Dispose old engine
+    soundEngineRef.current?.dispose();
+
+    // Create new engine
+    soundEngineRef.current = createSoundEngine(selectedSoundEngine, audioContextRef.current, masterGainRef.current);
+    console.log('[MelodySequencer] Switched to sound engine:', selectedSoundEngine);
+  }, [selectedSoundEngine]);
 
   // Calculate scale notes when key/scale changes (2 octaves)
   useEffect(() => {
@@ -284,17 +299,17 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
     }
   }, [playbackPosition, isPlaying, notes, onNoteEvent, stepDuration, _tempo, activePages, STEPS_PER_PAGE, TOTAL_PAGES]);
 
-  // Schedule note playback via Tone.js
+  // Schedule note playback via sound engine
   const scheduleNote = useCallback((note: MelodyNote) => {
-    const synth = synthRef.current;
-    if (!synth) return;
+    const soundEngine = soundEngineRef.current;
+    if (!soundEngine) return;
 
     try {
-      const noteName = Tone.Frequency(note.pitch, 'midi').toNote();
-      const duration = note.duration; // In beats (0.25 = 1/16th note)
+      const frequency = 440 * Math.pow(2, (note.pitch - 69) / 12); // MIDI to frequency
       const velocity = note.velocity / 127; // Normalize 0-1
+      const duration = note.duration; // In beats
 
-      synth.triggerAttackRelease(noteName, duration, Tone.now(), velocity);
+      soundEngine.playNote(frequency, velocity, duration);
     } catch (error) {
       console.error('[MelodySequencer] Error playing note:', error);
     }
@@ -580,6 +595,41 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
           <span className="text-xs text-gray-400">
             {notes.length} {notes.length === 1 ? 'note' : 'notes'}
           </span>
+
+          {/* Sound Engine Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setShowSoundMenu(!showSoundMenu)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs font-medium rounded-lg transition-colors min-h-[44px]"
+              aria-label="Select sound engine"
+            >
+              <Volume2 className="w-4 h-4" />
+              {soundEngineNames[selectedSoundEngine]}
+              <span className="text-xs">▼</span>
+            </button>
+
+            {showSoundMenu && (
+              <div className="absolute top-full mt-2 right-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50">
+                {(Object.keys(soundEngineNames) as SoundEngineType[]).map((engineType) => (
+                  <button
+                    key={engineType}
+                    onClick={() => {
+                      setSelectedSoundEngine(engineType);
+                      setShowSoundMenu(false);
+                    }}
+                    className={`w-full px-4 py-2 text-left text-sm transition-colors ${
+                      selectedSoundEngine === engineType
+                        ? 'bg-primary-600 text-white'
+                        : 'text-gray-300 hover:bg-gray-700'
+                    }`}
+                  >
+                    {soundEngineNames[engineType]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => setShowHarmonicGuidance(!showHarmonicGuidance)}
             className={`p-2 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${
