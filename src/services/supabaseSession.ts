@@ -57,6 +57,7 @@ class SupabaseSessionService {
   private presenceSyncCallbacks: ((participants: Participant[]) => void)[] = [];
   private tempoChangeCallbacks: ((tempo: number) => void)[] = [];
   private playbackChangeCallbacks: ((isPlaying: boolean) => void)[] = [];
+  private keyScaleChangeCallbacks: ((key: string, scale: string) => void)[] = [];
   private connectionStatusCallbacks: ((status: ConnectionStatus) => void)[] = [];
 
   constructor(supabaseClient: SupabaseClient) {
@@ -361,6 +362,26 @@ class SupabaseSessionService {
   }
 
   /**
+   * Subscribe to key/scale change events
+   *
+   * @param callback - Function called when key or scale changes
+   * @returns {Function} Unsubscribe function
+   *
+   * @example
+   * ```typescript
+   * const unsubscribe = service.onKeyScaleChange((key, scale) => {
+   *   console.log('Key/Scale changed:', key, scale);
+   * });
+   * ```
+   */
+  onKeyScaleChange(callback: (key: string, scale: string) => void): () => void {
+    this.keyScaleChangeCallbacks.push(callback);
+    return () => {
+      this.keyScaleChangeCallbacks = this.keyScaleChangeCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  /**
    * Subscribe to connection status changes
    *
    * @param callback - Function called when connection status changes
@@ -437,6 +458,35 @@ class SupabaseSessionService {
   }
 
   /**
+   * Broadcast key/scale change to all participants
+   *
+   * @param key - Musical key (e.g., "C", "D", "Eb")
+   * @param scale - Scale type (e.g., "major", "minor", "dorian")
+   *
+   * @example
+   * ```typescript
+   * await service.broadcastKeyScale('C', 'major');
+   * console.log('Key/Scale broadcast successfully');
+   * ```
+   */
+  async broadcastKeyScale(key: string, scale: string): Promise<void> {
+    if (!this.channel) {
+      console.warn('[SupabaseSessionService] Cannot broadcast key/scale - not in session');
+      return;
+    }
+
+    const payload: BroadcastPayload = { key, scale };
+
+    await this.channel.send({
+      type: 'broadcast',
+      event: 'key-change',
+      payload,
+    });
+
+    console.log('[SupabaseSessionService] Broadcast key/scale:', key, scale);
+  }
+
+  /**
    * Set up presence listener for participant tracking
    * @private
    */
@@ -507,6 +557,15 @@ class SupabaseSessionService {
       if (isPlaying !== undefined) {
         console.log('[SupabaseSessionService] Received playback change:', isPlaying);
         this.playbackChangeCallbacks.forEach(callback => callback(isPlaying));
+      }
+    });
+
+    // Key/scale change listener
+    this.channel.on('broadcast', { event: 'key-change' }, ({ payload }) => {
+      const { key, scale } = payload as BroadcastPayload;
+      if (key !== undefined && scale !== undefined) {
+        console.log('[SupabaseSessionService] Received key/scale change:', key, scale);
+        this.keyScaleChangeCallbacks.forEach(callback => callback(key, scale));
       }
     });
   }

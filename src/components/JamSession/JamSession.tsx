@@ -67,6 +67,13 @@ export const JamSession: React.FC<JamSessionProps> = ({
       // Future: sync playback state
     });
 
+    // Subscribe to key/scale changes from other participants
+    const unsubscribeKeyScale = supabaseSessionService.onKeyScaleChange((key, scale) => {
+      console.log('[JamSession] Remote key/scale change:', key, scale);
+      music.updateKey(key);
+      music.updateScale(scale);
+    });
+
     // Get initial connection status
     setConnectionStatus(supabaseSessionService.connectionStatus);
 
@@ -77,6 +84,7 @@ export const JamSession: React.FC<JamSessionProps> = ({
       unsubscribeStatus();
       unsubscribeTempo();
       unsubscribePlayback();
+      unsubscribeKeyScale();
     };
   }, [music]);
 
@@ -86,6 +94,13 @@ export const JamSession: React.FC<JamSessionProps> = ({
       supabaseSessionService.broadcastTempo(music.tempo);
     }
   }, [music.tempo]);
+
+  // Broadcast key/scale changes to other participants
+  useEffect(() => {
+    if (supabaseSessionService.isInSession()) {
+      supabaseSessionService.broadcastKeyScale(music.key, music.scale);
+    }
+  }, [music.key, music.scale]);
 
   // Playback timer - synced with global tempo
   useEffect(() => {
