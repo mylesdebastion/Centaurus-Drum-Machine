@@ -228,10 +228,9 @@ function App() {
     navigate('/');
   };
 
-  // Reserved for future WelcomeScreen button
-  // const handleChordMelodyTest = () => {
-  //   navigate('/chord-melody-test');
-  // };
+  const handleChordMelodyTest = () => {
+    navigate('/chord-melody-test');
+  };
 
   const handleExitChordMelodyTest = () => {
     navigate('/');
@@ -265,6 +264,7 @@ function App() {
               onHeaderTest={handleHeaderTest}
               onStudio={handleStudio}
               onSupabaseTest={handleSupabaseTest}
+              onChordMelodyTest={handleChordMelodyTest}
             />
           }
         />

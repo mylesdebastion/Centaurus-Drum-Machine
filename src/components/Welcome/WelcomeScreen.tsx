@@ -16,6 +16,7 @@ interface WelcomeScreenProps {
   onHeaderTest?: () => void;
   onStudio?: () => void;
   onSupabaseTest?: () => void;
+  onChordMelodyTest?: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
@@ -32,7 +33,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onLumiTest,
   onHeaderTest,
   onStudio,
-  onSupabaseTest
+  onSupabaseTest,
+  onChordMelodyTest
 }) => {
   const [joinCode, setJoinCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
@@ -303,6 +305,27 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 </p>
                 <div className="flex items-center gap-2 text-sm text-indigo-400 group-hover:text-indigo-300">
                   <span>Launch Studio</span>
+                  <Play className="w-4 h-4" />
+                </div>
+              </button>
+            )}
+
+            {/* Chord Melody Arranger */}
+            {onChordMelodyTest && (
+              <button
+                onClick={onChordMelodyTest}
+                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-violet-500/50 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <Music2 className="w-6 h-6 text-violet-400" />
+                  <h3 className="font-semibold text-white">Chord Melody Arranger</h3>
+                  <span className="text-xs bg-violet-600/30 text-violet-300 px-2 py-1 rounded">Beta</span>
+                </div>
+                <p className="text-sm text-gray-400 mb-4">
+                  Interactive chord progression sequencer with melody grid and harmonic guidance
+                </p>
+                <div className="flex items-center gap-2 text-sm text-violet-400 group-hover:text-violet-300">
+                  <span>Launch Arranger</span>
                   <Play className="w-4 h-4" />
                 </div>
               </button>
