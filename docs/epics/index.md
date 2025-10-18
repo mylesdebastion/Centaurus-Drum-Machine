@@ -2,7 +2,7 @@
 
 This directory contains all project epics organized by epic number. Each epic represents a major feature area or system architecture component.
 
-**Total Epics:** 11 (5 Complete, 3 In Progress, 3 Planning)
+**Total Epics:** 15 (6 Complete, 4 In Progress, 5 Planning)
 
 ---
 
@@ -16,11 +16,15 @@ This directory contains all project epics organized by epic number. Each epic re
 | [Epic 4](./epic-4-global-music-controls.md) | Global Music Controls & State Management | ✅ COMPLETE | High | 6 stories | 100% (6/6 complete) |
 | [Epic 5](./epic-5-universal-responsive-architecture.md) | Universal Responsive Architecture | ✅ COMPLETE | High | 1 story | 100% (Story 5.1 complete) |
 | [Epic 6](./epic-6-multi-client-sessions-wled.md) | Multi-Client Sessions & WLED Integration | 🚧 IN PROGRESS | High | 5 stories | 20% (Phase 0 complete, blocked) |
+| [Epic 7](./epic-7-jam-session-backend.md) | Jam Session Backend Infrastructure | ✅ COMPLETE | High | 10 stories | 100% (Supabase Realtime complete) |
 | [Epic 9](./epic-9-multi-instrument-midi-visualization.md) | Multi-Instrument MIDI Visualization | 🚧 IN PROGRESS | High | 4 stories | 50% (9.1-9.2 complete, 9.3-9.4 pending) |
 | [Epic 11](./epic-11-roli-lumi-integration.md) | ROLI LUMI Integration | 🚧 IN PROGRESS | High | 1 story | 40% (Phase 2.1 complete) |
 | [Epic 12](./epic-12-sound-engine-expansion.md) | Sound Engine Expansion | ✅ COMPLETE | Medium | 1 story | 100% (All engines implemented) |
 | [Epic 13](./epic-13-documentation-infrastructure.md) | Documentation Infrastructure & Reconciliation | ✅ COMPLETE | High | 2 stories | 100% (both stories complete) |
 | [Epic 14](./epic-14-module-adapter-system.md) | Module Adapter System & Global State Integration | 🚧 IN PROGRESS | High | 6 stories | 10% (14.1 in progress) |
+| [Epic 15](./epic-15-chord-melody-arranger.md) | Chord Progression & Melody Arranger Module | 📝 PLANNING | High | 9 stories | Not started |
+| [Epic 16](./epic-16-unified-module-ui-template.md) | Unified Studio Module UI Template | 📝 PLANNING | Medium | 3 stories | Not started |
+| [Epic 17](./epic-17-remote-wled-state-sync.md) | Remote WLED Control via Jam Sessions | 📝 PLANNING | High | 3 stories | Not started |
 
 ---
 
@@ -227,6 +231,101 @@ This directory contains all project epics organized by epic number. Each epic re
 
 ---
 
+### Epic 7: Jam Session Backend Infrastructure
+**Status:** ✅ COMPLETE
+**Goal:** Build real-time collaborative backend infrastructure using Supabase Realtime for session management and state synchronization.
+
+**Key Features:**
+- Supabase Realtime Channels with Broadcast + Presence
+- Session management (room codes, participants)
+- Real-time state sync (tempo, playback, key/scale)
+- Broadcast/subscribe patterns via `supabaseSessionService`
+- Cost-effective MVP (free tier: 200 connections, 2M messages/month)
+
+**Stories:**
+- ✅ [Story 7.1](../stories/7.1-supabase-setup.md): Supabase Project Setup
+- ✅ [Story 7.2](../stories/7.2-supabase-realtime-service.md): Supabase Realtime Service Layer
+- ✅ [Story 7.3](../stories/7.3-jam-session-ui-integration.md): Jam Session UI Integration
+- ✅ Stories 7.4-7.10: Additional features (shareable URLs, state sync, error handling)
+
+**Technical Foundation for:**
+- Epic 17: Remote WLED Control (state sync extension)
+- Epic 6: Multi-Client Sessions (future WebRTC integration)
+
+---
+
+### Epic 15: Chord Progression & Melody Arranger Module
+**Status:** 📝 PLANNING
+**Goal:** Transform guitar fretboard chord progression feature into standalone Studio module with melody arranger capabilities and intelligent module routing.
+
+**Key Features:**
+- ChordMelodyArranger module for Studio
+- Chord progression builder with genre-based presets
+- Melody arranger step sequencer
+- Module routing system (send to Piano, Guitar, Drum, etc.)
+- GlobalMusicContext integration (key/scale/tempo sync)
+- Roman numeral progressions (adaptable to any key)
+
+**Stories:**
+- 📝 Story 15.1-15.9: Chord service extraction, UI, melody arranger, routing, integration
+
+**Dependencies:**
+- Epic 4 (GlobalMusicContext)
+- Epic 14 (Module adapter patterns)
+
+---
+
+### Epic 16: Unified Studio Module UI Template
+**Status:** 📝 PLANNING
+**Goal:** Establish consistent UI template for all Studio modules by extracting ChordMelodyArranger header/settings pattern.
+
+**Key Features:**
+- ModuleHeader component (icon, title, subtitle, settings gear)
+- ModuleTransportControls component (play/pause/stop)
+- ModuleSettingsPanel component (collapsible slide-up panel)
+- Responsive design patterns
+- Apply to all 6 modules (DrumMachine, PianoRoll, GuitarFretboard, etc.)
+
+**Stories:**
+- 📝 [Story 16.1-16.6](../stories/): Extract template, migrate ChordMelody, apply to all modules
+
+**Dependencies:**
+- Epic 4 (GlobalMusicContext transport state)
+- Epic 5 (Responsive patterns)
+- Epic 15 (ChordMelodyArranger reference implementation)
+
+---
+
+### Epic 17: Remote WLED Control via Jam Sessions
+**Status:** 📝 PLANNING
+**Goal:** Enable remote devices to control local WLED hardware via jam sessions by syncing musical state through Supabase Realtime.
+
+**Key Features:**
+- Musical state synchronization (drum patterns, notes, chords)
+- Delta-based updates (99% bandwidth savings)
+- Client-side color derivation (50% bandwidth savings)
+- Local LED frame generation (<1ms latency)
+- Natural "bridge" behavior (no special mode needed)
+- 79x bandwidth reduction vs naive approach (330 KB vs 26 MB per jam)
+
+**Stories:**
+- 📝 [Story 17.1](../stories/17.1-delta-drum-state-sync.md): Delta-Based Drum State Sync
+- 📝 [Story 17.2](../stories/17.2-client-side-color-derivation.md): Client-Side Color Derivation
+- 📝 [Story 17.3](../stories/17.3-full-pattern-sync-led-integration.md): Full Pattern Sync & LED Integration
+
+**Dependencies:**
+- Epic 7 (Supabase Realtime infrastructure) ✅
+- Epic 14 (LED Compositor integration) ✅
+
+**Architecture:** [remote-wled-state-sync.md](../architecture/remote-wled-state-sync.md)
+
+**Future Enhancements (Epic 18+):**
+- Multi-module state sync (Piano Roll, IsometricSequencer)
+- Binary message format (Uint8Array optimization)
+- DJ visualizer audio input integration
+
+---
+
 ## Epic Status Legend
 
 - ✅ **COMPLETE**: All stories implemented and verified
@@ -273,5 +372,5 @@ This directory contains all project epics organized by epic number. Each epic re
 
 ---
 
-**Last Updated:** 2025-01-13
+**Last Updated:** 2025-10-18
 **Maintained By:** BMad Framework (Product Owner, PM, Dev Agents)
