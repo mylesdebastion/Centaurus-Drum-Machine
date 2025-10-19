@@ -11,6 +11,7 @@ import { Plus } from 'lucide-react';
 import { ViewTemplate, ViewCard } from '@/components/Layout/ViewTemplate';
 import { wledDeviceRegistry } from '@/services/WLEDDeviceRegistry';
 import { routingMatrix } from '@/services/VisualizationRoutingMatrix';
+import { ledCompositor } from '@/services/LEDCompositor';
 import type { WLEDDevice } from '@/types/wled';
 import type { DeviceAssignment } from '@/types/visualization';
 import { DeviceCard } from './DeviceCard';
@@ -134,6 +135,26 @@ export const WLEDManager: React.FC<WLEDManagerProps> = ({ onBack }) => {
     >
       {/* Routing Status */}
       <ViewCard title="Current Routing Status">
+        <div className="mb-4 flex gap-2">
+          <button
+            onClick={() => {
+              console.log('[WLEDManager] === ROUTING DEBUG ===');
+              console.log('[WLEDManager] Registered modules:', ledCompositor.getAllModuleCapabilities());
+              console.log('[WLEDManager] Current assignments:', routingMatrix.getCurrentAssignments());
+              routingMatrix.debugPrintRouting();
+              ledCompositor.debugPrintCapabilities();
+            }}
+            className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm transition-colors"
+          >
+            Debug Routing (Console)
+          </button>
+          <button
+            onClick={() => routingMatrix.recalculateRouting('manual-recalculation')}
+            className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-sm transition-colors"
+          >
+            Force Recalculate
+          </button>
+        </div>
         <RoutingStatusDisplay assignments={routingAssignments} />
       </ViewCard>
 
