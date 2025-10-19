@@ -2,9 +2,11 @@
  * LED Compositor Service
  *
  * Epic 14, Story 14.7 - LED Compositor Implementation
+ * Epic 18, Story 18.2 - Module Capability Declaration System
  * Design document: docs/architecture/led-compositor-design.md
  *
  * Blends multiple module LED outputs onto limited hardware using visual compositing
+ * Extended with module registration system for intelligent routing
  */
 
 import {
@@ -15,6 +17,12 @@ import {
   checkModeCompatibility,
   checkNotePerLedCompatibility,
 } from '../types';
+import type {
+  ModuleVisualizationCapability,
+  ModuleId,
+  ModuleRegistrationEvent,
+  ModuleUnregistrationEvent,
+} from '../types/visualization';
 
 /**
  * Compositor event types for UI integration
@@ -60,6 +68,18 @@ class LEDCompositorService {
    * Event listeners for UI integration
    */
   private eventListeners: CompositorEventCallback[] = [];
+
+  /**
+   * Module capability registry (Story 18.2)
+   * Stores visualization capabilities for registered modules
+   */
+  private moduleCapabilities: Map<ModuleId, ModuleVisualizationCapability> = new Map();
+
+  /**
+   * Module registration event callbacks
+   */
+  private registrationCallbacks: ((event: ModuleRegistrationEvent) => void)[] = [];
+  private unregistrationCallbacks: ((event: ModuleUnregistrationEvent) => void)[] = [];
 
   private constructor() {
     console.log('[LEDCompositor] Service initialized');
@@ -176,6 +196,166 @@ class LEDCompositorService {
   public removeEventListener(callback: CompositorEventCallback): void {
     this.eventListeners = this.eventListeners.filter(cb => cb !== callback);
   }
+
+  // ===== Module Registration API (Story 18.2) =====
+
+  /**
+   * Register a module's visualization capabilities
+   * Modules call this on mount to declare what visualizations they can produce
+   *
+   * @param capability - Module capability declaration
+   *
+   * @example
+   * ```typescript
+   * const drumMachineCapability: ModuleVisualizationCapability = {
+   *   moduleId: 'drum-machine',
+   *   produces: [
+   *     {
+   *       type: 'step-sequencer-grid',
+   *       dimensionPreference: '2D',
+   *       overlayCompatible: false,
+   *       priority: 10,
+   *     },
+   *   ],
+   * };
+   *
+   * ledCompositor.registerModule(drumMachineCapability);
+   * ```
+   */
+  public registerModule(capability: ModuleVisualizationCapability): void {
+    this.moduleCapabilities.set(capability.moduleId, capability);
+
+    console.log(`[LEDCompositor] Module registered: ${capability.moduleId}`);
+    console.log(`[LEDCompositor] Produces ${capability.produces.length} visualization(s):`, capability.produces.map(p => p.type).join(', '));
+
+    // Notify registration callbacks
+    const event: ModuleRegistrationEvent = {
+      capability,
+      timestamp: Date.now(),
+    };
+
+    this.registrationCallbacks.forEach(callback => {
+      try {
+        callback(event);
+      } catch (error) {
+        console.error('[LEDCompositor] Error in registration callback:', error);
+      }
+    });
+  }
+
+  /**
+   * Unregister a module's visualization capabilities
+   * Modules call this on unmount to clean up
+   *
+   * @param moduleId - Module identifier
+   *
+   * @example
+   * ```typescript
+   * ledCompositor.unregisterModule('drum-machine');
+   * ```
+   */
+  public unregisterModule(moduleId: ModuleId): void {
+    const existed = this.moduleCapabilities.delete(moduleId);
+
+    if (existed) {
+      console.log(`[LEDCompositor] Module unregistered: ${moduleId}`);
+
+      // Notify unregistration callbacks
+      const event: ModuleUnregistrationEvent = {
+        moduleId,
+        timestamp: Date.now(),
+      };
+
+      this.unregistrationCallbacks.forEach(callback => {
+        try {
+          callback(event);
+        } catch (error) {
+          console.error('[LEDCompositor] Error in unregistration callback:', error);
+        }
+      });
+    } else {
+      console.warn(`[LEDCompositor] Attempted to unregister unknown module: ${moduleId}`);
+    }
+  }
+
+  /**
+   * Check if a module is currently registered
+   * @param moduleId - Module identifier
+   * @returns {boolean} True if module is registered
+   */
+  public isModuleRegistered(moduleId: ModuleId): boolean {
+    return this.moduleCapabilities.has(moduleId);
+  }
+
+  /**
+   * Get all registered module capabilities
+   * @returns {ModuleVisualizationCapability[]} Array of module capabilities
+   */
+  public getAllModuleCapabilities(): ModuleVisualizationCapability[] {
+    return Array.from(this.moduleCapabilities.values());
+  }
+
+  /**
+   * Get a specific module's capability
+   * @param moduleId - Module identifier
+   * @returns {ModuleVisualizationCapability | undefined} Module capability or undefined
+   */
+  public getModuleCapability(moduleId: ModuleId): ModuleVisualizationCapability | undefined {
+    return this.moduleCapabilities.get(moduleId);
+  }
+
+  /**
+   * Subscribe to module registration events
+   * @param callback - Function called when modules register
+   * @returns {Function} Unsubscribe function
+   */
+  public onModuleRegistered(callback: (event: ModuleRegistrationEvent) => void): () => void {
+    this.registrationCallbacks.push(callback);
+    return () => {
+      this.registrationCallbacks = this.registrationCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  /**
+   * Subscribe to module unregistration events
+   * @param callback - Function called when modules unregister
+   * @returns {Function} Unsubscribe function
+   */
+  public onModuleUnregistered(callback: (event: ModuleUnregistrationEvent) => void): () => void {
+    this.unregistrationCallbacks.push(callback);
+    return () => {
+      this.unregistrationCallbacks = this.unregistrationCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  /**
+   * Debug: Print all registered modules and their capabilities
+   */
+  public debugPrintCapabilities(): void {
+    console.log('[LEDCompositor] Registered Modules:');
+    console.log('='.repeat(80));
+
+    if (this.moduleCapabilities.size === 0) {
+      console.log('  No modules registered');
+      return;
+    }
+
+    this.moduleCapabilities.forEach((capability, moduleId) => {
+      console.log(`\n  Module: ${moduleId}`);
+      console.log(`  Produces:`);
+
+      capability.produces.forEach((producer, index) => {
+        console.log(`    ${index + 1}. ${producer.type}`);
+        console.log(`       - Dimension: ${producer.dimensionPreference}`);
+        console.log(`       - Overlay: ${producer.overlayCompatible ? 'Yes' : 'No'}`);
+        console.log(`       - Priority: ${producer.priority}`);
+      });
+    });
+
+    console.log('\n' + '='.repeat(80));
+  }
+
+  // ===== End Module Registration API =====
 
   /**
    * Process device: check compatibility, composite frames, send to hardware

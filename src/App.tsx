@@ -9,6 +9,7 @@ import { EducationMode } from './components/Education/EducationMode';
 import { IsometricSequencer } from './components/IsometricSequencer/IsometricSequencer';
 import { LiveAudioVisualizer } from './components/LiveAudioVisualizer/LiveAudioVisualizer';
 import { WLEDDirectTest } from './components/WLEDExperiment/WLEDDirectTest';
+import { WLEDManager } from './components/WLEDManager';
 import { MIDITest } from './components/MIDI/MIDITest';
 import { PianoRoll } from './components/PianoRoll/PianoRoll';
 import { GuitarFretboard } from './components/GuitarFretboard/GuitarFretboard';
@@ -173,6 +174,14 @@ function App() {
     navigate('/');
   };
 
+  const handleWLEDManager = () => {
+    navigate('/wled-manager');
+  };
+
+  const handleExitWLEDManager = () => {
+    navigate('/');
+  };
+
   const handleMIDITest = () => {
     navigate('/midi-test');
   };
@@ -258,6 +267,7 @@ function App() {
               onIsometricMode={handleIsometricMode}
               onDJVisualizer={handleDJVisualizer}
               onWLEDExperiment={handleWLEDExperiment}
+              onWLEDManager={handleWLEDManager}
               onMIDITest={handleMIDITest}
               onPianoRoll={handlePianoRoll}
               onGuitarFretboard={handleGuitarFretboard}
@@ -316,6 +326,14 @@ function App() {
           element={
             <WLEDDirectTest
               onBack={handleExitWLEDExperiment}
+            />
+          }
+        />
+        <Route
+          path="/wled-manager"
+          element={
+            <WLEDManager
+              onBack={handleExitWLEDManager}
             />
           }
         />

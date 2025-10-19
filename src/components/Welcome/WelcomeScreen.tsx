@@ -9,6 +9,7 @@ interface WelcomeScreenProps {
   onIsometricMode: () => void;
   onDJVisualizer: () => void;
   onWLEDExperiment: () => void;
+  onWLEDManager?: () => void;
   onMIDITest: () => void;
   onPianoRoll: () => void;
   onGuitarFretboard: () => void;
@@ -27,6 +28,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onIsometricMode,
   onDJVisualizer,
   onWLEDExperiment,
+  onWLEDManager,
   onMIDITest,
   onPianoRoll,
   onGuitarFretboard,
@@ -248,6 +250,27 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 <Play className="w-4 h-4" />
               </div>
             </button>
+
+            {/* WLED Manager */}
+            {onWLEDManager && (
+              <button
+                onClick={onWLEDManager}
+                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-orange-500/50 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <Activity className="w-6 h-6 text-orange-400" />
+                  <h3 className="font-semibold text-white">WLED Manager</h3>
+                  <span className="text-xs bg-orange-600/30 text-orange-300 px-2 py-1 rounded">Beta</span>
+                </div>
+                <p className="text-sm text-gray-400 mb-4">
+                  Configure LED hardware for intelligent visualization routing
+                </p>
+                <div className="flex items-center gap-2 text-sm text-orange-400 group-hover:text-orange-300">
+                  <span>Open Manager</span>
+                  <Play className="w-4 h-4" />
+                </div>
+              </button>
+            )}
 
             {/* LUMI SysEx Test */}
             <button
