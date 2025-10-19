@@ -46,6 +46,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, assignedColor, o
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'error'>(
     device ? 'unknown' : 'unknown'
   );
+  const [testPattern, setTestPattern] = useState<'rainbow' | 'solid' | undefined>(undefined);
 
   // Build capabilities object
   const buildCapabilities = (): DeviceCapabilities => {
@@ -77,6 +78,9 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, assignedColor, o
     setTestSuccess(false);
     setConnectionStatus('unknown');
 
+    // Show rainbow test pattern in virtual preview
+    setTestPattern('rainbow');
+
     try {
       // First, test connection to get device info
       const info = await wledDeviceRegistry.testConnection(ip);
@@ -84,7 +88,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, assignedColor, o
       // Calculate LED count based on current dimension settings
       const testLedCount = dimensions === '2D' ? gridWidth * gridHeight : ledCount;
 
-      // Send rainbow test pattern
+      // Send rainbow test pattern to physical device
       await wledDeviceRegistry.sendRainbowTestPattern(ip, testLedCount);
 
       // Success - update status
@@ -92,11 +96,16 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, assignedColor, o
       setTestSuccess(true);
       console.log(`✅ Connected to ${info.name} (v${info.ver}) - ${info.leds.count} LEDs detected`);
 
-      // Hide success indicator after 2 seconds
-      setTimeout(() => setTestSuccess(false), 2000);
+      // Hide success indicator and test pattern after 3 seconds
+      setTimeout(() => {
+        setTestSuccess(false);
+        setTestPattern(undefined);
+      }, 3000);
     } catch (error) {
       setConnectionStatus('error');
       console.error(`❌ Connection failed to ${ip}:`, error);
+      // Clear test pattern on error
+      setTestPattern(undefined);
     } finally {
       setIsTesting(false);
     }
@@ -468,7 +477,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, assignedColor, o
             } : undefined,
             reverseDirection: device.reverse_direction,
             connectionStatus: connectionStatus,
-            testPattern: undefined,
+            testPattern: testPattern,
           } as any}
           showLivePreview={true}
         />

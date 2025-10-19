@@ -12,19 +12,8 @@ import type { CompositorEvent } from '@/services/LEDCompositor';
 
 const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColors, showLivePreview = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [animationFrame, setAnimationFrame] = useState(0);
   const [compositedColors, setCompositedColors] = useState<string[]>([]);
-
-  // Show placeholder if no data after 10 seconds
-  useEffect(() => {
-    if (!ledColors || ledColors.length === 0) {
-      const timer = setTimeout(() => setShowPlaceholder(true), 10000);
-      return () => clearTimeout(timer);
-    } else {
-      setShowPlaceholder(false);
-    }
-  }, [ledColors]);
 
   // Animate test patterns and waiting states
   useEffect(() => {
@@ -200,15 +189,6 @@ const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColo
     return (
       <div className="relative w-full h-8 bg-gray-800 rounded-lg overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
-      </div>
-    );
-  }
-
-  // Placeholder when no data after timeout
-  if (showPlaceholder && (!ledColors || ledColors.length === 0) && (!showLivePreview || compositedColors.length === 0) && !device.testPattern) {
-    return (
-      <div className="w-full h-8 bg-gray-800 rounded-lg flex items-center justify-center">
-        <p className="text-gray-500 text-xs">Waiting for visualization...</p>
       </div>
     );
   }
