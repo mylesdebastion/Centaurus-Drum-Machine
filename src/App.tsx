@@ -19,6 +19,7 @@ import { SupabaseConnectionTest } from './components/SupabaseConnectionTest';
 import { ChordMelodyArranger } from './components/Studio/modules/ChordMelodyArranger';
 import { UsernameModal, getStoredUsername } from './components/JamSession/UsernameModal';
 import { supabaseSessionService } from './services/supabaseSession';
+import { AuthTest } from './components/AuthTest';
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
@@ -390,6 +391,10 @@ function App() {
               />
             </div>
           }
+        />
+        <Route
+          path="/auth-test"
+          element={<AuthTest />}
         />
       </Routes>
     </GlobalMusicProvider>
