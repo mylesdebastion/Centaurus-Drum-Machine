@@ -38,7 +38,10 @@
       "mcp__supabase__list_tables",
       "Bash(npm install:*)",
       "Read(//d/**)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(git branch -r --contains \"onChordMelodyTest\")",
+      "Bash(if not exist supabasemigrations mkdir supabasemigrations)",
+      "mcp__supabase__apply_migration"
     ],
     "deny": [],
     "ask": []
