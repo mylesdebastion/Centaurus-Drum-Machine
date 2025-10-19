@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useMemo, useCallback, useEf
 import { RootNote, ScaleName, useMusicalScale } from '../hooks/useMusicalScale';
 import { audioEngine } from '../utils/audioEngine';
 import { ColorMode } from '../utils/colorMapping';
+import { supabaseSessionService } from '../services/supabaseSession';
 
 /**
  * Global Music State Interface
@@ -208,6 +209,9 @@ export const GlobalMusicProvider: React.FC<GlobalMusicProviderProps> = ({ childr
   // Initialize state from localStorage
   const [state, setState] = useState<GlobalMusicState>(() => loadStateFromLocalStorage());
 
+  // Track if playback state change came from remote source (prevent broadcast loop)
+  const isRemotePlaybackChangeRef = React.useRef(false);
+
   // Integrate useMusicalScale hook
   const musicalScale = useMusicalScale({
     initialRoot: state.key,
@@ -247,6 +251,57 @@ export const GlobalMusicProvider: React.FC<GlobalMusicProviderProps> = ({ childr
     audioEngine.syncTransportBPM(state.tempo);
     console.log('[GlobalMusicContext] Synced tempo with AudioEngine Transport:', state.tempo);
   }, [state.tempo]);
+
+  // Broadcast colorMode changes to session participants (Story 17.2)
+  useEffect(() => {
+    if (supabaseSessionService.isInSession()) {
+      supabaseSessionService.broadcastColorMode(state.colorMode);
+    }
+  }, [state.colorMode]);
+
+  // Subscribe to remote colorMode changes (Story 17.2)
+  useEffect(() => {
+    const unsubscribe = supabaseSessionService.onColorModeChange((mode: string) => {
+      console.log('[GlobalMusicContext] Remote color mode change:', mode);
+      setState(prev => ({ ...prev, colorMode: mode as ColorMode }));
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Broadcast isPlaying (global transport) changes to session participants
+  useEffect(() => {
+    // Don't broadcast if the change came from a remote source (prevent loop)
+    if (isRemotePlaybackChangeRef.current) {
+      isRemotePlaybackChangeRef.current = false;
+      return;
+    }
+
+    if (supabaseSessionService.isInSession()) {
+      supabaseSessionService.broadcastPlayback(state.isPlaying);
+    }
+  }, [state.isPlaying]);
+
+  // Subscribe to remote playback changes (global transport sync)
+  useEffect(() => {
+    const unsubscribe = supabaseSessionService.onPlaybackChange((playing: boolean) => {
+      console.log('[GlobalMusicContext] Remote playback change:', playing);
+
+      // Mark this as a remote change to prevent broadcast loop
+      isRemotePlaybackChangeRef.current = true;
+
+      setState(prev => ({ ...prev, isPlaying: playing }));
+
+      // Sync with Tone.js Transport via AudioEngine
+      if (playing) {
+        audioEngine.startTransport();
+      } else {
+        audioEngine.stopTransport();
+      }
+    });
+
+    return unsubscribe;
+  }, []);
 
   /**
    * Update tempo with validation (40-300 BPM)

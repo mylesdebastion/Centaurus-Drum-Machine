@@ -65,7 +65,27 @@ export type BroadcastEventType =
   | 'playback-control'
   | 'key-change'
   | 'state-request'
-  | 'state-response';
+  | 'state-response'
+  | 'drum-step'
+  | 'color-mode';
+
+/**
+ * Drum step event data (Story 17.1)
+ * Delta-based state sync for drum pattern editing
+ */
+export interface DrumStepEvent {
+  /** Track index (0-7) */
+  track: number;
+
+  /** Step index (0-15) */
+  step: number;
+
+  /** Step enabled/disabled */
+  enabled: boolean;
+
+  /** Step velocity (0-100) */
+  velocity: number;
+}
 
 /**
  * Broadcast payload structure
@@ -84,4 +104,10 @@ export interface BroadcastPayload {
   /** State request/response (Story 7.7) */
   requesterId?: string;
   sessionState?: SessionState;
+
+  /** Drum step change event (Story 17.1) */
+  drumStep?: DrumStepEvent;
+
+  /** Color mode change event (Story 17.2) */
+  mode?: string; // 'chromatic' | 'harmonic' | 'spectrum'
 }

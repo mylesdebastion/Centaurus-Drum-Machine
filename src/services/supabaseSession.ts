@@ -39,6 +39,7 @@ import type {
   Participant,
   ConnectionStatus,
   BroadcastPayload,
+  DrumStepEvent,
 } from '@/types/session';
 
 /**
@@ -58,6 +59,8 @@ class SupabaseSessionService {
   private tempoChangeCallbacks: ((tempo: number) => void)[] = [];
   private playbackChangeCallbacks: ((isPlaying: boolean) => void)[] = [];
   private keyScaleChangeCallbacks: ((key: string, scale: string) => void)[] = [];
+  private drumStepCallbacks: ((data: DrumStepEvent) => void)[] = [];
+  private colorModeChangeCallbacks: ((mode: string) => void)[] = [];
   private connectionStatusCallbacks: ((status: ConnectionStatus) => void)[] = [];
 
   constructor(supabaseClient: SupabaseClient) {
@@ -487,6 +490,107 @@ class SupabaseSessionService {
   }
 
   /**
+   * Broadcast drum step change to all participants (Story 17.1)
+   * Delta-based state sync for efficient pattern editing
+   *
+   * @param data - Drum step event data
+   *
+   * @example
+   * ```typescript
+   * await service.broadcastDrumStep({
+   *   track: 0,
+   *   step: 7,
+   *   enabled: true,
+   *   velocity: 80
+   * });
+   * ```
+   */
+  async broadcastDrumStep(data: DrumStepEvent): Promise<void> {
+    if (!this.channel) {
+      console.warn('[SupabaseSessionService] Cannot broadcast drum step - not in session');
+      return;
+    }
+
+    const payload: BroadcastPayload = { drumStep: data };
+
+    await this.channel.send({
+      type: 'broadcast',
+      event: 'drum-step',
+      payload,
+    });
+
+    console.log('[SupabaseSessionService] Broadcast drum step:', data);
+  }
+
+  /**
+   * Subscribe to drum step change events (Story 17.1)
+   *
+   * @param callback - Function called when drum step changes
+   * @returns {Function} Unsubscribe function
+   *
+   * @example
+   * ```typescript
+   * const unsubscribe = service.onDrumStep((data) => {
+   *   console.log('Drum step changed:', data);
+   * });
+   * ```
+   */
+  onDrumStep(callback: (data: DrumStepEvent) => void): () => void {
+    this.drumStepCallbacks.push(callback);
+    return () => {
+      this.drumStepCallbacks = this.drumStepCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  /**
+   * Broadcast color mode change to all participants (Story 17.2)
+   * Enables client-side color derivation across devices
+   *
+   * @param mode - Color mode ('chromatic' | 'harmonic' | 'spectrum')
+   *
+   * @example
+   * ```typescript
+   * await service.broadcastColorMode('harmonic');
+   * ```
+   */
+  async broadcastColorMode(mode: string): Promise<void> {
+    if (!this.channel) {
+      console.warn('[SupabaseSessionService] Cannot broadcast color mode - not in session');
+      return;
+    }
+
+    const payload: BroadcastPayload = { mode };
+
+    await this.channel.send({
+      type: 'broadcast',
+      event: 'color-mode',
+      payload,
+    });
+
+    console.log('[SupabaseSessionService] Broadcast color mode:', mode);
+  }
+
+  /**
+   * Subscribe to color mode change events (Story 17.2)
+   *
+   * @param callback - Function called when color mode changes
+   * @returns {Function} Unsubscribe function
+   *
+   * @example
+   * ```typescript
+   * const unsubscribe = service.onColorModeChange((mode) => {
+   *   console.log('Color mode changed:', mode);
+   * });
+   * ```
+   */
+  onColorModeChange(callback: (mode: string) => void): () => void {
+    this.colorModeChangeCallbacks.push(callback);
+    return () => {
+      this.colorModeChangeCallbacks = this.colorModeChangeCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  /**
    * Set up presence listener for participant tracking
    * @private
    */
@@ -566,6 +670,24 @@ class SupabaseSessionService {
       if (key !== undefined && scale !== undefined) {
         console.log('[SupabaseSessionService] Received key/scale change:', key, scale);
         this.keyScaleChangeCallbacks.forEach(callback => callback(key, scale));
+      }
+    });
+
+    // Drum step change listener (Story 17.1)
+    this.channel.on('broadcast', { event: 'drum-step' }, ({ payload }) => {
+      const { drumStep } = payload as BroadcastPayload;
+      if (drumStep !== undefined) {
+        console.log('[SupabaseSessionService] Received drum step change:', drumStep);
+        this.drumStepCallbacks.forEach(callback => callback(drumStep));
+      }
+    });
+
+    // Color mode change listener (Story 17.2)
+    this.channel.on('broadcast', { event: 'color-mode' }, ({ payload }) => {
+      const { mode } = payload as BroadcastPayload;
+      if (mode !== undefined) {
+        console.log('[SupabaseSessionService] Received color mode change:', mode);
+        this.colorModeChangeCallbacks.forEach(callback => callback(mode));
       }
     });
   }
