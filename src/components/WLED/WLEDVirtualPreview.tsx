@@ -7,11 +7,14 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { WLEDVirtualPreviewProps } from './types';
+import { ledCompositor } from '@/services/LEDCompositor';
+import type { CompositorEvent } from '@/services/LEDCompositor';
 
-const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColors }) => {
+const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColors, showLivePreview = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [animationFrame, setAnimationFrame] = useState(0);
+  const [compositedColors, setCompositedColors] = useState<string[]>([]);
 
   // Show placeholder if no data after 10 seconds
   useEffect(() => {
@@ -32,6 +35,31 @@ const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColo
       return () => clearInterval(interval);
     }
   }, [device.testPattern]);
+
+  // Subscribe to compositor events for live preview (Story 18.8)
+  useEffect(() => {
+    if (!showLivePreview) return;
+
+    const handleCompositedFrame = (event: CompositorEvent) => {
+      if (event.type !== 'composited-frame') return;
+      if (event.deviceId !== device.id) return; // Filter by device
+
+      // Convert Uint8ClampedArray [R, G, B, ...] → string[] ["#RRGGBB", ...]
+      const hexColors: string[] = [];
+      for (let i = 0; i < event.pixelData.length; i += 3) {
+        const r = event.pixelData[i].toString(16).padStart(2, '0');
+        const g = event.pixelData[i + 1].toString(16).padStart(2, '0');
+        const b = event.pixelData[i + 2].toString(16).padStart(2, '0');
+        hexColors.push(`#${r}${g}${b}`);
+      }
+
+      // Update state (triggers canvas re-render)
+      setCompositedColors(hexColors);
+    };
+
+    ledCompositor.addEventListener(handleCompositedFrame);
+    return () => ledCompositor.removeEventListener(handleCompositedFrame);
+  }, [device.id, showLivePreview]);
 
   // Canvas dimensions (thin line style like VirtualLEDStrip)
   const canvasWidth = 400;
@@ -113,7 +141,10 @@ const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColo
     // Generate LED array
     const ledArray: { r: number; g: number; b: number }[] = [];
 
-    // Test pattern mode
+    // Determine which color source to use (priority order)
+    const activeColors = device.testPattern ? ledColors : (showLivePreview && compositedColors.length > 0 ? compositedColors : ledColors);
+
+    // Test pattern mode (highest priority)
     if (device.testPattern === 'rainbow') {
       // Rainbow test pattern (animated)
       const time = animationFrame * 0.05;
@@ -124,14 +155,14 @@ const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColo
       }
     } else if (device.testPattern === 'solid') {
       // Solid color test (use first LED color or white)
-      const solidColor = ledColors && ledColors.length > 0 ? hexToRgb(ledColors[0]) : { r: 255, g: 255, b: 255 };
+      const solidColor = activeColors && activeColors.length > 0 ? hexToRgb(activeColors[0]) : { r: 255, g: 255, b: 255 };
       for (let i = 0; i < safeLedCount; i++) {
         ledArray.push(solidColor);
       }
-    } else if (ledColors && ledColors.length > 0) {
-      // Normal mode: use provided LED data
+    } else if (activeColors && activeColors.length > 0) {
+      // Normal mode: use provided LED data (compositor or manual)
       for (let i = 0; i < safeLedCount; i++) {
-        const hexColor = ledColors[i] || '000000';
+        const hexColor = activeColors[i] || '000000';
         const color = hexToRgb(hexColor);
         ledArray.push(color);
       }
@@ -162,7 +193,7 @@ const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColo
 
       ctx.fillRect(x, y, width, canvasHeight);
     }
-  }, [device, ledColors, animationFrame, safeLedCount, ledSize]);
+  }, [device, ledColors, compositedColors, showLivePreview, animationFrame, safeLedCount, ledSize]);
 
   // Skeleton loader during connection
   if (device.connectionStatus === 'connecting') {
@@ -174,10 +205,10 @@ const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColo
   }
 
   // Placeholder when no data after timeout
-  if (showPlaceholder && (!ledColors || ledColors.length === 0) && !device.testPattern) {
+  if (showPlaceholder && (!ledColors || ledColors.length === 0) && (!showLivePreview || compositedColors.length === 0) && !device.testPattern) {
     return (
       <div className="w-full h-8 bg-gray-800 rounded-lg flex items-center justify-center">
-        <p className="text-gray-500 text-xs">Waiting for audio data...</p>
+        <p className="text-gray-500 text-xs">Waiting for visualization...</p>
       </div>
     );
   }

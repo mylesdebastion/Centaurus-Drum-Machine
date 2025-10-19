@@ -10,6 +10,7 @@ import React, { useState } from 'react';
 import { Trash2, Wifi, WifiOff, Check } from 'lucide-react';
 import { wledDeviceRegistry } from '@/services/WLEDDeviceRegistry';
 import type { WLEDDevice, WLEDDeviceInput, DeviceCapabilities } from '@/types/wled';
+import WLEDVirtualPreview from '@/components/WLED/WLEDVirtualPreview';
 
 interface DeviceCardProps {
   device: WLEDDevice | null; // null for new unsaved device
@@ -450,6 +451,27 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, assignedColor, o
             ({gridWidth * gridHeight} LEDs total)
           </span>
         </div>
+      )}
+
+      {/* Virtual LED Preview - Story 18.8 */}
+      {enabled && device && (
+        <WLEDVirtualPreview
+          device={{
+            id: device.id,
+            ledCount: device.capabilities.ledCount,
+            deviceType: device.capabilities.dimensions === '1D' ? 'strip' : 'matrix',
+            matrixConfig: device.capabilities.gridConfig ? {
+              width: device.capabilities.gridConfig.width,
+              height: device.capabilities.gridConfig.height,
+              serpentine: device.capabilities.gridConfig.serpentine,
+              orientation: device.capabilities.gridConfig.orientation,
+            } : undefined,
+            reverseDirection: device.reverse_direction,
+            connectionStatus: connectionStatus,
+            testPattern: undefined,
+          } as any}
+          showLivePreview={true}
+        />
       )}
     </div>
   );

@@ -78,4 +78,5 @@ export interface WLEDDeviceCardProps {
 export interface WLEDVirtualPreviewProps {
   device: WLEDDevice;
   ledColors?: string[];
+  showLivePreview?: boolean;
 }
