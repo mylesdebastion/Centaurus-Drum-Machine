@@ -59,6 +59,15 @@ class VisualizationRoutingMatrix {
 
     // Register built-in routing rules (Story 18.4)
     this.registerBuiltInRules();
+  }
+
+  /**
+   * Initialize subscriptions (called after both services are created)
+   * This avoids circular dependency issues during import
+   */
+  public initialize(): void {
+    // Set routing matrix reference in LEDCompositor
+    ledCompositor.setRoutingMatrix(this);
 
     // Subscribe to module registration/unregistration
     ledCompositor.onModuleRegistered(() => {
@@ -73,6 +82,8 @@ class VisualizationRoutingMatrix {
     wledDeviceRegistry.subscribeToDevices(() => {
       this.recalculateRouting('device-added');
     });
+
+    console.log('[RoutingMatrix] Initialized subscriptions');
   }
 
   /**
@@ -564,3 +575,6 @@ class VisualizationRoutingMatrix {
  * Use this exported instance throughout the application
  */
 export const routingMatrix = new VisualizationRoutingMatrix();
+
+// Initialize subscriptions after creation (avoids circular dependency)
+routingMatrix.initialize();

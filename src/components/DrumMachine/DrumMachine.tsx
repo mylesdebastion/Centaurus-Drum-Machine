@@ -92,6 +92,25 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
     });
   }, [currentStep, isPlaying, tracks]);
 
+  // Submit LED frames to WLED devices via automatic routing (Story 18.6)
+  React.useEffect(() => {
+    if (!isPlaying) return;
+
+    // Generate visualization frame
+    const frame = generateDrumMachineFrame(tracks, currentStep);
+
+    // Submit to LEDCompositor (automatic routing)
+    ledCompositor
+      .submitFrameWithRouting({
+        moduleId: 'drum-machine',
+        pixelData: frame,
+        timestamp: Date.now(),
+      })
+      .catch((error) => {
+        console.error('[DrumMachine] Failed to submit LED frame:', error);
+      });
+  }, [currentStep, isPlaying, tracks]);
+
   return (
     <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
       <div className="flex items-center justify-between mb-6">
@@ -176,3 +195,56 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
     </div>
   );
 };
+
+/**
+ * Generate LED frame from drum machine pattern (Story 18.6)
+ * Format: 6 tracks × 16 steps (RGB)
+ * @param tracks - Drum tracks
+ * @param activeStep - Current active step
+ * @returns {Uint8ClampedArray} RGB pixel data
+ */
+function generateDrumMachineFrame(
+  tracks: DrumTrack[],
+  activeStep: number
+): Uint8ClampedArray {
+  const numTracks = Math.min(tracks.length, 6); // Max 6 tracks for visualization
+  const numSteps = 16;
+  const frame = new Uint8ClampedArray(numTracks * numSteps * 3); // RGB
+
+  for (let trackIndex = 0; trackIndex < numTracks; trackIndex++) {
+    const track = tracks[trackIndex];
+
+    for (let step = 0; step < numSteps; step++) {
+      const pixelIndex = (trackIndex * numSteps + step) * 3;
+      const isActive = track.steps[step];
+      const isCurrentStep = step === activeStep;
+      const velocity = track.velocities[step];
+
+      if (isCurrentStep && isActive) {
+        // Active step with note (bright color based on velocity)
+        const intensity = Math.floor(velocity * 255);
+        frame[pixelIndex] = intensity; // R
+        frame[pixelIndex + 1] = intensity; // G
+        frame[pixelIndex + 2] = 255; // B (full blue for active)
+      } else if (isCurrentStep) {
+        // Current step, no note (dim white playhead)
+        frame[pixelIndex] = 50; // R
+        frame[pixelIndex + 1] = 50; // G
+        frame[pixelIndex + 2] = 50; // B
+      } else if (isActive) {
+        // Note (blue, intensity based on velocity)
+        const intensity = Math.floor(velocity * 200);
+        frame[pixelIndex] = 0; // R
+        frame[pixelIndex + 1] = intensity / 2; // G (slight green for depth)
+        frame[pixelIndex + 2] = intensity; // B
+      } else {
+        // Empty (black)
+        frame[pixelIndex] = 0;
+        frame[pixelIndex + 1] = 0;
+        frame[pixelIndex + 2] = 0;
+      }
+    }
+  }
+
+  return frame;
+}

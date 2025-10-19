@@ -28,6 +28,40 @@ Guitar        (Overlay Rules)               144-LED Strip (saved to DB)
 Audio         (Priority System)
 ```
 
+### Architecture Diagram (Mermaid)
+
+```mermaid
+graph TD
+    A[Modules] -->|Register Capabilities| B[LEDCompositor]
+    B -->|Query Capabilities| C[VisualizationRoutingMatrix]
+    D[WLED Device Registry] -->|Provide Devices| C
+    C -->|Apply Rules| E[Routing Rules Engine]
+    E -->|Return Assignments| C
+    C -->|Assignments| B
+    B -->|Submit Frame| F[Frame Conversion]
+    F -->|Device Frame| G[Overlay Blending]
+    G -->|Blended Frame| H[WLED HTTP API]
+    H -->|LED Updates| I[Physical LEDs]
+
+    J[User] -->|Configure Devices| K[WLED Manager UI]
+    K -->|CRUD| D
+    D -->|Realtime Sync| L[Supabase]
+    L -->|Realtime Updates| D
+
+    style A fill:#4CAF50
+    style I fill:#2196F3
+    style C fill:#FF9800
+    style E fill:#9C27B0
+```
+
+**Key Components:**
+- **Modules** (green): DrumMachine, Guitar, Piano, Audio Reactive
+- **LEDCompositor**: Central frame submission and routing orchestrator
+- **VisualizationRoutingMatrix** (orange): Intelligent routing algorithm
+- **Routing Rules Engine** (purple): Context-aware rules
+- **WLED Device Registry**: Persistent device storage (Supabase)
+- **Physical LEDs** (blue): Real WLED hardware
+
 ---
 
 ## Layer 1: WLED Device Registry
