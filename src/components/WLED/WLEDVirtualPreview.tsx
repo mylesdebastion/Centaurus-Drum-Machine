@@ -95,6 +95,11 @@ const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColo
       }
     }
 
+    // Apply reverse direction (same as isometric implementation)
+    if (device.reverseDirection) {
+      ledArray.reverse();
+    }
+
     // Draw LEDs on canvas (thin line style)
     for (let i = 0; i < safeLedCount; i++) {
       const led = ledArray[i];
