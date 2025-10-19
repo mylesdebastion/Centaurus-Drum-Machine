@@ -12,18 +12,8 @@ import type { CompositorEvent } from '@/services/LEDCompositor';
 
 const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColors, showLivePreview = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [animationFrame, setAnimationFrame] = useState(0);
   const [compositedColors, setCompositedColors] = useState<string[]>([]);
 
-  // Animate test patterns and waiting states
-  useEffect(() => {
-    if (device.testPattern === 'rainbow' || device.testPattern === 'solid') {
-      const interval = setInterval(() => {
-        setAnimationFrame((frame) => frame + 1);
-      }, 50); // 50ms = 20 FPS for smooth rainbow
-      return () => clearInterval(interval);
-    }
-  }, [device.testPattern]);
 
   // Subscribe to compositor events for live preview (Story 18.8)
   useEffect(() => {
@@ -84,72 +74,15 @@ const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColo
       };
     };
 
-    // Helper: Convert HSV to RGB (for rainbow test pattern)
-    const hsvToRgb = (h: number, s: number, v: number): { r: number; g: number; b: number } => {
-      const c = v * s;
-      const x = c * (1 - Math.abs(((h * 6) % 2) - 1));
-      const m = v - c;
-
-      let r = 0,
-        g = 0,
-        b = 0;
-
-      if (h >= 0 && h < 1 / 6) {
-        r = c;
-        g = x;
-        b = 0;
-      } else if (h >= 1 / 6 && h < 2 / 6) {
-        r = x;
-        g = c;
-        b = 0;
-      } else if (h >= 2 / 6 && h < 3 / 6) {
-        r = 0;
-        g = c;
-        b = x;
-      } else if (h >= 3 / 6 && h < 4 / 6) {
-        r = 0;
-        g = x;
-        b = c;
-      } else if (h >= 4 / 6 && h < 5 / 6) {
-        r = x;
-        g = 0;
-        b = c;
-      } else {
-        r = c;
-        g = 0;
-        b = x;
-      }
-
-      return {
-        r: Math.round((r + m) * 255),
-        g: Math.round((g + m) * 255),
-        b: Math.round((b + m) * 255),
-      };
-    };
-
     // Generate LED array
     const ledArray: { r: number; g: number; b: number }[] = [];
 
-    // Determine which color source to use (priority order)
-    const activeColors = device.testPattern ? ledColors : (showLivePreview && compositedColors.length > 0 ? compositedColors : ledColors);
+    // Determine which color source to use
+    const activeColors = showLivePreview && compositedColors.length > 0 ? compositedColors : ledColors;
 
-    // Test pattern mode (highest priority)
-    if (device.testPattern === 'rainbow') {
-      // Rainbow test pattern (animated)
-      const time = animationFrame * 0.05;
-      for (let i = 0; i < safeLedCount; i++) {
-        const hue = ((i / safeLedCount) + time) % 1.0;
-        const color = hsvToRgb(hue, 1.0, 1.0);
-        ledArray.push(color);
-      }
-    } else if (device.testPattern === 'solid') {
-      // Solid color test (use first LED color or white)
-      const solidColor = activeColors && activeColors.length > 0 ? hexToRgb(activeColors[0]) : { r: 255, g: 255, b: 255 };
-      for (let i = 0; i < safeLedCount; i++) {
-        ledArray.push(solidColor);
-      }
-    } else if (activeColors && activeColors.length > 0) {
-      // Normal mode: use provided LED data (compositor or manual)
+    // Display actual pixel data (no invented animations)
+    if (activeColors && activeColors.length > 0) {
+      // Show provided LED data (from compositor events or manual data)
       for (let i = 0; i < safeLedCount; i++) {
         const hexColor = activeColors[i] || '000000';
         const color = hexToRgb(hexColor);
@@ -182,7 +115,7 @@ const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColo
 
       ctx.fillRect(x, y, width, canvasHeight);
     }
-  }, [device, ledColors, compositedColors, showLivePreview, animationFrame, safeLedCount, ledSize]);
+  }, [device, ledColors, compositedColors, showLivePreview, safeLedCount, ledSize]);
 
   // Skeleton loader during connection
   if (device.connectionStatus === 'connecting') {

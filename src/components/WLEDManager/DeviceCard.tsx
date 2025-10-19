@@ -46,7 +46,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, assignedColor, o
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'error'>(
     device ? 'unknown' : 'unknown'
   );
-  const [testPattern, setTestPattern] = useState<'rainbow' | 'solid' | undefined>(undefined);
+  const [virtualPixelData, setVirtualPixelData] = useState<string[] | undefined>(undefined);
 
   // Build capabilities object
   const buildCapabilities = (): DeviceCapabilities => {
@@ -68,6 +68,35 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, assignedColor, o
     return caps;
   };
 
+  // Helper: HSV to RGB conversion
+  const hsvToRgb = (h: number, s: number, v: number): { r: number; g: number; b: number } => {
+    const c = v * s;
+    const x = c * (1 - Math.abs(((h * 6) % 2) - 1));
+    const m = v - c;
+
+    let r = 0, g = 0, b = 0;
+
+    if (h >= 0 && h < 1/6) {
+      r = c; g = x; b = 0;
+    } else if (h >= 1/6 && h < 2/6) {
+      r = x; g = c; b = 0;
+    } else if (h >= 2/6 && h < 3/6) {
+      r = 0; g = c; b = x;
+    } else if (h >= 3/6 && h < 4/6) {
+      r = 0; g = x; b = c;
+    } else if (h >= 4/6 && h < 5/6) {
+      r = x; g = 0; b = c;
+    } else {
+      r = c; g = 0; b = x;
+    }
+
+    return {
+      r: Math.round((r + m) * 255),
+      g: Math.round((g + m) * 255),
+      b: Math.round((b + m) * 255)
+    };
+  };
+
   // Test connection and send rainbow pattern
   const handleTestConnection = async () => {
     if (!ip) {
@@ -78,15 +107,23 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, assignedColor, o
     setTestSuccess(false);
     setConnectionStatus('unknown');
 
-    // Show rainbow test pattern in virtual preview
-    setTestPattern('rainbow');
+    // Generate static rainbow gradient (same as what gets sent to device)
+    const testLedCount = dimensions === '2D' ? gridWidth * gridHeight : ledCount;
+    const rainbowColors: string[] = [];
+
+    for (let i = 0; i < testLedCount; i++) {
+      const hue = i / testLedCount; // Static gradient, no animation
+      const rgb = hsvToRgb(hue, 1.0, 1.0);
+      const hex = `#${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
+      rainbowColors.push(hex);
+    }
+
+    // Show actual pixel data in virtual preview
+    setVirtualPixelData(rainbowColors);
 
     try {
       // First, test connection to get device info
       const info = await wledDeviceRegistry.testConnection(ip);
-
-      // Calculate LED count based on current dimension settings
-      const testLedCount = dimensions === '2D' ? gridWidth * gridHeight : ledCount;
 
       // Send rainbow test pattern to physical device
       await wledDeviceRegistry.sendRainbowTestPattern(ip, testLedCount);
@@ -96,16 +133,16 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, assignedColor, o
       setTestSuccess(true);
       console.log(`✅ Connected to ${info.name} (v${info.ver}) - ${info.leds.count} LEDs detected`);
 
-      // Hide success indicator and test pattern after 3 seconds
+      // Clear virtual pixel data after 3 seconds
       setTimeout(() => {
         setTestSuccess(false);
-        setTestPattern(undefined);
+        setVirtualPixelData(undefined);
       }, 3000);
     } catch (error) {
       setConnectionStatus('error');
       console.error(`❌ Connection failed to ${ip}:`, error);
-      // Clear test pattern on error
-      setTestPattern(undefined);
+      // Clear virtual pixel data on error
+      setVirtualPixelData(undefined);
     } finally {
       setIsTesting(false);
     }
@@ -477,8 +514,9 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, assignedColor, o
             } : undefined,
             reverseDirection: device.reverse_direction,
             connectionStatus: connectionStatus,
-            testPattern: testPattern,
+            testPattern: undefined,
           } as any}
+          ledColors={virtualPixelData}
           showLivePreview={true}
         />
       )}
