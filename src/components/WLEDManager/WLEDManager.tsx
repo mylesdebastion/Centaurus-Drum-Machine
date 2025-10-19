@@ -96,7 +96,7 @@ export const WLEDManager: React.FC<WLEDManagerProps> = ({ onBack }) => {
           },
           brightness: 204,
           reverse_direction: false,
-          enabled: i === 7, // Only device #8 (index 7) is enabled
+          enabled: true, // All devices enabled by default
           assigned_color: RAINBOW_COLORS[i],
         };
 
