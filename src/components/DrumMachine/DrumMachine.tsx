@@ -5,6 +5,8 @@ import { TrackRow } from './TrackRow';
 import { TransportControls } from './TransportControls';
 import { TrackManager } from './TrackManager';
 import { audioEngine } from '../../utils/audioEngine';
+import { ledCompositor } from '@/services/LEDCompositor';
+import { drumMachineCapability } from '@/capabilities/drumMachineCapability';
 
 interface DrumMachineProps {
   tracks: DrumTrack[];
@@ -47,6 +49,17 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
   onRemoveTrack,
   onLoadDefaultPattern
 }) => {
+  // Register module capability for WLED routing
+  React.useEffect(() => {
+    ledCompositor.registerModule(drumMachineCapability);
+    console.log('[DrumMachine] Module registered with LEDCompositor');
+
+    return () => {
+      ledCompositor.unregisterModule('drum-machine');
+      console.log('[DrumMachine] Module unregistered from LEDCompositor');
+    };
+  }, []);
+
   // Initialize audio engine on play (requires user interaction for Tone.js)
   const handlePlay = async () => {
     try {
