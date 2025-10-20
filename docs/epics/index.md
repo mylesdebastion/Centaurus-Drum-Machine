@@ -2,7 +2,7 @@
 
 This directory contains all project epics organized by epic number. Each epic represents a major feature area or system architecture component.
 
-**Total Epics:** 15 (6 Complete, 4 In Progress, 5 Planning)
+**Total Epics:** 16 (6 Complete, 5 In Progress, 5 Planning)
 
 ---
 
@@ -25,6 +25,7 @@ This directory contains all project epics organized by epic number. Each epic re
 | [Epic 15](./epic-15-chord-melody-arranger.md) | Chord Progression & Melody Arranger Module | 📝 PLANNING | High | 9 stories | Not started |
 | [Epic 16](./epic-16-unified-module-ui-template.md) | Unified Studio Module UI Template | 📝 PLANNING | Medium | 3 stories | Not started |
 | [Epic 17](./epic-17-remote-wled-state-sync.md) | Remote WLED Control via Jam Sessions | 📝 PLANNING | High | 3 stories | Not started |
+| [Epic 19](./epic-19-education-dj-visualizer-integration.md) | Education Mode DJ Visualizer Integration | 🚧 IN PROGRESS | Medium | 6 stories | 33% (19.1-19.2 in progress) |
 
 ---
 
@@ -326,6 +327,36 @@ This directory contains all project epics organized by epic number. Each epic re
 
 ---
 
+### Epic 19: Education Mode DJ Visualizer Integration
+**Status:** 🚧 IN PROGRESS (Story 19.2 Active)
+**Goal:** Integrate LiveAudioVisualizer into Education Mode lessons 2 & 4 for enhanced audio/pitch learning with real-time frequency visualization, while preserving step sequencer UI for rhythm lessons.
+
+**Key Features:**
+- LiveAudioVisualizer embedded mode for education context
+- Lesson 2 (Color & Pitch) - DJ visualizer spectrum mode
+- Lesson 4 (Melody & Harmony) - Piano keyboard with frequency visualization
+- WLED 1D LED strip spectrum visualization (Story 19.5)
+- WLED 2D LED matrix bar chart rendering (Story 19.6)
+- Pedagogical approach: step sequencer for rhythm (L1 & L3), visualizer for pitch/audio (L2 & L4)
+
+**Stories:**
+- 📝 [Story 19.1](../stories/19.1.story.md): LiveAudioVisualizer Embedded Mode
+- 🚧 [Story 19.2](../stories/19.2.story.md): Lesson 2 (Color & Pitch) Visualizer Integration (In Progress)
+- 📝 [Story 19.3](../stories/19.3.story.md): Performance Optimization & Polish (Lessons 2 & 4)
+- 📝 [Story 19.4](../stories/19.4.story.md): Lesson 4 (Melody & Harmony) Visualizer Integration
+- 📝 [Story 19.5](../stories/19.5-spectrum-wled-enhancement.md): Spectrum Mode WLED (1D LED Strips)
+- 📝 [Story 19.6](../stories/19.6-spectrum-wled-2d-matrix.md): Spectrum Mode WLED (2D LED Matrices)
+
+**Technical Foundation:**
+- Existing LiveAudioVisualizer at `/dj-visualizer` route
+- FrequencySourceManager for audio data mixing
+- WLED LED output via WebSocket bridge
+- 60fps canvas rendering, 30+ fps WLED output
+
+**Created:** 2025-10-19 (Sarah - Product Owner)
+
+---
+
 ## Epic Status Legend
 
 - ✅ **COMPLETE**: All stories implemented and verified
@@ -372,5 +403,5 @@ This directory contains all project epics organized by epic number. Each epic re
 
 ---
 
-**Last Updated:** 2025-10-18
+**Last Updated:** 2025-10-19
 **Maintained By:** BMad Framework (Product Owner, PM, Dev Agents)
