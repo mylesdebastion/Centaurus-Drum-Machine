@@ -194,6 +194,7 @@ Build rule-based system for context-aware routing behaviors (active module detec
 
 ### **Story 18.5: WLED Manager UI (Unified Component)**
 **Estimate:** 4-5 hours | **Priority:** 🟡 MEDIUM
+**Status:** ⚠️ **PARTIALLY COMPLETE - CRITICAL ISSUE IDENTIFIED**
 
 Create unified WLED Manager UI component for device registry management and real-time routing status display.
 
@@ -210,6 +211,16 @@ Create unified WLED Manager UI component for device registry management and real
 - Test connection button (HTTP `/json/info`)
 - Visual preview of current routing assignments
 - Mobile-responsive layout
+
+**🔴 CRITICAL ISSUE (2025-10-19):**
+Virtual preview implementation has poor visual rendering and data flow issues compared to working `/dj-visualizer` (LEDMatrixManager) implementation. Course correction needed.
+
+**See:** `docs/issues/issue-wled-manager-virtual-preview-problems.md`
+
+**⭐ STRATEGIC CONTEXT:**
+This issue revealed a broader architectural need: consolidate all WLED implementations to one canonical pattern (LEDMatrixManager). Story 18.10 addresses the full consolidation strategy.
+
+**See:** `docs/architecture/wled-implementation-consolidation.md`
 
 ---
 
@@ -256,6 +267,40 @@ Comprehensive testing with multiple modules active simultaneously and complete d
 
 ---
 
+### **Story 18.10: WLED Implementation Consolidation**
+**Estimate:** 8-10 hours | **Priority:** 🟡 MEDIUM
+**Prerequisites:** Story 18.5 (WLED Manager UI fixed)
+
+**⭐ NEW STORY (2025-10-19)** - Consolidate all WLED implementations to one canonical pattern.
+
+Deprecate legacy WLED implementations (WLEDDeviceManager) and migrate all modules to use the canonical LEDMatrixManager pattern. Ensures consistent 1:1 data flow (audio/visual input → virtual preview → physical device) across entire application.
+
+**Deliverables:**
+- Mark WLEDDeviceManager as `@deprecated` with migration guide
+- Migrate GuitarFretboard to use LEDMatrixManager
+- Create backward compatibility tests
+- Extract LEDMatrixManager to shared utility
+- Remove legacy WLED code (WLEDDeviceManager, WLEDDeviceCard)
+
+**Acceptance Criteria:**
+- All modules use canonical LEDMatrixManager pattern
+- Virtual preview matches physical device output (1:1) in all views
+- GuitarFretboard WLED output preserved (no breaking changes)
+- Legacy code removed, no duplicate WLED logic
+- Documentation updated (migration guide, architecture docs)
+
+**Architecture Document:** [wled-implementation-consolidation.md](../architecture/wled-implementation-consolidation.md)
+
+**Phases:**
+- Phase 1: Fix Story 18.5 (prerequisite, see issue doc)
+- Phase 2: Deprecate legacy implementations (2-3 hours)
+- Phase 3: Migrate GuitarFretboard (3-4 hours)
+- Phase 4: Unified WLED API, cleanup (3-4 hours)
+
+**Rationale:** Discovered during Story 18.5 that multiple WLED implementations exist with varying quality. LEDMatrixManager (used in /dj-visualizer and /education) has perfect 1:1 data flow, while others have virtual preview issues. Consolidating to one pattern improves maintainability and user experience.
+
+---
+
 ## Dependencies
 
 ### Epic Dependencies
@@ -271,6 +316,7 @@ Comprehensive testing with multiple modules active simultaneously and complete d
 - **18.0, 18.1, 18.2, 18.3 → 18.5** - UI requires auth + all backend components
 - **18.1-18.5 → 18.6** - Module migration requires full system
 - **18.6 → 18.7** - Testing after migration
+- **18.5 (fixed) → 18.10** - Consolidation requires working WLED Manager UI first
 
 ---
 
@@ -384,13 +430,15 @@ Comprehensive testing with multiple modules active simultaneously and complete d
 
 ## Timeline Estimate
 
-**Total Effort:** 32-41 hours (includes Story 18.0)
+**Total Effort (Core):** 32-41 hours (Stories 18.0-18.7)
+**Total Effort (With Consolidation):** 40-51 hours (includes Story 18.10)
 
 **Week 1:** Story 18.0 + Stories 18.1-18.3 (Auth + Backend Infrastructure)
 **Week 2:** Stories 18.4-18.6 (Rules Engine + UI & Integration)
 **Week 3:** Story 18.7 (Testing & Documentation)
+**Week 4:** Story 18.10 (WLED Implementation Consolidation)
 
-**Target Completion:** 3 weeks from start
+**Target Completion:** 4 weeks from start
 
 **Story Breakdown:**
 - Story 18.0: 4-6 hours (User Authentication MVP)
@@ -398,9 +446,10 @@ Comprehensive testing with multiple modules active simultaneously and complete d
 - Story 18.2: 3-4 hours (Module Capability Declaration)
 - Story 18.3: 5-6 hours (Visualization Routing Matrix)
 - Story 18.4: 4-5 hours (Rules Engine)
-- Story 18.5: 4-5 hours (WLED Manager UI)
+- Story 18.5: 4-5 hours (WLED Manager UI) + fix time (2-3 hours)
 - Story 18.6: 5-6 hours (LEDCompositor Integration)
 - Story 18.7: 3-4 hours (Testing & Documentation)
+- Story 18.10: 8-10 hours (WLED Implementation Consolidation) - **NEW**
 
 ---
 
