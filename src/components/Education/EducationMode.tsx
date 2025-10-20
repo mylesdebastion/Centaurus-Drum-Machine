@@ -577,16 +577,35 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-3">
                   <div className="w-full sm:w-16"></div>
                   <div className="grid grid-cols-8 sm:flex sm:gap-1.5 gap-1 w-full sm:w-auto">
-                    {Array.from({ length: 16 }, (_, i) => (
-                      <div
-                        key={i}
-                        className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center text-xs font-mono ${
-                          i % 4 === 0 ? 'text-yellow-400' : 'text-white/60'
-                        }`}
-                      >
-                        {i + 1}
-                      </div>
-                    ))}
+                    {Array.from({ length: 16 }, (_, i) => {
+                      // Determine color based on lesson and step
+                      let numberColor = 'text-white/60'; // Default for non-beat steps
+
+                      // Lesson 1 and Lesson 3 Step 1: Kick on 1, 5, 9, 13 (all red)
+                      if (selectedLesson.id === '1' || (selectedLesson.id === '3' && currentStepIndex === 0)) {
+                        if (i % 4 === 0) { // Steps 1, 5, 9, 13 (indices 0, 4, 8, 12)
+                          numberColor = 'text-red-500'; // Kick color
+                        }
+                      }
+
+                      // Lesson 3 Step 2: Kick on 1, 9 (red), Snare on 5, 13 (green)
+                      if (selectedLesson.id === '3' && currentStepIndex === 1) {
+                        if (i === 0 || i === 8) { // Steps 1, 9 (kick only)
+                          numberColor = 'text-red-500'; // Kick color
+                        } else if (i === 4 || i === 12) { // Steps 5, 13 (snare)
+                          numberColor = 'text-green-500'; // Snare color
+                        }
+                      }
+
+                      return (
+                        <div
+                          key={i}
+                          className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center text-xs font-mono ${numberColor}`}
+                        >
+                          {i + 1}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
