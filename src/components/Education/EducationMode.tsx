@@ -16,6 +16,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [userPattern, setUserPattern] = useState<boolean[]>(new Array(16).fill(false));
   const [snarePattern, setSnarePattern] = useState<boolean[]>(new Array(16).fill(false));
+  const [hihatPattern, setHihatPattern] = useState<boolean[]>(new Array(16).fill(false));
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPlayStep, setCurrentPlayStep] = useState(0);
   const [tempo] = useState(120); // Fixed tempo for education mode
@@ -106,7 +107,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     {
       id: '3',
       title: 'Rhythm Patterns',
-      description: 'Learn to create a complete 4/4 beat with kick and snare',
+      description: 'Learn to create a complete 4/4 beat with kick, snare, and hi-hat',
       difficulty: 'intermediate',
       steps: [
         {
@@ -121,6 +122,13 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
           instruction: 'Now add a snare track below. Click on steps 5 and 13 for the snare (beats 2 and 4)',
           expectedPattern: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
           hint: 'Snare typically goes on the backbeat (beats 2 and 4)',
+          completed: false
+        },
+        {
+          id: '3-3',
+          instruction: 'Finally, add hi-hats on every other step (1, 3, 5, 7, 9, 11, 13, 15) to complete the beat',
+          expectedPattern: [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false],
+          hint: 'Hi-hats on the 8th notes create the groove - click the odd-numbered steps',
           completed: false
         }
       ]
@@ -138,12 +146,18 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     const currentStep = selectedLesson.steps[currentStepIndex];
     if (!currentStep) return false;
     if (!currentStep.expectedPattern) return true;
-    
-    // For the second step of Rhythm Patterns lesson (snare track)
-    if (selectedLesson.id === '3' && currentStepIndex === 1) {
-      return JSON.stringify(snarePattern) === JSON.stringify(currentStep.expectedPattern);
+
+    // For Rhythm Patterns lesson, check the appropriate track
+    if (selectedLesson.id === '3') {
+      if (currentStepIndex === 1) {
+        // Step 2: Check snare pattern
+        return JSON.stringify(snarePattern) === JSON.stringify(currentStep.expectedPattern);
+      } else if (currentStepIndex === 2) {
+        // Step 3: Check hi-hat pattern
+        return JSON.stringify(hihatPattern) === JSON.stringify(currentStep.expectedPattern);
+      }
     }
-    
+
     return JSON.stringify(userPattern) === JSON.stringify(currentStep.expectedPattern);
   };
 
@@ -154,17 +168,30 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
 
     if (currentStepIndex < selectedLesson.steps.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
-      // Don't reset kick pattern when moving to snare step
-      if (!(selectedLesson.id === '3' && currentStepIndex === 0)) {
+
+      // For Rhythm Patterns lesson, preserve previous tracks
+      if (selectedLesson.id === '3') {
+        // When moving to snare step (step 2), keep kick pattern
+        // When moving to hi-hat step (step 3), keep kick and snare patterns
+        if (currentStepIndex === 0) {
+          // Moving from step 1 to step 2 - clear snare
+          setSnarePattern(new Array(16).fill(false));
+        } else if (currentStepIndex === 1) {
+          // Moving from step 2 to step 3 - clear hi-hat
+          setHihatPattern(new Array(16).fill(false));
+        }
+      } else {
+        // For other lessons, reset pattern
         setUserPattern(new Array(16).fill(false));
+        setSnarePattern(new Array(16).fill(false));
       }
-      setSnarePattern(new Array(16).fill(false));
     } else {
       // Lesson completed - reset all state
       setSelectedLesson(null);
       setCurrentStepIndex(0);
       setUserPattern(new Array(16).fill(false));
       setSnarePattern(new Array(16).fill(false));
+      setHihatPattern(new Array(16).fill(false));
       setDrumsPlayed(new Set());
       setColorModeStep(0);
       setVizMode('spectrum');
@@ -179,10 +206,16 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     if (!selectedLesson) return;
     const currentStep = selectedLesson.steps[currentStepIndex];
     if (!currentStep) return;
-    
-    // For the second step of Rhythm Patterns lesson (snare track)
-    if (selectedLesson?.id === '3' && currentStepIndex === 1) {
-      setSnarePattern(new Array(16).fill(false));
+
+    // For Rhythm Patterns lesson, reset the appropriate track
+    if (selectedLesson?.id === '3') {
+      if (currentStepIndex === 1) {
+        setSnarePattern(new Array(16).fill(false));
+      } else if (currentStepIndex === 2) {
+        setHihatPattern(new Array(16).fill(false));
+      } else {
+        setUserPattern(new Array(16).fill(false));
+      }
     } else {
       setUserPattern(new Array(16).fill(false));
     }
@@ -208,15 +241,20 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       if (userPattern[stepIndex]) {
         audioEngine.playDrum('kick', 0.8);
       }
-      
+
       // Play snare if snare pattern is active (for Rhythm Patterns lesson)
       if (selectedLesson?.id === '3' && snarePattern[stepIndex]) {
         audioEngine.playDrum('snare', 0.8);
       }
-      
+
+      // Play hi-hat if hi-hat pattern is active (for Rhythm Patterns lesson)
+      if (selectedLesson?.id === '3' && hihatPattern[stepIndex]) {
+        audioEngine.playDrum('hihat', 0.6);
+      }
+
       // Update visual step indicator
       setCurrentPlayStep(stepIndex);
-      
+
       stepIndex = (stepIndex + 1) % 16;
     }, "16n", 0); // 16th note intervals starting immediately
     
@@ -226,7 +264,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       Tone.Transport.stop();
       Tone.Transport.cancel(scheduleId);
     };
-  }, [isPlaying, tempo, userPattern, snarePattern, selectedLesson]);
+  }, [isPlaying, tempo, userPattern, snarePattern, hihatPattern, selectedLesson]);
 
   const handlePlayPattern = () => {
     setIsPlaying(!isPlaying);
@@ -598,6 +636,19 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                         }
                       }
 
+                      // Lesson 3 Step 3: Complete pattern with hi-hats on odd steps
+                      if (selectedLesson.id === '3' && currentStepIndex === 2) {
+                        const isOddStep = i % 2 === 0; // Odd-numbered steps (indices 0, 2, 4...)
+
+                        if (i === 0 || i === 8) { // Steps 1, 9 (kick + hi-hat)
+                          animateClass = 'animate-kick-hihat'; // Alternate red/purple
+                        } else if (i === 4 || i === 12) { // Steps 5, 13 (kick + snare + hi-hat)
+                          animateClass = 'animate-kick-snare-hihat'; // Alternate red/green/purple
+                        } else if (isOddStep) { // Other odd steps (hi-hat only)
+                          numberColor = 'text-purple-500'; // Hi-hat color
+                        }
+                      }
+
                       return (
                         <div
                           key={i}
@@ -632,8 +683,8 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                   </div>
                 </div>
 
-                {/* Snare Track for Rhythm Patterns lesson step 2 */}
-                {selectedLesson.id === '3' && currentStepIndex === 1 && (
+                {/* Snare Track for Rhythm Patterns lesson step 2 and 3 */}
+                {selectedLesson.id === '3' && (currentStepIndex === 1 || currentStepIndex === 2) && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-4">
                     <div className="w-full sm:w-16 text-white font-medium text-center sm:text-left">Snare</div>
                     <div className="grid grid-cols-8 sm:flex sm:gap-1.5 gap-1 w-full sm:w-auto">
@@ -651,6 +702,34 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                           style={{
                             backgroundColor: active ? '#10b981' : undefined,
                             borderColor: active ? '#10b981' : undefined
+                          }}
+                        >
+                          {active && <div className="w-2 h-2 rounded-full bg-white" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Hi-hat Track for Rhythm Patterns lesson step 3 */}
+                {selectedLesson.id === '3' && currentStepIndex === 2 && (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-4">
+                    <div className="w-full sm:w-16 text-white font-medium text-center sm:text-left">Hi-hat</div>
+                    <div className="grid grid-cols-8 sm:flex sm:gap-1.5 gap-1 w-full sm:w-auto">
+                      {hihatPattern.map((active, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            const newPattern = [...hihatPattern];
+                            newPattern[index] = !newPattern[index];
+                            setHihatPattern(newPattern);
+                          }}
+                          className={`step-button-compact ${active ? 'active' : ''} ${
+                            isPlaying && index === currentPlayStep ? 'ring-2 ring-yellow-400' : ''
+                          } touch-target`}
+                          style={{
+                            backgroundColor: active ? '#a855f7' : undefined,
+                            borderColor: active ? '#a855f7' : undefined
                           }}
                         >
                           {active && <div className="w-2 h-2 rounded-full bg-white" />}
