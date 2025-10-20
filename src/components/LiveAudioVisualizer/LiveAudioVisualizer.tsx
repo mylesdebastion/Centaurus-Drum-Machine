@@ -392,7 +392,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
 
         {isInitialized && (
           <>
-            <div className="bg-gray-900 rounded-lg overflow-hidden mb-4" style={{ height: '400px' }}>
+            <div className="bg-gray-900 rounded-lg overflow-hidden mb-4" style={{ height: '320px' }}>
               <canvas
                 ref={canvasRef}
                 className="w-full h-full cursor-crosshair"
