@@ -32,6 +32,8 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   const [colorModeStep, setColorModeStep] = useState(0);
   const [drumsPlayed, setDrumsPlayed] = useState<Set<string>>(new Set());
   const [vizMode, setVizMode] = useState<VisualizationMode>('spectrum');
+  const [audioInitialized, setAudioInitialized] = useState(false);
+  const [hasToggledVizMode, setHasToggledVizMode] = useState(false);
 
   // LED Strip visualization for Lesson 3 (multi-lane sequencer)
   const ledVisualizerRef = React.useRef<SingleLaneVisualizer | null>(null);
@@ -60,13 +62,21 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       // Reset all lesson 2 state when starting
       setDrumsPlayed(new Set());
       setColorModeStep(0);
-      setVizMode('spectrum');
+      setVizMode('ripple'); // Start in ripple mode
+      setHasToggledVizMode(false); // Reset toggle state
       setVisualizerSettings(prev => ({
         ...prev,
         colorMode: 'spectrum'
       }));
     }
   }, [selectedLesson]);
+
+  // Reset drums played when advancing to step 2 in lesson 2
+  useEffect(() => {
+    if (selectedLesson?.id === '2' && currentStepIndex === 1) {
+      setDrumsPlayed(new Set());
+    }
+  }, [selectedLesson, currentStepIndex]);
 
   // Initialize LED strip visualization for Lesson 1 (single-lane kick)
   useEffect(() => {
@@ -258,20 +268,14 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       steps: [
         {
           id: '2-1',
-          instruction: 'Click the drum buttons below to see how different sounds create live spectrum visualizations',
-          hint: 'Notice how low sounds like kick drums appear as red, while high sounds appear as blue/violet in the frequency bars',
+          instruction: 'Try all 4 drum sounds and watch the ripple visualization respond to each one',
+          hint: 'Click each drum button to fill it in. Each sound creates different ripple patterns!',
           completed: false
         },
         {
           id: '2-2',
-          instruction: 'Now switch to Ripple mode to see sound as expanding circles instead of frequency bars',
-          hint: 'Ripple mode shows audio energy visually - try playing the drums to see the effect!',
-          completed: false
-        },
-        {
-          id: '2-3',
-          instruction: 'Try different color modes to see how the same sounds can be colored differently',
-          hint: 'Spectrum mode uses frequency (red=low, violet=high), Chromatic uses note names, and Harmonic shows musical relationships',
+          instruction: 'Switch to Spectrum mode and try all 4 drums again to see frequency bars',
+          hint: 'Toggle to spectrum mode, then click all 4 drums again to see how different sounds appear as frequency bars',
           completed: false
         }
       ]
@@ -358,6 +362,9 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         }
 
         // Don't auto-start playing - wait for pattern completion
+      } else if (selectedLesson.id === '2') {
+        // For Color and Pitch lesson, reset drums played for next step
+        setDrumsPlayed(new Set());
       } else {
         // For other lessons, reset pattern
         setUserPattern(new Array(16).fill(false));
@@ -471,28 +478,29 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
 
     // Track which drums have been played in lesson 2
     if (selectedLesson?.id === '2') {
-      const updatedDrums = new Set(drumsPlayed).add(drumName);
-      setDrumsPlayed(updatedDrums);
-
-      // Auto-advance to step 2.2 when all 4 drums have been played in step 2.1
-      if (currentStepIndex === 0 && updatedDrums.size === 4) {
-        setTimeout(() => {
-          setCurrentStepIndex(1);
-        }, 1500);
+      // In step 1, track immediately
+      // In step 2, only track if student has switched to spectrum mode
+      if (currentStepIndex === 0 || (currentStepIndex === 1 && hasToggledVizMode)) {
+        const updatedDrums = new Set(drumsPlayed).add(drumName);
+        setDrumsPlayed(updatedDrums);
       }
     }
   };
 
   const switchVisualizationMode = () => {
-    // Toggle between spectrum and ripple only
-    const newMode: VisualizationMode = vizMode === 'spectrum' ? 'ripple' : 'spectrum';
-    setVizMode(newMode);
+    // Switch to spectrum mode (big button in step 2)
+    setVizMode('spectrum');
 
-    // Auto-advance to step 2.3 when switching to ripple mode in step 2.2
-    if (selectedLesson?.id === '2' && currentStepIndex === 1 && newMode === 'ripple') {
-      setTimeout(() => {
-        setCurrentStepIndex(2);
-      }, 1500);
+    // Mark that visualization mode has been toggled (for drum tracking in step 2)
+    setHasToggledVizMode(true);
+  };
+
+  // Handle viz mode changes from the mode buttons
+  const handleVizModeChange = (mode: VisualizationMode) => {
+    setVizMode(mode);
+    // Mark as toggled if switching to spectrum in step 2
+    if (currentStepIndex === 1 && mode === 'spectrum') {
+      setHasToggledVizMode(true);
     }
   };
 
@@ -650,26 +658,34 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                   <LiveAudioVisualizer
                     embedded={true}
                     currentMode={vizMode}
-                    onModeChange={setVizMode}
+                    onModeChange={handleVizModeChange}
                     colorMode={visualizerSettings.colorMode}
                     className="mb-6"
+                    hideControls={true}
+                    frequencySource="drums-only"
+                    onInitialized={setAudioInitialized}
+                    showModeButtons={currentStepIndex === 1}
                   />
                 </div>
 
-                {/* Drum Buttons - Always visible in all steps */}
-                <div>
-                  <h4 className="text-white font-medium mb-3">
-                    {currentStepIndex === 0 && 'Click the drums to hear sounds and see colors:'}
-                    {currentStepIndex === 1 && 'Play drums to see the ripple effect:'}
-                    {currentStepIndex === 2 && 'Play drums in different color modes:'}
-                  </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                {/* Drum Buttons - Only visible when audio is initialized */}
+                {audioInitialized && (
+                  <div>
+                    <h4 className="text-white font-medium mb-3">
+                      {currentStepIndex === 0 && 'Click each drum to try it out (buttons will fill in when clicked):'}
+                      {currentStepIndex === 1 && 'Try all 4 drums again in Spectrum mode:'}
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                     <button
                       onClick={() => playDrumSound('kick', 36)}
-                      className="bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-lg transition-colors touch-target relative min-w-[140px]"
+                      className={`py-3 px-4 rounded-lg transition-colors touch-target relative min-w-[140px] border-4 ${
+                        (currentStepIndex === 0 ? drumsPlayed.has('kick') : drumsPlayed.has('kick') && hasToggledVizMode)
+                          ? 'bg-red-600 hover:bg-red-700 border-red-600 text-white'
+                          : 'bg-gray-800 hover:bg-gray-900 border-red-600 text-red-600'
+                      }`}
                     >
                       <div className="flex items-center justify-between">
-                        <Check className={`w-4 h-4 text-green-400 transition-opacity ${drumsPlayed.has('kick') ? 'opacity-100' : 'opacity-0'}`} />
+                        <Check className={`w-4 h-4 text-white transition-opacity ${(currentStepIndex === 0 ? drumsPlayed.has('kick') : drumsPlayed.has('kick') && hasToggledVizMode) ? 'opacity-100' : 'opacity-0'}`} />
                         <div className="flex-1 text-center">
                           🥁 Kick<br/>
                           <span className="text-xs opacity-75">(Low/Red)</span>
@@ -679,10 +695,14 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                     </button>
                     <button
                       onClick={() => playDrumSound('snare', 38)}
-                      className="bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg transition-colors touch-target relative min-w-[140px]"
+                      className={`py-3 px-4 rounded-lg transition-colors touch-target relative min-w-[140px] border-4 ${
+                        (currentStepIndex === 0 ? drumsPlayed.has('snare') : drumsPlayed.has('snare') && hasToggledVizMode)
+                          ? 'bg-green-600 hover:bg-green-700 border-green-600 text-white'
+                          : 'bg-gray-800 hover:bg-gray-900 border-green-600 text-green-600'
+                      }`}
                     >
                       <div className="flex items-center justify-between">
-                        <Check className={`w-4 h-4 text-green-400 transition-opacity ${drumsPlayed.has('snare') ? 'opacity-100' : 'opacity-0'}`} />
+                        <Check className={`w-4 h-4 text-white transition-opacity ${(currentStepIndex === 0 ? drumsPlayed.has('snare') : drumsPlayed.has('snare') && hasToggledVizMode) ? 'opacity-100' : 'opacity-0'}`} />
                         <div className="flex-1 text-center">
                           🥁 Snare<br/>
                           <span className="text-xs opacity-75">(Mid/Green)</span>
@@ -692,10 +712,14 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                     </button>
                     <button
                       onClick={() => playDrumSound('clap', 39)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg transition-colors touch-target relative min-w-[140px]"
+                      className={`py-3 px-4 rounded-lg transition-colors touch-target relative min-w-[140px] border-4 ${
+                        (currentStepIndex === 0 ? drumsPlayed.has('clap') : drumsPlayed.has('clap') && hasToggledVizMode)
+                          ? 'bg-blue-600 hover:bg-blue-700 border-blue-600 text-white'
+                          : 'bg-gray-800 hover:bg-gray-900 border-blue-600 text-blue-600'
+                      }`}
                     >
                       <div className="flex items-center justify-between">
-                        <Check className={`w-4 h-4 text-green-400 transition-opacity ${drumsPlayed.has('clap') ? 'opacity-100' : 'opacity-0'}`} />
+                        <Check className={`w-4 h-4 text-white transition-opacity ${(currentStepIndex === 0 ? drumsPlayed.has('clap') : drumsPlayed.has('clap') && hasToggledVizMode) ? 'opacity-100' : 'opacity-0'}`} />
                         <div className="flex-1 text-center">
                           👏 Clap<br/>
                           <span className="text-xs opacity-75">(High/Blue)</span>
@@ -705,10 +729,14 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                     </button>
                     <button
                       onClick={() => playDrumSound('hihat', 42)}
-                      className="bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg transition-colors touch-target relative min-w-[140px]"
+                      className={`py-3 px-4 rounded-lg transition-colors touch-target relative min-w-[140px] border-4 ${
+                        (currentStepIndex === 0 ? drumsPlayed.has('hihat') : drumsPlayed.has('hihat') && hasToggledVizMode)
+                          ? 'bg-purple-600 hover:bg-purple-700 border-purple-600 text-white'
+                          : 'bg-gray-800 hover:bg-gray-900 border-purple-600 text-purple-600'
+                      }`}
                     >
                       <div className="flex items-center justify-between">
-                        <Check className={`w-4 h-4 text-green-400 transition-opacity ${drumsPlayed.has('hihat') ? 'opacity-100' : 'opacity-0'}`} />
+                        <Check className={`w-4 h-4 text-white transition-opacity ${(currentStepIndex === 0 ? drumsPlayed.has('hihat') : drumsPlayed.has('hihat') && hasToggledVizMode) ? 'opacity-100' : 'opacity-0'}`} />
                         <div className="flex-1 text-center">
                           🎩 Hi-Hat<br/>
                           <span className="text-xs opacity-75">(Very High/Purple)</span>
@@ -717,61 +745,68 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                       </div>
                     </button>
                   </div>
-                </div>
 
-                {/* Step 2.2: Switch to Ripple Mode */}
-                {currentStepIndex === 1 && (
-                  <div>
+                  {/* Step 1 Completion: All drums played in ripple mode */}
+                  {currentStepIndex === 0 && drumsPlayed.size === 4 && (
                     <button
-                      onClick={switchVisualizationMode}
-                      className="btn-primary w-full mb-4 touch-target"
+                      onClick={nextStep}
+                      className="btn-primary w-full flex items-center justify-center gap-2 touch-target mb-4"
                     >
-                      Switch to Ripple Mode
+                      <span>Next Step</span>
+                      <ArrowRight className="w-4 h-4" />
                     </button>
-                    <div className="bg-black/30 rounded-lg p-4">
-                      <p className="text-white/80 text-sm">
-                        📊 <strong>Spectrum Mode</strong> shows frequency bars - low frequencies on the left, high frequencies on the right.
-                        <br /><br />
-                        🌊 <strong>Ripple mode</strong> will show audio energy as expanding circles instead! Click the button above to switch, then try playing the drums to see the effect.
-                      </p>
-                    </div>
-                  </div>
+                  )}
+
+                  {/* Step 2 Completion: All drums played in spectrum mode */}
+                  {currentStepIndex === 1 && drumsPlayed.size === 4 && vizMode === 'spectrum' && (
+                    <button
+                      onClick={nextStep}
+                      className="btn-accent w-full flex items-center justify-center gap-2 touch-target mb-4"
+                    >
+                      <span>Complete Lesson</span>
+                      <Check className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
                 )}
 
-                {/* Step 2.3: Try Color Modes */}
-                {currentStepIndex === 2 && (
+                {/* Step 2: Toggle Visualization Mode and Explanation */}
+                {currentStepIndex === 1 && (
                   <div>
-                    <button
-                      onClick={switchColorMode}
-                      className="btn-accent w-full mb-4 touch-target"
-                    >
-                      Switch to {visualizerSettings.colorMode === 'spectrum' ? 'Chromatic' :
-                                visualizerSettings.colorMode === 'chromatic' ? 'Harmonic' : 'Spectrum'} Color
-                    </button>
-                    <div className="bg-black/30 rounded-lg p-4 mb-4">
-                      <h4 className="text-white font-medium mb-2">
-                        Current: <span className="text-yellow-400 capitalize">{visualizerSettings.colorMode}</span>
-                      </h4>
-                      <p className="text-white/80 text-sm">
-                        {visualizerSettings.colorMode === 'spectrum' &&
-                          '🌈 Spectrum Mode: Colors represent frequency - low sounds are red, high sounds are violet'}
-                        {visualizerSettings.colorMode === 'chromatic' &&
-                          '🎵 Chromatic Mode: Each musical note has its own color that stays the same across octaves'}
-                        {visualizerSettings.colorMode === 'harmonic' &&
-                          '🎼 Harmonic Mode: Musically related notes have similar colors based on the circle of fifths'}
-                      </p>
-                    </div>
-
-                    {/* Lesson Complete Button - appears after trying at least 2 color modes */}
-                    {colorModeStep >= 1 && (
+                    {/* Big toggle button - only show until first toggle */}
+                    {!hasToggledVizMode && (
                       <button
-                        onClick={nextStep}
-                        className="btn-primary w-full flex items-center justify-center gap-2 touch-target"
+                        onClick={switchVisualizationMode}
+                        className="btn-primary w-full mb-4 touch-target"
                       >
-                        <span>Lesson Complete</span>
-                        <ArrowRight className="w-4 h-4" />
+                        Switch to Spectrum Mode
                       </button>
                     )}
+
+                    {/* Explanation box - always visible, updates based on current mode */}
+                    <div className="bg-black/30 rounded-lg p-4">
+                      <p className="text-white/80 text-sm">
+                        {vizMode === 'ripple' ? (
+                          <>
+                            🌊 <strong>Current: Ripple Mode</strong> - Audio energy shown as expanding circles.
+                            <br /><br />
+                            📊 Switch to <strong>Spectrum mode</strong> to see frequency bars - low frequencies on the left, high frequencies on the right.
+                          </>
+                        ) : vizMode === 'spectrum' ? (
+                          <>
+                            📊 <strong>Current: Spectrum Mode</strong> - Frequency bars showing sound across the spectrum.
+                            <br /><br />
+                            🌊 Switch to <strong>Ripple mode</strong> to see audio energy as expanding circles.
+                          </>
+                        ) : (
+                          <>
+                            📈 <strong>Current: Waveform Mode</strong> - Time-domain oscilloscope view showing the actual sound wave.
+                            <br /><br />
+                            📊 Switch to <strong>Spectrum mode</strong> for frequency analysis, or 🌊 <strong>Ripple mode</strong> for energy visualization.
+                          </>
+                        )}
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
