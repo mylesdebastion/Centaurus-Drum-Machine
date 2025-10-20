@@ -132,19 +132,16 @@ Integrate the existing LiveAudioVisualizer (DJ Visualizer) into Education Mode l
      - Visualization responds to all 8 piano keys (C-D-E-F-G-A-B-C)
      - Lesson 4 completion logic works correctly
 
-5. **Story 19.5: Spectrum Mode WLED Visualization (1D LED Strips)**
-   - Implement spectrum visualization for 1D WLED LED strips (1×N configuration)
-   - Horizontal frequency layout: LED 0 = bass, LED N = treble
-   - Amplitude → brightness mapping (bar height controls LED brightness)
-   - Color mapping from virtual spectrum visualization
-   - Fade-out smoothing to prevent LED flicker
-   - Acceptance Criteria:
-     - Frequencies laid out horizontally across LEDs 0-N (1D strips only)
-     - Bar chart height controls LED brightness (0-255), not vertical stacking
-     - LED colors mirror virtual spectrum canvas (red/green/yellow/cyan/blue)
-     - Smooth fade-out for percussive sounds (no flicker)
-     - Education Mode lesson 2 drums produce clear frequency peaks
-     - Standalone /dj-visualizer compatibility (no regression)
+5. **Story 19.5: Spectrum Mode WLED Visualization (1D LED Strips)** ⚠️ **POTENTIALLY SKIP/RESOLVED**
+   - ⚠️ **Discovery (2025-10-19):** May already work by configuring LED matrix as 90×1 (width=90, height=1) instead of 1×90
+   - **Why it works:** Existing SpectrumVisualization already renders bars across canvas width → maps to LED width
+   - **Verification needed:** Fade-out smoothing, brightness mapping, performance, color saturation
+   - **If tests pass:** Mark as SKIP - Already Resolved
+   - Original scope (if needed):
+     - Horizontal frequency layout: LED 0 = bass, LED N = treble
+     - Amplitude → brightness mapping (bar height controls LED brightness)
+     - Color mapping from virtual spectrum visualization
+     - Fade-out smoothing to prevent LED flicker
 
 6. **Story 19.6: Spectrum Mode WLED Visualization (2D LED Matrices)**
    - Implement spectrum bar chart rendering for 2D WLED LED matrices (M×N)
@@ -189,11 +186,14 @@ Integrate the existing LiveAudioVisualizer (DJ Visualizer) into Education Mode l
 
 ### Definition of Done
 
-- [ ] All six stories completed with acceptance criteria met (19.1, 19.2, 19.3, 19.4, 19.5, 19.6)
+- [ ] All six stories completed with acceptance criteria met (19.1, 19.2, 19.3, 19.4, 19.5*, 19.6)
+  - *Story 19.5 may be SKIPPED if simple config change (90×1 LED matrix) proves sufficient
 - [ ] **Lessons 1 & 3 step sequencer grids verified unchanged** (manual testing)
 - [ ] Lesson 2 spectrum visualization working correctly (drum frequency peaks)
 - [ ] Lesson 4 piano visualization working correctly (note/scale/chord visualization)
-- [ ] **WLED 1D LED strip spectrum visualization** (Story 19.5 - horizontal layout, amplitude → brightness)
+- [ ] **WLED 1D LED strip spectrum visualization** (Story 19.5* - may already work with 90×1 config)
+  - If skip: Verify fade-out, brightness, performance, colors all acceptable
+  - If implement: Only address specific gaps found during verification
 - [ ] **WLED 2D LED matrix spectrum visualization** (Story 19.6 - bar charts, orientation/flip controls)
 - [ ] Performance verified at 60fps canvas rendering on desktop and mobile (lessons 2 & 4)
 - [ ] WLED output verified at 30+ fps with minimal latency (1D and 2D configurations)
@@ -263,9 +263,10 @@ The epic should maintain system integrity while delivering enhanced visual learn
 - **Epic Number:** 19
 - **Status:** 🚧 IN PROGRESS (Story 19.2 active)
 - **Priority:** Medium
-- **Estimated Stories:** 6 (19.1-19.6)
+- **Estimated Stories:** 6 (19.1-19.6) - Story 19.5 may be SKIPPED
 - **Type:** Brownfield Enhancement
 - **Affected Components:** EducationMode (lessons 2 & 4), LiveAudioVisualizer, WLED LED output
 - **Testing Strategy:** Manual browser testing with DevTools performance monitoring
 - **Pedagogical Approach:** Step sequencer for rhythm (L1 & L3), DJ visualizer for audio/pitch (L2 & L4)
-- **WLED Support:** 1D LED strips (19.5) and 2D LED matrices (19.6)
+- **WLED Support:** 1D LED strips (19.5* - potentially already working), 2D LED matrices (19.6)
+- **Discovery (2025-10-19):** 1D LED strip spectrum may already work via 90×1 matrix configuration

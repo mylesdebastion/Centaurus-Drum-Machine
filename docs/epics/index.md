@@ -335,7 +335,7 @@ This directory contains all project epics organized by epic number. Each epic re
 - LiveAudioVisualizer embedded mode for education context
 - Lesson 2 (Color & Pitch) - DJ visualizer spectrum mode
 - Lesson 4 (Melody & Harmony) - Piano keyboard with frequency visualization
-- WLED 1D LED strip spectrum visualization (Story 19.5)
+- WLED 1D LED strip spectrum visualization (Story 19.5* - may already work via 90×1 config)
 - WLED 2D LED matrix bar chart rendering (Story 19.6)
 - Pedagogical approach: step sequencer for rhythm (L1 & L3), visualizer for pitch/audio (L2 & L4)
 
@@ -344,8 +344,10 @@ This directory contains all project epics organized by epic number. Each epic re
 - 🚧 [Story 19.2](../stories/19.2.story.md): Lesson 2 (Color & Pitch) Visualizer Integration (In Progress)
 - 📝 [Story 19.3](../stories/19.3.story.md): Performance Optimization & Polish (Lessons 2 & 4)
 - 📝 [Story 19.4](../stories/19.4.story.md): Lesson 4 (Melody & Harmony) Visualizer Integration
-- 📝 [Story 19.5](../stories/19.5-spectrum-wled-enhancement.md): Spectrum Mode WLED (1D LED Strips)
+- ⚠️ [Story 19.5](../stories/19.5-spectrum-wled-enhancement.md): Spectrum Mode WLED (1D LED Strips) - **POTENTIALLY SKIP/RESOLVED**
 - 📝 [Story 19.6](../stories/19.6-spectrum-wled-2d-matrix.md): Spectrum Mode WLED (2D LED Matrices)
+
+**Discovery (2025-10-19):** Story 19.5 may be unnecessary - 1D LED strip spectrum already works by configuring LED matrix as 90×1 (width=90, height=1) instead of 1×90. Verification needed before officially skipping.
 
 **Technical Foundation:**
 - Existing LiveAudioVisualizer at `/dj-visualizer` route
