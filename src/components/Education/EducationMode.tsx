@@ -80,7 +80,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         laneIndex: 0, // Lane 0 = Red (kick)
         multiNotesMode: false, // Single lane mode
         assignedLanes: [],
-        reverseDirection: false,
+        reverseDirection: true, // Reverse direction: step 0 at LED 0
         status: 'disconnected',
         protocol: 'http',
         studentName: 'Education-Student'
@@ -153,7 +153,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         laneIndex: 0,
         multiNotesMode: true, // Enable multi-lane mode
         assignedLanes: [0, 6, 11], // Kick (red/C), Snare (green/F#), Hi-hat (purple/B)
-        reverseDirection: false,
+        reverseDirection: true, // Reverse direction: step 0 at LED 0
         status: 'disconnected',
         protocol: 'http',
         studentName: 'Education-Student'
