@@ -580,6 +580,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                     {Array.from({ length: 16 }, (_, i) => {
                       // Determine color based on lesson and step
                       let numberColor = 'text-white/60'; // Default for non-beat steps
+                      let animateClass = ''; // For alternating animation
 
                       // Lesson 1 and Lesson 3 Step 1: Kick on 1, 5, 9, 13 (all red)
                       if (selectedLesson.id === '1' || (selectedLesson.id === '3' && currentStepIndex === 0)) {
@@ -588,19 +589,19 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                         }
                       }
 
-                      // Lesson 3 Step 2: Kick on 1, 9 (red), Snare on 5, 13 (green)
+                      // Lesson 3 Step 2: Kick on 1, 9 (red), Steps 5, 13 alternate (both kick+snare)
                       if (selectedLesson.id === '3' && currentStepIndex === 1) {
                         if (i === 0 || i === 8) { // Steps 1, 9 (kick only)
                           numberColor = 'text-red-500'; // Kick color
-                        } else if (i === 4 || i === 12) { // Steps 5, 13 (snare)
-                          numberColor = 'text-green-500'; // Snare color
+                        } else if (i === 4 || i === 12) { // Steps 5, 13 (both kick and snare)
+                          animateClass = 'animate-kick-snare'; // Alternate red/green
                         }
                       }
 
                       return (
                         <div
                           key={i}
-                          className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center text-xs font-mono ${numberColor}`}
+                          className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center text-xs font-mono ${numberColor} ${animateClass}`}
                         >
                           {i + 1}
                         </div>
