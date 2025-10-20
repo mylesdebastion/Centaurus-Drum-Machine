@@ -68,7 +68,80 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     }
   }, [selectedLesson]);
 
-  // Initialize LED strip visualization for Lesson 3
+  // Initialize LED strip visualization for Lesson 1 (single-lane kick)
+  useEffect(() => {
+    if (selectedLesson?.id === '1') {
+      // Create LED strip config for single-lane kick drum
+      const ledConfig: LEDStripConfig = {
+        id: 'education-lesson1',
+        name: 'Education Mode - Lesson 1',
+        ipAddress: '192.168.8.158', // Default WLED IP
+        ledCount: 90,
+        laneIndex: 0, // Lane 0 = Red (kick)
+        multiNotesMode: false, // Single lane mode
+        assignedLanes: [],
+        reverseDirection: false,
+        status: 'disconnected',
+        protocol: 'http',
+        studentName: 'Education-Student'
+      };
+
+      // Create visualizer
+      const visualizer = new SingleLaneVisualizer(ledConfig, 16, {
+        updateRate: 30,
+        brightness: 0.8,
+        visualizationMode: 'static', // Static step sequencer mode
+        protocol: 'udp' // Use WebSocket bridge for pixel-perfect control
+      });
+
+      ledVisualizerRef.current = visualizer;
+
+      // Test connection (silent)
+      visualizer.testConnection();
+
+      // Start LED animation loop
+      const updateLEDs = () => {
+        if (!ledVisualizerRef.current) return;
+
+        // Update LED strip with kick pattern
+        ledVisualizerRef.current.updateStrip(
+          userPattern, // Single pattern array
+          currentPlayStep,
+          isPlaying,
+          '#ff0000', // Red for kick
+          false, // solo
+          false, // muted
+          0, // beatProgress
+          false, // smoothScrolling
+          Date.now() // globalTimestamp
+        ).catch(error => {
+          console.warn('[Education] LED update error:', error);
+        });
+
+        ledAnimationRef.current = requestAnimationFrame(updateLEDs);
+      };
+
+      // Start animation
+      updateLEDs();
+
+      // Cleanup on unmount or lesson change
+      return () => {
+        if (ledAnimationRef.current) {
+          cancelAnimationFrame(ledAnimationRef.current);
+        }
+        ledVisualizerRef.current = null;
+      };
+    } else {
+      // Clean up LED visualizer when leaving lesson 1
+      if (ledAnimationRef.current) {
+        cancelAnimationFrame(ledAnimationRef.current);
+        ledAnimationRef.current = null;
+      }
+      ledVisualizerRef.current = null;
+    }
+  }, [selectedLesson, userPattern, currentPlayStep, isPlaying]);
+
+  // Initialize LED strip visualization for Lesson 3 (multi-lane)
   useEffect(() => {
     if (selectedLesson?.id === '3') {
       // Create LED strip config (same defaults as lesson 2)
