@@ -81,7 +81,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         ledCount: 90,
         laneIndex: 0,
         multiNotesMode: true, // Enable multi-lane mode
-        assignedLanes: [0, 1, 2], // Kick (red), Snare (green), Hi-hat (purple)
+        assignedLanes: [0, 6, 11], // Kick (red/C), Snare (green/F#), Hi-hat (purple/B)
         reverseDirection: false,
         status: 'disconnected',
         protocol: 'http',
@@ -109,10 +109,24 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
 
         // Build 2D pattern array [kick, snare, hihat]
         const patterns: boolean[][] = [
-          userPattern,    // Lane 0 - Kick (red)
-          snarePattern,   // Lane 1 - Snare (green)
-          hihatPattern    // Lane 2 - Hi-hat (purple)
+          userPattern,    // Lane 0 (red/C)
+          snarePattern,   // Lane 6 (green/F#)
+          hihatPattern    // Lane 11 (purple/B)
         ];
+
+        // Debug logging (first update only)
+        if (!window._educationLEDDebugLogged) {
+          console.log('[Education] LED Update Debug:', {
+            patterns,
+            currentPlayStep,
+            isPlaying,
+            kickActive: userPattern.some(v => v),
+            snareActive: snarePattern.some(v => v),
+            hihatActive: hihatPattern.some(v => v),
+            assignedLanes: [0, 6, 11]
+          });
+          (window as any)._educationLEDDebugLogged = true;
+        }
 
         // Update LED strip
         ledVisualizerRef.current.updateStrip(
@@ -151,6 +165,19 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       ledVisualizerRef.current = null;
     }
   }, [selectedLesson, userPattern, snarePattern, hihatPattern, currentPlayStep, isPlaying]);
+
+  // Auto-start playing when pattern becomes correct in Lesson 3
+  useEffect(() => {
+    if (selectedLesson?.id === '3' && !isPlaying) {
+      const isCorrect = checkPattern();
+      if (isCorrect) {
+        // Pattern is correct! Start playing automatically
+        setTimeout(() => {
+          setIsPlaying(true);
+        }, 300);
+      }
+    }
+  }, [selectedLesson, userPattern, snarePattern, hihatPattern, currentStepIndex, isPlaying]);
 
   const lessons: EducationLesson[] = [
     {
@@ -275,10 +302,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
           setHihatPattern(new Array(16).fill(false));
         }
 
-        // Auto-start playing after a brief delay (let state settle)
-        setTimeout(() => {
-          setIsPlaying(true);
-        }, 500);
+        // Don't auto-start playing - wait for pattern completion
       } else {
         // For other lessons, reset pattern
         setUserPattern(new Array(16).fill(false));
