@@ -171,6 +171,10 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
 
       // For Rhythm Patterns lesson, preserve previous tracks
       if (selectedLesson.id === '3') {
+        // Stop playing when advancing to new track (steps 2 and 3)
+        // This gives a clean slate for the new drum element
+        setIsPlaying(false);
+
         // When moving to snare step (step 2), keep kick pattern
         // When moving to hi-hat step (step 3), keep kick and snare patterns
         if (currentStepIndex === 0) {
@@ -180,6 +184,11 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
           // Moving from step 2 to step 3 - clear hi-hat
           setHihatPattern(new Array(16).fill(false));
         }
+
+        // Auto-start playing after a brief delay (let state settle)
+        setTimeout(() => {
+          setIsPlaying(true);
+        }, 500);
       } else {
         // For other lessons, reset pattern
         setUserPattern(new Array(16).fill(false));
