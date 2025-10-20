@@ -93,7 +93,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         updateRate: 30,
         brightness: 0.8,
         visualizationMode: 'static', // Static step sequencer mode
-        protocol: 'http'
+        protocol: 'udp' // Use WebSocket bridge for pixel-perfect control
       });
 
       ledVisualizerRef.current = visualizer;
