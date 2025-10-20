@@ -71,8 +71,6 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   // Initialize LED strip visualization for Lesson 3
   useEffect(() => {
     if (selectedLesson?.id === '3') {
-      console.log('[Education] Initializing LED strip for Lesson 3 multi-lane sequencer');
-
       // Create LED strip config (same defaults as lesson 2)
       const ledConfig: LEDStripConfig = {
         id: 'education-lesson3',
@@ -98,10 +96,8 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
 
       ledVisualizerRef.current = visualizer;
 
-      // Test connection
-      visualizer.testConnection().then(success => {
-        console.log(`[Education] LED strip connection: ${success ? 'SUCCESS' : 'FAILED'}`);
-      });
+      // Test connection (silent)
+      visualizer.testConnection();
 
       // Start LED animation loop
       const updateLEDs = () => {
@@ -113,20 +109,6 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
           snarePattern,   // Lane 6 (green/F#)
           hihatPattern    // Lane 11 (purple/B)
         ];
-
-        // Debug logging (first update only)
-        if (!window._educationLEDDebugLogged) {
-          console.log('[Education] LED Update Debug:', {
-            patterns,
-            currentPlayStep,
-            isPlaying,
-            kickActive: userPattern.some(v => v),
-            snareActive: snarePattern.some(v => v),
-            hihatActive: hihatPattern.some(v => v),
-            assignedLanes: [0, 6, 11]
-          });
-          (window as any)._educationLEDDebugLogged = true;
-        }
 
         // Update LED strip
         ledVisualizerRef.current.updateStrip(
