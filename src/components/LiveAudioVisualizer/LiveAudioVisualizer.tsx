@@ -24,13 +24,19 @@ interface LiveAudioVisualizerProps {
   embedded?: boolean; // When true, renders in a compact embedded mode
   layout?: 'mobile' | 'desktop'; // Layout hint for responsive rendering (does NOT cause remount)
   className?: string; // Additional CSS classes for visibility control
+  currentMode?: VisualizationMode; // Controlled mode (optional, for parent control)
+  onModeChange?: (mode: VisualizationMode) => void; // Mode change callback for controlled mode
+  colorMode?: 'spectrum' | 'chromatic' | 'harmonic'; // Color mode for spectrum visualization
 }
 
 export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
   onBack,
   embedded = false,
   layout: _layout = 'desktop', // Reserved for future mobile-specific optimizations
-  className = ''
+  className = '',
+  currentMode: controlledMode,
+  onModeChange,
+  colorMode
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioManagerRef = useRef<AudioInputManager | null>(null);
@@ -43,7 +49,11 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
-  const [currentMode, setCurrentMode] = useState<VisualizationMode>('ripple');
+  const [internalMode, setInternalMode] = useState<VisualizationMode>('ripple');
+
+  // Use controlled mode if provided, otherwise use internal state
+  const currentMode = controlledMode ?? internalMode;
+
   const [gain, setGain] = useState(0.5); // 50%
   const [frequencyScale, setFrequencyScale] = useState<'log' | 'linear' | 'quadratic'>('log');
   const [showSettings, setShowSettings] = useState(false);
@@ -227,9 +237,31 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
     return () => window.removeEventListener('resize', resizeCanvas);
   }, []);
 
+  // Update color mode when prop changes
+  useEffect(() => {
+    if (colorMode && vizEngineRef.current) {
+      vizEngineRef.current.setColorMode(colorMode);
+    }
+  }, [colorMode]);
+
+  // Auto-start visualization in embedded mode (no mic input required for drums-only)
+  useEffect(() => {
+    if (embedded && vizEngineRef.current && adapterRef.current && !animationFrameRef.current) {
+      console.log('[LiveAudioVisualizer] Auto-starting visualization for embedded mode');
+      startVisualization();
+    }
+  }, [embedded]);
+
   // Handle mode change
   const handleModeChange = (mode: VisualizationMode) => {
-    setCurrentMode(mode);
+    // Update controlled or internal state
+    if (onModeChange) {
+      onModeChange(mode);
+    } else {
+      setInternalMode(mode);
+    }
+
+    // Update visualization engine
     if (vizEngineRef.current) {
       vizEngineRef.current.setMode(mode);
     }
@@ -534,6 +566,11 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
               </div>
             </div>
 
+            {/* LED Matrix Manager - Always rendered for LED output (hidden from UI) */}
+            <div style={{ display: 'none' }}>
+              <LEDMatrixManager />
+            </div>
+
             {showSettings && (
               <div className="mt-4">
                 <CollapsiblePanel title="Settings" defaultOpen={true}>
@@ -558,6 +595,8 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                         </p>
                       )}
                     </div>
+
+                    {/* LED Matrix Manager UI - Shown in settings panel */}
                     <LEDMatrixManager />
                   </div>
                 </CollapsiblePanel>
