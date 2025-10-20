@@ -6,6 +6,8 @@ import { EducationLesson, VisualizerSettings, MIDINote } from '../../types';
 import { audioEngine } from '../../utils/audioEngine';
 import { LiveAudioVisualizer } from '../LiveAudioVisualizer/LiveAudioVisualizer';
 import type { VisualizationMode } from '../LiveAudioVisualizer/VisualizationEngine';
+import { SingleLaneVisualizer } from '../../utils/SingleLaneVisualizer';
+import type { LEDStripConfig } from '../../types/led';
 
 interface EducationModeProps {
   onExitEducation: () => void;
@@ -30,6 +32,10 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   const [colorModeStep, setColorModeStep] = useState(0);
   const [drumsPlayed, setDrumsPlayed] = useState<Set<string>>(new Set());
   const [vizMode, setVizMode] = useState<VisualizationMode>('spectrum');
+
+  // LED Strip visualization for Lesson 3 (multi-lane sequencer)
+  const ledVisualizerRef = React.useRef<SingleLaneVisualizer | null>(null);
+  const ledAnimationRef = React.useRef<number | null>(null);
 
   // Initialize audio engine on component mount
   useEffect(() => {
@@ -61,6 +67,90 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       }));
     }
   }, [selectedLesson]);
+
+  // Initialize LED strip visualization for Lesson 3
+  useEffect(() => {
+    if (selectedLesson?.id === '3') {
+      console.log('[Education] Initializing LED strip for Lesson 3 multi-lane sequencer');
+
+      // Create LED strip config (same defaults as lesson 2)
+      const ledConfig: LEDStripConfig = {
+        id: 'education-lesson3',
+        name: 'Education Mode - Lesson 3',
+        ipAddress: '192.168.8.158', // Default WLED IP
+        ledCount: 90,
+        laneIndex: 0,
+        multiNotesMode: true, // Enable multi-lane mode
+        assignedLanes: [0, 1, 2], // Kick (red), Snare (green), Hi-hat (purple)
+        reverseDirection: false,
+        status: 'disconnected',
+        protocol: 'http',
+        studentName: 'Education-Student'
+      };
+
+      // Create visualizer
+      const visualizer = new SingleLaneVisualizer(ledConfig, 16, {
+        updateRate: 30,
+        brightness: 0.8,
+        visualizationMode: 'static', // Static step sequencer mode
+        protocol: 'http'
+      });
+
+      ledVisualizerRef.current = visualizer;
+
+      // Test connection
+      visualizer.testConnection().then(success => {
+        console.log(`[Education] LED strip connection: ${success ? 'SUCCESS' : 'FAILED'}`);
+      });
+
+      // Start LED animation loop
+      const updateLEDs = () => {
+        if (!ledVisualizerRef.current) return;
+
+        // Build 2D pattern array [kick, snare, hihat]
+        const patterns: boolean[][] = [
+          userPattern,    // Lane 0 - Kick (red)
+          snarePattern,   // Lane 1 - Snare (green)
+          hihatPattern    // Lane 2 - Hi-hat (purple)
+        ];
+
+        // Update LED strip
+        ledVisualizerRef.current.updateStrip(
+          patterns,
+          currentPlayStep,
+          isPlaying,
+          '#ff0000', // Not used in multi-notes mode
+          false, // solo
+          false, // muted
+          0, // beatProgress
+          false, // smoothScrolling
+          Date.now() // globalTimestamp for color cycling
+        ).catch(error => {
+          console.warn('[Education] LED update error:', error);
+        });
+
+        ledAnimationRef.current = requestAnimationFrame(updateLEDs);
+      };
+
+      // Start animation
+      updateLEDs();
+
+      // Cleanup on unmount or lesson change
+      return () => {
+        if (ledAnimationRef.current) {
+          cancelAnimationFrame(ledAnimationRef.current);
+        }
+        ledVisualizerRef.current = null;
+      };
+    } else {
+      // Clean up LED visualizer when leaving lesson 3
+      if (ledAnimationRef.current) {
+        cancelAnimationFrame(ledAnimationRef.current);
+        ledAnimationRef.current = null;
+      }
+      ledVisualizerRef.current = null;
+    }
+  }, [selectedLesson, userPattern, snarePattern, hihatPattern, currentPlayStep, isPlaying]);
 
   const lessons: EducationLesson[] = [
     {
