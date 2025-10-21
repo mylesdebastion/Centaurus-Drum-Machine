@@ -143,7 +143,7 @@ Enable **offline-first workshop mode** for deaf student education with WLED visu
 **Goal:** Complete APC40 LED feedback for all buttons, enabling intuitive pattern programming workflow. **NOTE:** Instructor can program patterns via laptop keyboard/mouse if APC40 incomplete.
 
 **Acceptance Criteria:**
-1. All 40 APC40 clip launch buttons show LED feedback:
+1. All 40 APC40 clip launch buttons COPRECTLY MAPPED to hardware and /isometretic lane step sequencers to show LED feedback:
    - **Active step:** Bright color (pattern note exists)
    - **Inactive step:** Dim/off (no note)
    - **Current playhead:** Blinking indicator
@@ -251,6 +251,57 @@ Enable **offline-first workshop mode** for deaf student education with WLED visu
 
 ---
 
+#### **Story 20.5: Collaborative Boomwhacker Performance Lesson** 🟡 **OPTIONAL**
+**Priority:** MEDIUM (Workshop Enhancement - Optional)
+**Time Estimate:** 4-6 hours
+**Prerequisites:** Story 20.1 (Workshop Config) - optional with graceful degradation
+**Status:** 📝 PLANNING
+**Story Document:** `docs/stories/20.5-collaborative-boomwhacker-lesson.md`
+
+**Goal:** Add a 4th lesson to Education Mode that guides K5-10 deaf and hearing students through playing "Twinkle Twinkle Little Star" collaboratively using color-coded boomwhackers and WLED tube visualization.
+
+**Acceptance Criteria:**
+1. **Lesson 4 structure:**
+   - Title: "Play Together"
+   - Difficulty: Intermediate
+   - 4-5 progressive steps guiding students through collaborative performance
+2. **Step 1:** Introduction to colored notes (C=Red, D=Orange, E=Yellow, etc.)
+   - Display color-to-note reference chart with boomwhacker colors
+3. **Step 2:** Practice your note
+   - Simple pattern (C-D-E-F-G) with LED cues
+   - Auto-loop at 90 BPM (slow tempo for beginners)
+4. **Step 3:** Learn the melody pattern
+   - Visual breakdown of "Twinkle Twinkle Little Star" (C-C-G-G-A-A-G, F-F-E-E-D-D-C)
+5. **Step 4:** Play together
+   - Full melody with multi-lane WLED sync (if workshop config exists)
+   - 4-beat count-in ("4-3-2-1")
+   - Playhead indicator showing current step
+   - Graceful degradation to demo mode (no workshop config)
+6. **Step 5 (optional):** Free play mode for simple melody creation
+
+**Integration Verification:**
+- **IV1:** Existing Lessons 1-3 continue to work unchanged
+- **IV2:** Follows existing lesson data structure and state management pattern
+- **IV3:** Reuses SingleLaneVisualizer from Lessons 1/3 for WLED control
+- **IV4:** Integration with workshop config (Story 20.1) is optional with graceful degradation
+- **IV5:** Accessible for deaf students (visual cues only, no audio-only instructions)
+
+**Deliverables:**
+- Modified `src/components/Education/EducationMode.tsx` (add Lesson 4 to array, ~150 lines)
+- Hardcoded "Twinkle Twinkle" melody pattern (16-step sequence)
+- Color reference chart component (inline JSX)
+- Multi-lane WLED visualization support (workshop mode)
+- Demo mode fallback (single-lane visualization)
+
+**Workshop Timeline:**
+- **NOT BLOCKING for Wednesday workshop** (critical path is 20.1 → 20.3 → 20.4)
+- Can be implemented post-workshop as an enhancement
+- Adds educational value for collaborative boomwhacker activities
+
+**Note:** This story supersedes Epic 19's planned "Melody & Harmony" Lesson 4 (piano keyboard) due to workshop priority. Epic 19's lesson can be renumbered as Lesson 5 post-workshop.
+
+---
+
 ## Dependency Map
 
 ### Cross-Epic Dependencies
@@ -295,6 +346,14 @@ Morning:
 Afternoon:
 ├── Story 20.2 (APC40 completion) [IF NOT DONE YESTERDAY - OPTIONAL]
 └── Final polish, bug fixes, workshop dry run
+```
+
+**Post-Workshop (Optional Enhancement):**
+```
+└── Story 20.5 (Collaborative Boomwhacker Lesson) [4-6h] ← OPTIONAL (adds Lesson 4 to Education Mode)
+    - NOT BLOCKING for workshop
+    - Depends on Story 20.1 (workshop config) with graceful degradation
+    - Adds educational value for collaborative boomwhacker activities
 ```
 
 ---
@@ -361,6 +420,9 @@ Afternoon:
 
 - ⚠️ APC40 controller fully functional (LED buttons, pattern programming) - **NICE-TO-HAVE**
 - ⚠️ Story 1.6 (APC40 LED Mapping) completed - **NOT BLOCKING**
+- ⚠️ Story 20.5 (Collaborative Boomwhacker Lesson 4) - **OPTIONAL POST-WORKSHOP**
+  - Adds 4th lesson to Education Mode ("Play Together" - Twinkle Twinkle)
+  - Uses workshop config (20.1) with graceful degradation to demo mode
 
 ### Scenario #2 (Tablet Supplement) - DEFERRED
 
@@ -413,6 +475,13 @@ Afternoon:
 
 ## Post-Workshop Backlog
 
+**Epic 20 Optional Enhancements:**
+- **Story 20.5:** Collaborative Boomwhacker Lesson 4 (4-6h)
+  - Adds "Play Together" lesson to Education Mode
+  - Guides students through "Twinkle Twinkle Little Star" with WLED visualization
+  - Uses workshop config (20.1) with graceful degradation
+  - Educational value for collaborative boomwhacker activities
+
 **Deferred to Epic 21 (Future):**
 - **Tablet Sync (Scenario #2):** Local network sync architecture (HTTP polling or WebSocket)
 - **Tablet Discovery:** Local network discovery (mDNS/QR codes)
@@ -438,6 +507,12 @@ Afternoon:
 4. Story 20.2 (APC40 LED Mapping) - NICE-TO-HAVE (3-4h)
    - Instructor can program patterns via laptop UI if APC40 incomplete
    - NOT BLOCKING for workshop success
+
+**POST-WORKSHOP ENHANCEMENT:**
+5. Story 20.5 (Collaborative Boomwhacker Lesson 4) - OPTIONAL (4-6h)
+   - Adds "Play Together" lesson to Education Mode
+   - Guides students through "Twinkle Twinkle Little Star" with WLED visualization
+   - NOT BLOCKING for workshop - can be implemented after Wednesday
 
 **Key Integration Points:**
 - Leverage Story 2.3 (WLED Manager) - already complete (backup manual config)
@@ -467,6 +542,7 @@ Afternoon:
 |------|---------|-------------|---------|
 | 2025-10-20 | 1.0 | Initial epic creation for workshop readiness | Sarah (PO) |
 | 2025-10-20 | 1.1 | Revised scope based on hardware reality: APC40 optional, tablet sync deferred, focus on laptop+WLED critical path | Sarah (PO) + Dev |
+| 2025-10-20 | 1.2 | Added Story 20.5 (Collaborative Boomwhacker Lesson 4) as optional post-workshop enhancement | Sarah (PO) |
 
 ---
 
