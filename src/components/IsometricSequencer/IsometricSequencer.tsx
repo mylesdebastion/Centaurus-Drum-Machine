@@ -177,14 +177,15 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   const soundEngineRef = useRef<SoundEngine | null>(null);
 
   // Melody generation mode state
-  type MelodyMode = 'melody' | 'random' | 'chords' | 'beats';
+  type MelodyMode = 'melody' | 'random' | 'chords' | 'beats' | 'twinkle';
   const [selectedMelodyMode, setSelectedMelodyMode] = useState<MelodyMode>('melody');
   const [showMelodyMenu, setShowMelodyMenu] = useState(false);
   const melodyModeNames: Record<MelodyMode, string> = {
     melody: 'Melody',
     random: 'Random',
     chords: 'Chords',
-    beats: 'Beats'
+    beats: 'Beats',
+    twinkle: 'Twinkle'
   };
 
   // Key/Scale menu state
@@ -1760,6 +1761,33 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     setPattern(newPattern);
   };
 
+  const generateTwinkle = () => {
+    // Clear current pattern
+    const newPattern: boolean[][] = Array(12).fill(null).map(() => Array(16).fill(false));
+
+    // Use the current root and scale
+    const currentScale = getCurrentScale();
+
+    // Twinkle Twinkle Little Star melody in scale degrees (1-indexed)
+    // "Twinkle twinkle little star, how I wonder what you are"
+    // C C G G A A G - F F E E D D C
+    // Scale degrees: 1 1 5 5 6 6 5 - 4 4 3 3 2 2 1
+    const scaleDegrees = [
+      1, 1, 5, 5, 6, 6, 5, 0, // Twinkle twinkle little star (0 = rest)
+      4, 4, 3, 3, 2, 2, 1, 0  // How I wonder what you are
+    ];
+
+    // Map scale degrees to actual notes in current scale
+    scaleDegrees.forEach((degree, step) => {
+      if (degree > 0 && degree <= currentScale.length) {
+        const noteIndex = currentScale[degree - 1]; // Convert 1-indexed to 0-indexed
+        newPattern[noteIndex][step] = true;
+      }
+    });
+
+    setPattern(newPattern);
+  };
+
   // Unified pattern generator based on selected mode
   const generatePattern = () => {
     switch (selectedMelodyMode) {
@@ -1774,6 +1802,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
         break;
       case 'beats':
         generateBeats();
+        break;
+      case 'twinkle':
+        generateTwinkle();
         break;
     }
   };
@@ -1790,7 +1821,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
     setSelectedScale(randomScale);
 
     // Randomly select melody mode
-    const melodyModes: MelodyMode[] = ['melody', 'random', 'chords', 'beats'];
+    const melodyModes: MelodyMode[] = ['melody', 'random', 'chords', 'beats', 'twinkle'];
     const randomMelodyMode = melodyModes[Math.floor(Math.random() * melodyModes.length)];
     setSelectedMelodyMode(randomMelodyMode);
 
@@ -1813,6 +1844,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           break;
         case 'beats':
           generateBeats();
+          break;
+        case 'twinkle':
+          generateTwinkle();
           break;
       }
     }, 50);
@@ -2107,6 +2141,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
                           break;
                         case 'beats':
                           generateBeats();
+                          break;
+                        case 'twinkle':
+                          generateTwinkle();
                           break;
                       }
                     }, 0);
