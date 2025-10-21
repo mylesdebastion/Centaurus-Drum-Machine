@@ -7,8 +7,8 @@
 
 import type { HardwareController } from './types';
 import { APC40Controller } from '../apc40/APC40Controller';
+import { LaunchpadProController } from '../launchpad/LaunchpadProController';
 // Future imports (enabled after respective epics complete):
-// import { LaunchpadProController } from '../launchpad/LaunchpadProController';
 // import { ROLILumiController } from '../roli/ROLILumiController';
 
 export type ControllerType =
@@ -60,11 +60,8 @@ export const CONTROLLER_REGISTRY: Record<ControllerType, ControllerDefinition> =
     description: '8×8 RGB grid with velocity pads (USB-C)',
     manufacturer: 'Novation',
     gridSize: '8×8',
-    available: false, // ⏳ Enable after Epic 8 Story 8.1
-    create: (_deviceId) => {
-      throw new Error('Launchpad Pro Mk3 integration not yet implemented (Epic 8)');
-      // Future: return new LaunchpadProController('mk3', deviceId);
-    }
+    available: true, // ✅ Available (Story 8.1)
+    create: (deviceId) => new LaunchpadProController('mk3', deviceId)
   },
 
   'launchpad-pro-2015': {
@@ -73,11 +70,8 @@ export const CONTROLLER_REGISTRY: Record<ControllerType, ControllerDefinition> =
     description: '8×8 RGB grid with velocity pads',
     manufacturer: 'Novation',
     gridSize: '8×8',
-    available: false, // ⏳ Enable after Epic 8 Story 8.1
-    create: (_deviceId) => {
-      throw new Error('Launchpad Pro 2015 integration not yet implemented (Epic 8)');
-      // Future: return new LaunchpadProController('2015', deviceId);
-    }
+    available: true, // ✅ Available (Story 8.1)
+    create: (deviceId) => new LaunchpadProController('2015', deviceId)
   },
 
   'roli-lumi': {

@@ -41,7 +41,11 @@ export type { UseControllerSelectionReturn } from './core/useControllerSelection
 // APC40 Hardware Controller
 export { APC40Controller } from './apc40/APC40Controller';
 export { apc40Integration } from './apc40/integration';
-export type { 
-  APC40IntegrationOptions, 
-  APC40IntegrationResult 
+export type {
+  APC40IntegrationOptions,
+  APC40IntegrationResult
 } from './apc40/integration';
+
+// Launchpad Pro Hardware Controller
+export { LaunchpadProController } from './launchpad/LaunchpadProController';
+export type { LaunchpadModel } from './launchpad/LaunchpadProController';
