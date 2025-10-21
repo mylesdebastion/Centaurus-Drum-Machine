@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap, Lightbulb, Volume2, RotateCw, Plug } from 'lucide-react';
+import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap, Lightbulb, Volume2, RotateCw, Settings } from 'lucide-react';
 import { SingleLaneVisualizer } from '../../utils/SingleLaneVisualizer';
 import { LEDStripManager } from '../LEDStripManager/LEDStripManager';
 import { APC40ButtonEvent } from '../../utils/APC40Controller';
@@ -202,6 +202,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
   const [ledEnabled, setLEDEnabled] = useState(false);
   // Animation mode toggle (default to smooth scrolling for better musical flow)
   const [smoothScrolling, setSmoothScrolling] = useState(true);
+
+  // Hardware controller settings state
+  const [showHardwareSelector, setShowHardwareSelector] = useState(false);
 
   // Hardware Manager integration (Story 8.0)
   const { controllers } = useHardwareContext();
@@ -1984,10 +1987,18 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
 
           {/* Hardware Controller (Story 8.0) */}
           <div className="flex items-center gap-2">
-            <Plug className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-300">
-              {apc40Connected ? 'Connected' : 'No Controller'}
-            </span>
+            <button
+              onClick={() => setShowHardwareSelector(!showHardwareSelector)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                showHardwareSelector
+                  ? 'bg-primary-600 hover:bg-primary-500'
+                  : 'bg-gray-700 hover:bg-gray-600'
+              }`}
+              title="Hardware controller settings"
+            >
+              <Settings className="w-4 h-4" />
+              {apc40Connected && <div className="w-2 h-2 rounded-full bg-green-500" />}
+            </button>
             {apc40Connected && (
               <button
                 onClick={() => setAPC40Rotated(!apc40Rotated)}
@@ -2024,7 +2035,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
       )}
 
       {/* Hardware Controller Settings Panel (Story 8.0) - hidden in education mode */}
-      {!isEducationMode && (
+      {!isEducationMode && showHardwareSelector && (
         <div className="border-b border-gray-700 bg-gray-900">
           <div className="p-4">
             <HardwareControllerSelector />
