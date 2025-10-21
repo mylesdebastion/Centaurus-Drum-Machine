@@ -21,10 +21,22 @@ export type {
 export { HardwareManager, useHardwareContext } from './core/HardwareManager';
 export { useHardware } from './core/useHardware';
 export { HardwareErrorBoundary, withHardwareErrorBoundary, useHardwareErrorReset } from './core/HardwareErrorBoundary';
+export { useControllerSelection } from './core/useControllerSelection';
+
+// Controller Registry
+export {
+  CONTROLLER_REGISTRY,
+  getAvailableControllers,
+  getAllControllers,
+  createController,
+  getControllerDefinition,
+} from './core/ControllerRegistry';
+export type { ControllerType, ControllerDefinition } from './core/ControllerRegistry';
 
 // Type exports
 export type { UseHardwareReturn, HardwareStats } from './core/useHardware';
 export type { HardwareManagerProps } from './core/HardwareManager';
+export type { UseControllerSelectionReturn } from './core/useControllerSelection';
 
 // APC40 Hardware Controller
 export { APC40Controller } from './apc40/APC40Controller';

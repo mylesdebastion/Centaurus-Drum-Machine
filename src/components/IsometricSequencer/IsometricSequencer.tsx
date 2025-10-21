@@ -1,8 +1,10 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap, Lightbulb, Gamepad2, Volume2, RotateCw } from 'lucide-react';
+import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap, Lightbulb, Volume2, RotateCw, Plug } from 'lucide-react';
 import { SingleLaneVisualizer } from '../../utils/SingleLaneVisualizer';
 import { LEDStripManager } from '../LEDStripManager/LEDStripManager';
-import { APC40Controller, APC40ButtonEvent } from '../../utils/APC40Controller';
+import { APC40ButtonEvent } from '../../utils/APC40Controller';
+import { useHardwareContext } from '@/hardware';
+import { HardwareControllerSelector } from '../Hardware/HardwareControllerSelector';
 import { createSoundEngine, SoundEngine, SoundEngineType, soundEngineNames } from '../../utils/soundEngines';
 import { useModuleContext } from '../../hooks/useModuleContext';
 import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
@@ -201,9 +203,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
   // Animation mode toggle (default to smooth scrolling for better musical flow)
   const [smoothScrolling, setSmoothScrolling] = useState(true);
 
-  // APC40 hardware control state
-  const [apc40Controller] = useState(() => new APC40Controller());
-  const [apc40Connected, setAPC40Connected] = useState(false);
+  // Hardware Manager integration (Story 8.0)
+  const { controllers } = useHardwareContext();
+  const activeController = controllers.find(c => c.connectionStatus === 'connected');
+  const apc40Controller = activeController; // For backward compatibility with existing code
+  const apc40Connected = activeController?.connectionStatus === 'connected';
   const [apc40Rotated, setAPC40Rotated] = useState(false);
 
   // Sound engine state
@@ -1159,30 +1163,22 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     }
   }, [ledEnabled, ledVisualizers, pattern, currentBeat, isPlaying, boomwhackerColors, showAllNotes, getActiveLanes, bpm]);
 
-  // APC40 hardware integration - setup/teardown
+  // Auto-sync hardware controller color mode with harmonic toggle
   useEffect(() => {
-    // Set up APC40 event handlers
-    apc40Controller.setButtonPressHandler(handleAPC40ButtonPress);
-    apc40Controller.setConnectionChangeHandler(setAPC40Connected);
-
-    // Cleanup on unmount
-    return () => {
-      apc40Controller.disconnect();
-    };
-  }, [apc40Controller]);
-
-  // Auto-sync APC40 color mode with harmonic toggle
-  useEffect(() => {
-    const colorMode = useHarmonicMode ? 'harmonic' : 'chromatic';
-    apc40Controller.setColorMode(colorMode);
+    if (apc40Controller && 'setColorMode' in apc40Controller) {
+      const colorMode = useHarmonicMode ? 'harmonic' : 'chromatic';
+      (apc40Controller as any).setColorMode(colorMode);
+    }
   }, [apc40Controller, useHarmonicMode]);
 
-  // Auto-sync APC40 rotation setting
+  // Auto-sync hardware controller rotation setting
   useEffect(() => {
-    apc40Controller.setRotation(apc40Rotated);
-    // Clear LEDs when rotation changes to refresh the display
-    if (apc40Connected) {
-      apc40Controller.clearAllLEDs();
+    if (apc40Controller && 'setRotation' in apc40Controller) {
+      (apc40Controller as any).setRotation(apc40Rotated);
+      // Clear LEDs when rotation changes to refresh the display
+      if (apc40Connected && 'clearAllLEDs' in apc40Controller) {
+        (apc40Controller as any).clearAllLEDs();
+      }
     }
   }, [apc40Controller, apc40Rotated, apc40Connected]);
 
@@ -1215,9 +1211,17 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     playNote(chromaticLane);
   }, [playNote, getActiveLanes, apc40Rotated, getEffectiveLaneOrder]);
 
-  // Update APC40 LEDs when pattern or playback state changes
+  // Hardware Manager integration - Set up event handlers (Story 8.0)
+  useEffect(() => {
+    if (apc40Controller && 'setButtonPressHandler' in apc40Controller) {
+      (apc40Controller as any).setButtonPressHandler(handleAPC40ButtonPress);
+    }
+  }, [apc40Controller, handleAPC40ButtonPress]);
+
+  // Update hardware controller LEDs when pattern or playback state changes
   const updateAPC40LEDs = useCallback(() => {
-    if (!apc40Connected) return;
+    if (!apc40Connected || !apc40Controller) return;
+    if (!('updateSequencerLEDs' in apc40Controller)) return;
 
     // Use effective lane ordering (respects Circle of Fifths when enabled)
     // In rotated mode, we need at least 8 lanes, so use all chromatic notes
@@ -1231,8 +1235,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
       return chromaticLane !== undefined ? (pattern[chromaticLane] || Array(16).fill(false)) : Array(16).fill(false);
     });
 
-    // Update APC40 with current pattern and playback state
-    apc40Controller.updateSequencerLEDs(
+    // Update hardware controller with current pattern and playback state
+    (apc40Controller as any).updateSequencerLEDs(
       apc40Pattern,
       currentBeat,
       isPlaying,
@@ -1241,21 +1245,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     );
   }, [apc40Connected, pattern, currentBeat, isPlaying, boomwhackerColors, getActiveLanes, apc40Controller, apc40Rotated]);
 
-  // Connect APC40
-  const connectAPC40 = useCallback(async () => {
-    try {
-      await apc40Controller.connect();
-      console.log('🎛️ APC40 connected successfully');
-    } catch (error) {
-      console.error('🚫 Failed to connect APC40:', error);
-      alert('Failed to connect APC40: ' + (error as Error).message);
-    }
-  }, [apc40Controller]);
-
-  // Disconnect APC40
-  const disconnectAPC40 = useCallback(() => {
-    apc40Controller.disconnect();
-  }, [apc40Controller]);
+  // Hardware controller connect/disconnect now handled by HardwareControllerSelector (Story 8.0)
 
   // Main render loop
   const render = useCallback(() => {
@@ -1992,19 +1982,12 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
             </label>
           </div>
 
+          {/* Hardware Controller (Story 8.0) */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={apc40Connected ? disconnectAPC40 : connectAPC40}
-              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${
-                apc40Connected
-                  ? 'bg-green-600 hover:bg-green-500'
-                  : 'bg-gray-700 hover:bg-gray-600'
-              }`}
-            >
-              <Gamepad2 className="w-4 h-4" />
-              APC40
-            </button>
-
+            <Plug className="w-4 h-4 text-gray-400" />
+            <span className="text-sm text-gray-300">
+              {apc40Connected ? 'Connected' : 'No Controller'}
+            </span>
             {apc40Connected && (
               <button
                 onClick={() => setAPC40Rotated(!apc40Rotated)}
@@ -2019,7 +2002,6 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
                 90°
               </button>
             )}
-
           </div>
         </div>
         </div>
@@ -2038,6 +2020,15 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
             selectedRoot={selectedRoot}
             selectedScale={selectedScale}
           />
+        </div>
+      )}
+
+      {/* Hardware Controller Settings Panel (Story 8.0) - hidden in education mode */}
+      {!isEducationMode && (
+        <div className="border-b border-gray-700 bg-gray-900">
+          <div className="p-4">
+            <HardwareControllerSelector />
+          </div>
         </div>
       )}
 

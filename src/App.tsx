@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { GlobalMusicProvider } from './contexts/GlobalMusicContext';
+import { HardwareManager } from './hardware';
 import { audioEngine, TransportState } from './utils/audioEngine';
 import { WelcomeScreen } from './components/Welcome/WelcomeScreen';
 import { JamSession } from './components/JamSession/JamSession';
@@ -248,14 +249,15 @@ function App() {
 
   return (
     <GlobalMusicProvider>
-      {/* Username Modal */}
-      <UsernameModal
-        isOpen={showUsernameModal}
-        onSave={handleUsernameSubmit}
-        onCancel={handleUsernameCancel}
-      />
+      <HardwareManager>
+        {/* Username Modal */}
+        <UsernameModal
+          isOpen={showUsernameModal}
+          onSave={handleUsernameSubmit}
+          onCancel={handleUsernameCancel}
+        />
 
-      <Routes>
+        <Routes>
         <Route
           path="/"
           element={
@@ -415,6 +417,7 @@ function App() {
           element={<AuthTest />}
         />
       </Routes>
+      </HardwareManager>
     </GlobalMusicProvider>
   );
 }
