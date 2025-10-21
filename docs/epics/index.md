@@ -2,7 +2,7 @@
 
 This directory contains all project epics organized by epic number. Each epic represents a major feature area or system architecture component.
 
-**Total Epics:** 16 (6 Complete, 5 In Progress, 5 Planning)
+**Total Epics:** 18 (6 Complete, 5 In Progress, 7 Planning)
 
 ---
 
@@ -17,7 +17,9 @@ This directory contains all project epics organized by epic number. Each epic re
 | [Epic 5](./epic-5-universal-responsive-architecture.md) | Universal Responsive Architecture | ✅ COMPLETE | High | 1 story | 100% (Story 5.1 complete) |
 | [Epic 6](./epic-6-multi-client-sessions-wled.md) | Multi-Client Sessions & WLED Integration | 🚧 IN PROGRESS | High | 5 stories | 20% (Phase 0 complete, blocked) |
 | [Epic 7](./epic-7-jam-session-backend.md) | Jam Session Backend Infrastructure | ✅ COMPLETE | High | 10 stories | 100% (Supabase Realtime complete) |
+| [Epic 8](./epic-8-launchpad-pro-integration.md) | Launchpad Pro Hardware Integration | 📝 PLANNING | High | 4 stories (1 prerequisite) | Not started |
 | [Epic 9](./epic-9-multi-instrument-midi-visualization.md) | Multi-Instrument MIDI Visualization | 🚧 IN PROGRESS | High | 4 stories | 50% (9.1-9.2 complete, 9.3-9.4 pending) |
+| [Epic 10](./epic-10-wled-preset-management.md) | WLED Preset Management | 📝 PLANNING | High | 1 story | Not started |
 | [Epic 11](./epic-11-roli-lumi-integration.md) | ROLI LUMI Integration | 🚧 IN PROGRESS | High | 1 story | 40% (Phase 2.1 complete) |
 | [Epic 12](./epic-12-sound-engine-expansion.md) | Sound Engine Expansion | ✅ COMPLETE | Medium | 1 story | 100% (All engines implemented) |
 | [Epic 13](./epic-13-documentation-infrastructure.md) | Documentation Infrastructure & Reconciliation | ✅ COMPLETE | High | 2 stories | 100% (both stories complete) |
@@ -148,6 +150,35 @@ This directory contains all project epics organized by epic number. Each epic re
 
 ---
 
+### Epic 10: WLED Preset Management
+**Status:** 📝 PLANNING
+**Goal:** Enable users to save, manage, and quickly load WLED device configurations as named presets, reducing setup time from 3-5 minutes to <15 seconds.
+
+**Key Features:**
+- Local preset save/load with inline UI (no modals)
+- Preset dropdown with quick selection
+- Unsaved changes detection with visual indicator
+- Non-blocking undo pattern for preset loading
+- Toast notifications for user feedback
+- localStorage persistence (foundation for cloud sync)
+
+**Stories:**
+- 📝 [Story 10.1](../stories/10.1.story.md): Local Preset Save/Load (Inline UI - No Modals)
+
+**User Value:**
+- **~4 minute time savings per hardware setup** (critical for live performance prep)
+- Rapid switching between configurations (guitar rig, drum kit, full band)
+- Inline expandable forms following UX_STANDARDS.md anti-modal philosophy
+
+**Integration Points:**
+- WLEDDeviceManager component (Story 6.1 Phase 0)
+- `/jam` Settings tab
+- localStorage services
+
+**Created:** 2025-10-21 (Sarah - Product Owner, via Epic 8 conflict resolution)
+
+---
+
 ### Epic 11: ROLI LUMI Integration
 **Status:** 🚧 IN PROGRESS (Phase 2.1 Complete)
 **Goal:** Seamless integration with ROLI Piano M (LUMI Keys) for visual feedback showing scales, intervals, and chord tones through per-key LED control.
@@ -252,6 +283,51 @@ This directory contains all project epics organized by epic number. Each epic re
 **Technical Foundation for:**
 - Epic 17: Remote WLED Control (state sync extension)
 - Epic 6: Multi-Client Sessions (future WebRTC integration)
+
+---
+
+### Epic 8: Launchpad Pro Hardware Integration
+**Status:** 📝 PLANNING
+**Goal:** Enable Novation Launchpad Pro (Mk3 and 2015 models) as hardware controllers for drum sequencing and isometric visualization with 8×8 RGB grid, velocity sensitivity, and enhanced control capabilities.
+
+**Key Features:**
+- Novation Launchpad Pro Mk3 (USB-C, 2020+) support
+- Launchpad Pro 2015 (original model) backward compatibility
+- 8×8 RGB grid (64 pads vs. APC40's 40 pads = 60% larger)
+- Full RGB color control (262,144 colors vs. APC40's ~8)
+- Velocity-sensitive pads (0-127 dynamic input)
+- Polyphonic aftertouch (pressure-sensitive performance)
+- Horizontal/vertical layout orientation toggle
+- Extended `HardwareController` interface (non-breaking)
+
+**Stories:**
+- 🔥 **Story 8.0:** Hardware Controller Selection Infrastructure (PREREQUISITE - 3-4h)
+  - Refactor hardcoded APC40 to dynamic controller selection
+  - Create ControllerRegistry with factory pattern
+  - Build HardwareControllerSelector UI component
+  - Enable zero-modification integration for future controllers
+- 📝 Story 8.1: LaunchpadProController Implementation (Web MIDI, SysEx, RGB LED control, button input)
+- 📝 Story 8.2: Drum Sequencer Integration & Layout Orientation (8×8 grid mapping, color modes, toggle)
+- 📝 Story 8.3: Performance Optimization & Multi-Device Testing (60fps LEDs, Mk3/2015/APC40 testing)
+
+**Technical Foundation:**
+- Research findings: `/research/launchpad-pro-integration-findings.md` (complete MIDI protocol, code scaffolding)
+- Extends Epic 1 (APC40) patterns: `HardwareController` abstraction, queue-based LED updates
+- Web MIDI API (Chrome/Edge/Opera)
+
+**Critical Prerequisite:**
+- 🔥 Story 8.0 MUST be completed before Stories 8.1-8.3
+- Without Story 8.0, Launchpad Pro requires hardcoding into IsometricSequencer
+
+**Dependencies:**
+- Epic 4 (GlobalMusicContext for tempo/key/scale)
+- Epic 1 (HardwareController interface)
+
+**Hardware Availability:**
+- ✅ Launchpad Pro Mk3 (USB-C)
+- ✅ Launchpad Pro 2015 (developer has both devices)
+
+**Created:** 2025-10-21 (Sarah - Product Owner, via BMad Analyst research)
 
 ---
 
@@ -405,5 +481,5 @@ This directory contains all project epics organized by epic number. Each epic re
 
 ---
 
-**Last Updated:** 2025-10-19
+**Last Updated:** 2025-10-21 (Epic 8: Launchpad Pro Integration added)
 **Maintained By:** BMad Framework (Product Owner, PM, Dev Agents)
