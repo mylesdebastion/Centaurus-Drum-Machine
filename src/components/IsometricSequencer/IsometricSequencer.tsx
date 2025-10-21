@@ -6,9 +6,12 @@ import { APC40Controller, APC40ButtonEvent } from '../../utils/APC40Controller';
 import { createSoundEngine, SoundEngine, SoundEngineType, soundEngineNames } from '../../utils/soundEngines';
 import { useModuleContext } from '../../hooks/useModuleContext';
 import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
+import type { EducationConfig } from '../../types';
 
 interface IsometricSequencerProps {
   onBack: () => void;
+  educationConfig?: EducationConfig; // Optional - undefined = standalone mode
+  onPlayStateChange?: (isPlaying: boolean, togglePlay: () => void) => void; // Expose play controls for education mode
 }
 
 // Vector3 class for 3D calculations
@@ -102,11 +105,14 @@ class Camera3D {
   }
 }
 
-export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }) => {
+export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, educationConfig, onPlayStateChange }) => {
   // Module Adapter Pattern - Context Detection (Epic 14, Story 14.5)
   const context = useModuleContext();
   const globalMusic = useGlobalMusic();
   const isStandalone = context === 'standalone';
+
+  // Education Mode Detection (Story 20.6)
+  const isEducationMode = !!educationConfig;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
@@ -158,6 +164,35 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   // Mouse position tracking removed - not currently used
   // const [mousePos, setMousePos] = useState<{x: number, y: number} | null>(null);
   const [hoveredNote, setHoveredNote] = useState<{lane: number, step: number} | null>(null);
+
+  // Load pattern from educationConfig when in education mode (Story 20.6)
+  useEffect(() => {
+    if (isEducationMode && educationConfig) {
+      const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      const newPattern = Array(12).fill(null).map(() => Array(16).fill(false));
+
+      // Load each note's pattern from config
+      Object.entries(educationConfig.pattern).forEach(([noteName, notePattern]) => {
+        const laneIndex = noteNames.indexOf(noteName);
+        if (laneIndex !== -1 && notePattern) {
+          newPattern[laneIndex] = [...notePattern];
+          // Repeat pattern to fill 16 steps if pattern is only 8 steps
+          if (notePattern.length === 8) {
+            newPattern[laneIndex] = [...notePattern, ...notePattern];
+          }
+        }
+      });
+
+      setPattern(newPattern);
+    }
+  }, [isEducationMode, educationConfig]);
+
+  // Expose play controls to parent component in education mode (Story 20.6)
+  useEffect(() => {
+    if (isEducationMode && onPlayStateChange) {
+      onPlayStateChange(isPlaying, togglePlay);
+    }
+  }, [isEducationMode, isPlaying, onPlayStateChange]);
 
   // LED visualization state
   const [showLEDManager, setShowLEDManager] = useState(false);
@@ -337,6 +372,14 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
 
   // Get active lanes based on current mode
   const getActiveLanes = () => {
+    // Education Mode: Use visibleLanes from config (Story 20.6)
+    if (isEducationMode && educationConfig) {
+      const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      return educationConfig.visibleLanes
+        .map(noteName => noteNames.indexOf(noteName))
+        .filter(idx => idx !== -1); // Filter out any invalid note names
+    }
+
     if (showAllNotes) {
       // All 12 chromatic notes - use effective lane order for Circle of Fifths
       return getEffectiveLaneOrder();
@@ -1335,6 +1378,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   }, [isPlaying, bpm, currentBeat, steps, effectiveLanes, activeLanes, pattern, playNote]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Prevent editing in education mode (Story 20.6)
+    if (isEducationMode) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -1356,7 +1402,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
       // Play note for feedback
       playNote(chromaticLane);
     }
-  }, [getMouseWorldPosition, playNote]);
+  }, [getMouseWorldPosition, playNote, isEducationMode]);
 
   // Control handlers
   const togglePlay = () => {
@@ -1853,15 +1899,16 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
   };
 
   return (
-    <div className="min-h-screen bg-black flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 to-gray-800 border-b border-gray-700">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          Back
+    <div className={`${isEducationMode ? 'h-[600px]' : 'min-h-screen'} bg-black flex flex-col`}>
+      {/* Header - hidden in education mode */}
+      {!isEducationMode && (
+        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 to-gray-800 border-b border-gray-700">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            Back
         </button>
 
         <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
@@ -1975,10 +2022,11 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
 
           </div>
         </div>
-      </div>
+        </div>
+      )}
 
-      {/* LED Strip Manager Panel */}
-      {showLEDManager && (
+      {/* LED Strip Manager Panel - hidden in education mode */}
+      {!isEducationMode && showLEDManager && (
         <div className="border-b border-gray-700">
           <LEDStripManager
             boomwhackerColors={getEffectiveColors()}
@@ -2007,15 +2055,16 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
 
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center justify-center gap-4 p-4 bg-gradient-to-r from-gray-900 to-gray-800 border-t border-gray-700">
-        <button
-          onClick={togglePlay}
-          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 rounded-lg transition-all transform hover:scale-105 font-semibold"
-        >
-          {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-          {isPlaying ? 'Pause' : 'Play'}
-        </button>
+      {/* Controls - hidden in education mode */}
+      {!isEducationMode && (
+        <div className="flex items-center justify-center gap-4 p-4 bg-gradient-to-r from-gray-900 to-gray-800 border-t border-gray-700">
+          <button
+            onClick={togglePlay}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 rounded-lg transition-all transform hover:scale-105 font-semibold"
+          >
+            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+            {isPlaying ? 'Pause' : 'Play'}
+          </button>
 
         <button
           onClick={clearPattern}
@@ -2203,10 +2252,12 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
           <Shuffle className="w-5 h-5" />
           Random
         </button>
-      </div>
+        </div>
+      )}
 
-      {/* Instructions */}
-      <div className="text-center p-4 bg-gray-900 text-gray-400 text-sm">
+      {/* Instructions - hidden in education mode */}
+      {!isEducationMode && (
+        <div className="text-center p-4 bg-gray-900 text-gray-400 text-sm">
         <div className="mb-2">
           Click anywhere on the 3D view to add/remove notes • Use Melody for musical patterns • Random for noise • Clear to reset
         </div>
@@ -2215,7 +2266,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }
             🎛️ APC40 Connected: Use hardware buttons to control first 5 lanes (8 steps) • LEDs show pattern and playhead
           </div>
         )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
