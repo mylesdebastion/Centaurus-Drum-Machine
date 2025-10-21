@@ -29,8 +29,8 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     ledMatrixEnabled: false,
     ledMatrixIP: ''
   });
-  const [midiNotes, setMidiNotes] = useState<MIDINote[]>([]);
-  const [colorModeStep, setColorModeStep] = useState(0);
+  const [_midiNotes, setMidiNotes] = useState<MIDINote[]>([]); // Reserved for future visualization
+  const [_colorModeStep, setColorModeStep] = useState(0); // Reserved for color mode tracking
   const [drumsPlayed, setDrumsPlayed] = useState<Set<string>>(new Set());
   const [vizMode, setVizMode] = useState<VisualizationMode>('spectrum');
   const [audioInitialized, setAudioInitialized] = useState(false);
@@ -89,7 +89,6 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       // Create LED strip config for single-lane kick drum
       const ledConfig: LEDStripConfig = {
         id: 'education-lesson1',
-        name: 'Education Mode - Lesson 1',
         ipAddress: '192.168.8.158', // Default WLED IP
         ledCount: 90,
         laneIndex: 0, // Lane 0 = Red (kick)
@@ -97,7 +96,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         assignedLanes: [],
         reverseDirection: true, // Reverse direction: step 0 at LED 0
         status: 'disconnected',
-        protocol: 'http',
+        enabled: true,
         studentName: 'Education-Student'
       };
 
@@ -154,7 +153,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       }
       ledVisualizerRef.current = null;
     }
-  }, [selectedLesson, userPattern, currentPlayStep, isPlaying]);
+  }, [selectedLesson]); // Only recreate when lesson changes - animation loop accesses current state via closure
 
   // Initialize LED strip visualization for Lesson 5 (multi-lane, formerly Lesson 3)
   useEffect(() => {
@@ -162,7 +161,6 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       // Create LED strip config (same defaults as lesson 2)
       const ledConfig: LEDStripConfig = {
         id: 'education-lesson5',
-        name: 'Education Mode - Lesson 5',
         ipAddress: '192.168.8.158', // Default WLED IP
         ledCount: 90,
         laneIndex: 0,
@@ -170,7 +168,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         assignedLanes: [0, 6, 11], // Kick (red/C), Snare (green/F#), Hi-hat (purple/B)
         reverseDirection: true, // Reverse direction: step 0 at LED 0
         status: 'disconnected',
-        protocol: 'http',
+        enabled: true,
         studentName: 'Education-Student'
       };
 
@@ -234,7 +232,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       }
       ledVisualizerRef.current = null;
     }
-  }, [selectedLesson, userPattern, snarePattern, hihatPattern, currentPlayStep, isPlaying]);
+  }, [selectedLesson]); // Only recreate when lesson changes - animation loop accesses current state via closure
 
   // Auto-start playing when pattern becomes correct in Lesson 5
   useEffect(() => {
@@ -599,18 +597,19 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     }
   };
 
-  const switchColorMode = () => {
-    const modes: Array<'spectrum' | 'chromatic' | 'harmonic'> = ['spectrum', 'chromatic', 'harmonic'];
-    const currentIndex = modes.indexOf(visualizerSettings.colorMode);
-    const nextIndex = (currentIndex + 1) % modes.length;
-
-    setVisualizerSettings(prev => ({
-      ...prev,
-      colorMode: modes[nextIndex]
-    }));
-
-    setColorModeStep(prev => prev + 1);
-  };
+  // Reserved for future color mode switching UI
+  // const switchColorMode = () => {
+  //   const modes: Array<'spectrum' | 'chromatic' | 'harmonic'> = ['spectrum', 'chromatic', 'harmonic'];
+  //   const currentIndex = modes.indexOf(visualizerSettings.colorMode);
+  //   const nextIndex = (currentIndex + 1) % modes.length;
+  //
+  //   setVisualizerSettings(prev => ({
+  //     ...prev,
+  //     colorMode: modes[nextIndex]
+  //   }));
+  //
+  //   setColorModeStep(prev => prev + 1);
+  // };
 
   if (!selectedLesson) {
     return (
