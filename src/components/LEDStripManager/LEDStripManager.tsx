@@ -29,7 +29,7 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
     {
       id: 'default_wledtube1',
       laneIndex: 0, // C note
-      ipAddress: '192.168.8.151',
+      ipAddress: '192.168.8.101',
       studentName: 'WLEDTUBE1',
       enabled: true,
       status: 'disconnected',
@@ -41,7 +41,7 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
     {
       id: 'default_wledtube2',
       laneIndex: 2, // D note (C major scale degree 2)
-      ipAddress: '192.168.8.152',
+      ipAddress: '192.168.8.102',
       studentName: 'WLEDTUBE2',
       enabled: true,
       status: 'disconnected',
@@ -53,7 +53,7 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
     {
       id: 'default_wledtube3',
       laneIndex: 4, // E note (C major scale degree 3)
-      ipAddress: '192.168.8.153',
+      ipAddress: '192.168.8.103',
       studentName: 'WLEDTUBE3',
       enabled: true,
       status: 'disconnected',
@@ -65,7 +65,7 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
     {
       id: 'default_wledtube4',
       laneIndex: 5, // F note (C major scale degree 4)
-      ipAddress: '192.168.8.154',
+      ipAddress: '192.168.8.104',
       studentName: 'WLEDTUBE4',
       enabled: true,
       status: 'disconnected',
@@ -77,7 +77,7 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
     {
       id: 'default_wledtube5',
       laneIndex: 7, // G note (C major scale degree 5)
-      ipAddress: '192.168.8.155',
+      ipAddress: '192.168.8.105',
       studentName: 'WLEDTUBE5',
       enabled: true,
       status: 'disconnected',
@@ -89,7 +89,7 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
     {
       id: 'default_wledtube6',
       laneIndex: 9, // A note (C major scale degree 6)
-      ipAddress: '192.168.8.156',
+      ipAddress: '192.168.8.106',
       studentName: 'WLEDTUBE6',
       enabled: true,
       status: 'disconnected',
@@ -101,7 +101,7 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
     {
       id: 'default_wledtube7',
       laneIndex: 11, // B note (C major scale degree 7)
-      ipAddress: '192.168.8.157',
+      ipAddress: '192.168.8.107',
       studentName: 'WLEDTUBE7',
       enabled: true,
       status: 'disconnected',
@@ -113,8 +113,20 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
     {
       id: 'default_wledtube8',
       laneIndex: 0, // Default lane, but will use multi-notes mode
-      ipAddress: '192.168.8.158',
+      ipAddress: '192.168.8.108',
       studentName: 'WLEDTUBE8',
+      enabled: true,
+      status: 'disconnected',
+      ledCount: 90,
+      multiNotesMode: true, // Enable multi-notes mode for all C major scale notes
+      assignedLanes: [0, 2, 4, 5, 7, 9, 11], // C, D, E, F, G, A, B (C major scale)
+      reverseDirection: true
+    },
+    {
+      id: 'default_multitube',
+      laneIndex: 0, // Default lane, but will use multi-notes mode
+      ipAddress: '192.168.8.158',
+      studentName: 'MULTITUBE',
       enabled: true,
       status: 'disconnected',
       ledCount: 90,
@@ -200,8 +212,8 @@ export const LEDStripManager: React.FC<LEDStripManagerProps> = ({
             };
           }
         }
-        // Update WLEDTUBE8 multi-notes mode to use current scale
-        else if (config.studentName === 'WLEDTUBE8' && config.multiNotesMode) {
+        // Update WLEDTUBE8 and MULTINOTE multi-notes mode to use current scale
+        else if ((config.studentName === 'WLEDTUBE8' || config.studentName === 'MULTINOTE') && config.multiNotesMode) {
           return {
             ...config,
             assignedLanes: currentScaleNotes
