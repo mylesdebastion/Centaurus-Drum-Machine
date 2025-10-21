@@ -8,6 +8,7 @@ import { LiveAudioVisualizer } from '../LiveAudioVisualizer/LiveAudioVisualizer'
 import type { VisualizationMode } from '../LiveAudioVisualizer/VisualizationEngine';
 import { SingleLaneVisualizer } from '../../utils/SingleLaneVisualizer';
 import type { LEDStripConfig } from '../../types/led';
+import { IsometricSequencer } from '../IsometricSequencer/IsometricSequencer';
 
 interface EducationModeProps {
   onExitEducation: () => void;
@@ -34,6 +35,10 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   const [vizMode, setVizMode] = useState<VisualizationMode>('spectrum');
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [hasToggledVizMode, setHasToggledVizMode] = useState(false);
+
+  // Isometric Sequencer play controls (Story 20.6)
+  const [isoSeqPlaying, setIsoSeqPlaying] = useState(false);
+  const [isoSeqTogglePlay, setIsoSeqTogglePlay] = useState<(() => void) | null>(null);
 
   // LED Strip visualization for Lesson 3 (multi-lane sequencer)
   const ledVisualizerRef = React.useRef<SingleLaneVisualizer | null>(null);
@@ -151,13 +156,13 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     }
   }, [selectedLesson, userPattern, currentPlayStep, isPlaying]);
 
-  // Initialize LED strip visualization for Lesson 3 (multi-lane)
+  // Initialize LED strip visualization for Lesson 5 (multi-lane, formerly Lesson 3)
   useEffect(() => {
-    if (selectedLesson?.id === '3') {
+    if (selectedLesson?.id === '5') {
       // Create LED strip config (same defaults as lesson 2)
       const ledConfig: LEDStripConfig = {
-        id: 'education-lesson3',
-        name: 'Education Mode - Lesson 3',
+        id: 'education-lesson5',
+        name: 'Education Mode - Lesson 5',
         ipAddress: '192.168.8.158', // Default WLED IP
         ledCount: 90,
         laneIndex: 0,
@@ -231,9 +236,9 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     }
   }, [selectedLesson, userPattern, snarePattern, hihatPattern, currentPlayStep, isPlaying]);
 
-  // Auto-start playing when pattern becomes correct in Lesson 3
+  // Auto-start playing when pattern becomes correct in Lesson 5
   useEffect(() => {
-    if (selectedLesson?.id === '3' && !isPlaying) {
+    if (selectedLesson?.id === '5' && !isPlaying) {
       const isCorrect = checkPattern();
       if (isCorrect) {
         // Pattern is correct! Start playing automatically
@@ -282,26 +287,116 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     },
     {
       id: '3',
+      title: 'Rhythm & Timekeeping',
+      description: 'Learn to keep steady beat and count in time',
+      difficulty: 'beginner',
+      steps: [
+        {
+          id: '3-1',
+          instruction: 'Keep the steady beat! Hit your boomwhacker on every beat.',
+          hint: '💡 Listen to the count: 1, 2, 3, 4. Keep the same speed all the way through!',
+          completed: false,
+          educationConfig: {
+            visibleLanes: ['C'],
+            pattern: {
+              C: [true, true, true, true, true, true, true, true] // Every beat
+            },
+            tempo: 90,
+            enableCountIn: true,
+            showBeatCounter: true,
+            loopCount: 2
+          }
+        },
+        {
+          id: '3-2',
+          instruction: 'Team Sunrise plays warm colors, then Team Ocean plays cool colors! Take turns!',
+          hint: '💡 Warm colors (red, orange, yellow), then Cool colors (green, blue)! Call and response!',
+          completed: false,
+          educationConfig: {
+            visibleLanes: ['C', 'D', 'E', 'F', 'G', 'A'], // All 6, but grouped visually
+            pattern: {
+              // Team Sunrise (warm colors) - beat 1, then beat 5
+              C: [true, false, false, false, true, false, false, false],
+              D: [true, false, false, false, true, false, false, false],
+              E: [true, false, false, false, true, false, false, false],
+              // Team Ocean (cool colors) - beat 3, then beat 7
+              F: [false, false, true, false, false, false, true, false],
+              G: [false, false, true, false, false, false, true, false],
+              A: [false, false, true, false, false, false, true, false]
+              // Pattern: Sunrise-rest-Ocean-rest-Sunrise-rest-Ocean-rest
+            },
+            tempo: 90,
+            enableCountIn: true,
+            showBeatCounter: true,
+            loopCount: 2
+          }
+        },
+        {
+          id: '3-3',
+          instruction: 'Each of you plays YOUR note at YOUR time. Stay quiet on empty beats!',
+          hint: '💡 Empty beats are just as important as the notes! Count them silently.',
+          completed: false,
+          educationConfig: {
+            visibleLanes: ['C', 'D', 'E', 'F', 'G', 'A'], // All 6 lanes visible
+            pattern: {
+              C: [true, false, false, false, false, false, false, false],  // Beat 1
+              // Beat 2: rest
+              D: [false, false, true, false, false, false, false, false],  // Beat 3
+              // Beat 4: rest
+              E: [false, false, false, false, true, false, false, false],  // Beat 5
+              // Beat 6: rest
+              G: [false, false, false, false, false, false, true, false]   // Beat 7
+              // Beat 8: rest
+              // F and A don't play this pattern (but they count!)
+            },
+            tempo: 90,
+            enableCountIn: true,
+            showBeatCounter: true,
+            showTimeline: true
+          }
+        },
+        {
+          id: '3-4',
+          instruction: 'Advanced rhythm! Watch carefully - some notes play twice, some beats are silent.',
+          hint: '💡 This rhythm is like Twinkle Twinkle! Double notes + rests = musical magic!',
+          completed: false,
+          educationConfig: {
+            visibleLanes: ['C', 'D', 'E', 'F', 'G', 'A'],
+            pattern: {
+              C: [true, true, false, false, false, false, false, false],
+              G: [false, false, false, true, false, false, false, true],
+              A: [false, false, false, false, true, true, false, false]
+            },
+            tempo: 90,
+            enableCountIn: true,
+            showBeatCounter: true,
+            showTimeline: true
+          }
+        }
+      ]
+    },
+    {
+      id: '5',
       title: 'Rhythm Patterns',
       description: 'Learn to create a complete 4/4 beat with kick, snare, and hi-hat',
       difficulty: 'intermediate',
       steps: [
         {
-          id: '3-1',
+          id: '5-1',
           instruction: 'First, create a kick drum pattern on steps 1, 5, 9, and 13',
           expectedPattern: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
           hint: 'The kick drum should hit on every quarter note (beats 1, 2, 3, 4)',
           completed: false
         },
         {
-          id: '3-2',
+          id: '5-2',
           instruction: 'Now add a snare track below. Click on steps 5 and 13 for the snare (beats 2 and 4)',
           expectedPattern: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
           hint: 'Snare typically goes on the backbeat (beats 2 and 4)',
           completed: false
         },
         {
-          id: '3-3',
+          id: '5-3',
           instruction: 'Finally, add hi-hats on every other step (1, 3, 5, 7, 9, 11, 13, 15) to complete the beat',
           expectedPattern: [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false],
           hint: 'Hi-hats on the 8th notes create the groove - click the odd-numbered steps',
@@ -324,7 +419,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     if (!currentStep.expectedPattern) return true;
 
     // For Rhythm Patterns lesson, check the appropriate track
-    if (selectedLesson.id === '3') {
+    if (selectedLesson.id === '5') {
       if (currentStepIndex === 1) {
         // Step 2: Check snare pattern
         return JSON.stringify(snarePattern) === JSON.stringify(currentStep.expectedPattern);
@@ -346,7 +441,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       setCurrentStepIndex(currentStepIndex + 1);
 
       // For Rhythm Patterns lesson, preserve previous tracks
-      if (selectedLesson.id === '3') {
+      if (selectedLesson.id === '5') {
         // Stop playing when advancing to new track (steps 2 and 3)
         // This gives a clean slate for the new drum element
         setIsPlaying(false);
@@ -393,7 +488,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     if (!currentStep) return;
 
     // For Rhythm Patterns lesson, reset the appropriate track
-    if (selectedLesson?.id === '3') {
+    if (selectedLesson?.id === '5') {
       if (currentStepIndex === 1) {
         setSnarePattern(new Array(16).fill(false));
       } else if (currentStepIndex === 2) {
@@ -428,12 +523,12 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       }
 
       // Play snare if snare pattern is active (for Rhythm Patterns lesson)
-      if (selectedLesson?.id === '3' && snarePattern[stepIndex]) {
+      if (selectedLesson?.id === '5' && snarePattern[stepIndex]) {
         audioEngine.playDrum('snare', 0.8);
       }
 
       // Play hi-hat if hi-hat pattern is active (for Rhythm Patterns lesson)
-      if (selectedLesson?.id === '3' && hihatPattern[stepIndex]) {
+      if (selectedLesson?.id === '5' && hihatPattern[stepIndex]) {
         audioEngine.playDrum('hihat', 0.6);
       }
 
@@ -644,6 +739,42 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
             </div>
           )}
         </div>
+
+        {/* Embedded Isometric Sequencer for Lesson 3 (Rhythm & Timekeeping) - Story 20.6 */}
+        {selectedLesson?.id === '3' && currentStep.educationConfig && (
+          <div className="space-y-6 mb-6">
+            {/* Isometric Sequencer without controls */}
+            <IsometricSequencer
+              onBack={() => {}} // Disabled in education mode
+              educationConfig={currentStep.educationConfig}
+              onPlayStateChange={(isPlaying, togglePlay) => {
+                setIsoSeqPlaying(isPlaying);
+                setIsoSeqTogglePlay(() => togglePlay);
+              }}
+            />
+
+            {/* Unified Control Bar: Play/Pause and Next Step */}
+            <div className="flex items-center justify-center gap-4 p-4 bg-gradient-to-r from-gray-900 to-gray-800 rounded-lg border border-gray-700">
+              {/* Play/Pause Button */}
+              <button
+                onClick={() => isoSeqTogglePlay?.()}
+                className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 rounded-lg transition-all transform hover:scale-105 font-semibold text-lg touch-target"
+              >
+                {isoSeqPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
+                {isoSeqPlaying ? 'Pause' : 'Play Pattern'}
+              </button>
+
+              {/* Next Step Button */}
+              <button
+                onClick={nextStep}
+                className="btn-accent flex items-center gap-2 px-8 py-4 text-lg font-semibold touch-target"
+              >
+                <span>{currentStepIndex < selectedLesson.steps.length - 1 ? 'Next Step' : 'Complete Lesson'}</span>
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Interactive Drum Pattern */}
         {(currentStep.expectedPattern || selectedLesson?.id === '2') && (
@@ -897,7 +1028,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                 </div>
 
                 {/* Snare Track for Rhythm Patterns lesson step 2 and 3 */}
-                {selectedLesson.id === '3' && (currentStepIndex === 1 || currentStepIndex === 2) && (
+                {selectedLesson.id === '5' && (currentStepIndex === 1 || currentStepIndex === 2) && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-4">
                     <div className="w-full sm:w-16 text-white font-medium text-center sm:text-left">Snare</div>
                     <div className="grid grid-cols-8 sm:flex sm:gap-1.5 gap-1 w-full sm:w-auto">
@@ -925,7 +1056,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                 )}
 
                 {/* Hi-hat Track for Rhythm Patterns lesson step 3 */}
-                {selectedLesson.id === '3' && currentStepIndex === 2 && (
+                {selectedLesson.id === '5' && currentStepIndex === 2 && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-4">
                     <div className="w-full sm:w-16 text-white font-medium text-center sm:text-left">Hi-hat</div>
                     <div className="grid grid-cols-8 sm:flex sm:gap-1.5 gap-1 w-full sm:w-auto">
