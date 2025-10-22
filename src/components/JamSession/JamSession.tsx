@@ -8,7 +8,9 @@ import { createDefaultPattern } from '../../utils/drumPatterns';
 import { supabaseSessionService } from '../../services/supabaseSession';
 import { ConnectionStatus } from './ConnectionStatus';
 import { UserList } from './UserList';
-import type { Participant, ConnectionStatus as StatusType } from '../../types/session';
+import type { Participant, ConnectionStatus as StatusType, DrumStepEvent } from '../../types/session';
+import { useControllerSelection, useLaunchpadDrumIntegration } from '../../hardware';
+import { HardwareControllerSelector } from '../Hardware/HardwareControllerSelector';
 
 /**
  * New Jam Session (Epic 4)
@@ -39,6 +41,12 @@ export const JamSession: React.FC<JamSessionProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const playbackTimerRef = useRef<number | null>(null);
 
+  // Debounce timer for drum step broadcasts (Story 17.1)
+  const drumStepDebounceTimerRef = useRef<number | null>(null);
+
+  // Hardware controller integration (Story 8.2)
+  const { activeController, selectedType } = useControllerSelection();
+
   // Subscribe to Supabase session updates
   useEffect(() => {
     console.log('[JamSession] Setting up Supabase subscriptions');
@@ -61,10 +69,13 @@ export const JamSession: React.FC<JamSessionProps> = ({
       music.updateTempo(tempo);
     });
 
-    // Subscribe to playback control from other participants (future)
+    // Subscribe to playback control from other participants
     const unsubscribePlayback = supabaseSessionService.onPlaybackChange((playing) => {
       console.log('[JamSession] Remote playback change:', playing);
-      // Future: sync playback state
+      setIsPlaying(playing);
+      if (!playing) {
+        setCurrentStep(0); // Reset to beginning on stop
+      }
     });
 
     // Subscribe to key/scale changes from other participants
@@ -72,6 +83,22 @@ export const JamSession: React.FC<JamSessionProps> = ({
       console.log('[JamSession] Remote key/scale change:', key, scale);
       music.updateKey(key);
       music.updateScale(scale);
+    });
+
+    // Subscribe to drum step changes from other participants (Story 17.1)
+    const unsubscribeDrumStep = supabaseSessionService.onDrumStep((data: DrumStepEvent) => {
+      console.log('[JamSession] Remote drum step change:', data);
+      setTracks((prev) =>
+        prev.map((track, trackIndex) =>
+          trackIndex === data.track
+            ? {
+                ...track,
+                steps: track.steps.map((s, stepIndex) => (stepIndex === data.step ? data.enabled : s)),
+                velocities: track.velocities.map((v, stepIndex) => (stepIndex === data.step ? data.velocity / 100 : v)),
+              }
+            : track
+        )
+      );
     });
 
     // Get initial connection status
@@ -85,6 +112,7 @@ export const JamSession: React.FC<JamSessionProps> = ({
       unsubscribeTempo();
       unsubscribePlayback();
       unsubscribeKeyScale();
+      unsubscribeDrumStep();
     };
   }, [music]);
 
@@ -122,20 +150,58 @@ export const JamSession: React.FC<JamSessionProps> = ({
   }, [isPlaying, music.tempo]);
 
   // Drum Machine handlers
-  const handlePlay = () => setIsPlaying(true);
+  const handlePlay = () => {
+    setIsPlaying(true);
+
+    // Broadcast playback state to session
+    if (supabaseSessionService.isInSession()) {
+      supabaseSessionService.broadcastPlayback(true);
+    }
+  };
+
   const handleStop = () => {
     setIsPlaying(false);
     setCurrentStep(0);
+
+    // Broadcast playback state to session
+    if (supabaseSessionService.isInSession()) {
+      supabaseSessionService.broadcastPlayback(false);
+    }
   };
 
   const handleStepToggle = (trackId: string, stepIndex: number) => {
-    setTracks((prev) =>
-      prev.map((track) =>
+    setTracks((prev) => {
+      const newTracks = prev.map((track) =>
         track.id === trackId
           ? { ...track, steps: track.steps.map((s, i) => (i === stepIndex ? !s : s)) }
           : track
-      )
-    );
+      );
+
+      // Broadcast step change to session (Story 17.1)
+      if (supabaseSessionService.isInSession()) {
+        const trackIndex = prev.findIndex((t) => t.id === trackId);
+        const track = prev[trackIndex];
+        const enabled = !track.steps[stepIndex];
+        const velocity = Math.round(track.velocities[stepIndex] * 100);
+
+        // Debounce broadcasts to prevent flooding (50ms window)
+        if (drumStepDebounceTimerRef.current) {
+          clearTimeout(drumStepDebounceTimerRef.current);
+        }
+
+        drumStepDebounceTimerRef.current = window.setTimeout(() => {
+          supabaseSessionService.broadcastDrumStep({
+            track: trackIndex,
+            step: stepIndex,
+            enabled,
+            velocity,
+          });
+          drumStepDebounceTimerRef.current = null;
+        }, 50);
+      }
+
+      return newTracks;
+    });
   };
 
   const handleVelocityChange = (trackId: string, stepIndex: number, velocity: number) => {
@@ -208,6 +274,17 @@ export const JamSession: React.FC<JamSessionProps> = ({
   const handleLoadDefaultPattern = () => {
     setTracks(createDefaultPattern());
   };
+
+  // Launchpad Pro integration (Story 8.2) - placed after handlers
+  const { toggleOrientation, orientation } = useLaunchpadDrumIntegration({
+    controller: selectedType === 'launchpad-pro-mk3' ? activeController : undefined,
+    tracks,
+    currentStep,
+    isPlaying,
+    colorMode: music.colorMode,
+    onStepToggle: handleStepToggle,
+    onVelocityChange: handleVelocityChange,
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -329,6 +406,9 @@ export const JamSession: React.FC<JamSessionProps> = ({
         <div className="max-w-7xl mx-auto">
           {activeTab === 'drum' && (
             <div className="space-y-4">
+              {/* Hardware Controller Selection (Story 8.2) */}
+              <HardwareControllerSelector />
+
               {/* Drum Machine Toggle */}
               <div className="bg-gray-800 rounded-lg border border-gray-700">
                 <button
@@ -372,6 +452,8 @@ export const JamSession: React.FC<JamSessionProps> = ({
                       onAddTrack={handleAddTrack}
                       onRemoveTrack={handleRemoveTrack}
                       onLoadDefaultPattern={handleLoadDefaultPattern}
+                      launchpadOrientation={selectedType === 'launchpad-pro-mk3' ? orientation : undefined}
+                      onToggleLaunchpadOrientation={selectedType === 'launchpad-pro-mk3' ? toggleOrientation : undefined}
                     />
                   </div>
                 )}

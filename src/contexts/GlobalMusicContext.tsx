@@ -1,7 +1,11 @@
 import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
+import { User } from '@supabase/supabase-js';
 import { RootNote, ScaleName, useMusicalScale } from '../hooks/useMusicalScale';
 import { audioEngine } from '../utils/audioEngine';
 import { ColorMode } from '../utils/colorMapping';
+import { supabaseSessionService } from '../services/supabaseSession';
+import { useAuth } from '../hooks/useAuth';
+import type { UserProfile } from '../types/auth';
 
 /**
  * Global Music State Interface
@@ -36,6 +40,21 @@ export interface GlobalMusicState {
       devices: WLEDDevice[];
       activeDeviceId: string | null;
     };
+  };
+  /**
+   * Authentication state (Story 18.0)
+   * Provides access to current user and auth status
+   * NOT persisted to localStorage (managed by Supabase Auth)
+   */
+  auth: {
+    /** Current authenticated user (null if anonymous) */
+    user: User | null;
+    /** User profile from database (null if anonymous) */
+    profile: UserProfile | null;
+    /** True if user is authenticated */
+    isAuthenticated: boolean;
+    /** True if still loading auth state on mount */
+    loading: boolean;
   };
 }
 
@@ -78,14 +97,14 @@ export interface GlobalMusicContextValue extends GlobalMusicState {
 
 /**
  * Default state values
+ * Note: auth and isPlaying are initialized separately (not in DEFAULT_STATE)
  */
-const DEFAULT_STATE: GlobalMusicState = {
+const DEFAULT_STATE: Omit<GlobalMusicState, 'auth' | 'isPlaying'> = {
   tempo: 120,
   key: 'C',
   scale: 'major',
   colorMode: 'chromatic',
   masterVolume: 0.7,
-  isPlaying: false, // Epic 14, Story 14.2 - Always starts paused
   hardware: {
     midi: {
       inputDevice: null,
@@ -107,18 +126,22 @@ const STORAGE_VERSION = 1;
 
 /**
  * localStorage schema interface
+ * Note: auth and isPlaying fields are NOT persisted
+ * - auth: managed by Supabase Auth
+ * - isPlaying: transport state is in-memory only (Story 14.2)
  */
 interface StoredState {
   version: number;
-  state: GlobalMusicState;
+  state: Omit<GlobalMusicState, 'auth' | 'isPlaying'>;
   timestamp: string;
 }
 
 /**
  * Load state from localStorage
  * Returns default state if loading fails or data is invalid
+ * Note: auth and isPlaying are NOT loaded from localStorage
  */
-function loadStateFromLocalStorage(): GlobalMusicState {
+function loadStateFromLocalStorage(): Omit<GlobalMusicState, 'auth' | 'isPlaying'> {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return DEFAULT_STATE;
@@ -163,16 +186,17 @@ function loadStateFromLocalStorage(): GlobalMusicState {
 /**
  * Save state to localStorage
  * Handles errors gracefully (quota exceeded, disabled localStorage, etc.)
- * Epic 14, Story 14.2: EXCLUDES isPlaying field (transport state is in-memory only)
+ * Story 14.2: EXCLUDES isPlaying field (transport state is in-memory only)
+ * Story 18.0: EXCLUDES auth field (managed by Supabase Auth)
  */
 function saveStateToLocalStorage(state: GlobalMusicState): void {
   try {
-    // Destructure to exclude isPlaying (not persisted)
-    const { isPlaying, ...persistedState } = state;
+    // Destructure to exclude isPlaying and auth (not persisted)
+    const { isPlaying, auth, ...persistedState } = state;
 
     const stored: StoredState = {
       version: STORAGE_VERSION,
-      state: persistedState as GlobalMusicState, // Cast needed due to isPlaying exclusion
+      state: persistedState,
       timestamp: new Date().toISOString(),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
@@ -205,8 +229,36 @@ export interface GlobalMusicProviderProps {
  * Provides global music state to entire application
  */
 export const GlobalMusicProvider: React.FC<GlobalMusicProviderProps> = ({ children }) => {
-  // Initialize state from localStorage
-  const [state, setState] = useState<GlobalMusicState>(() => loadStateFromLocalStorage());
+  // Initialize auth state (Story 18.0)
+  const auth = useAuth();
+
+  // Initialize state from localStorage (excluding auth and isPlaying which are managed separately)
+  const [state, setState] = useState<GlobalMusicState>(() => ({
+    ...loadStateFromLocalStorage(),
+    isPlaying: false, // Story 14.2 - Always starts paused (not persisted)
+    auth: {
+      user: null,
+      profile: null,
+      isAuthenticated: false,
+      loading: true,
+    },
+  }));
+
+  // Sync auth state from useAuth hook into global state
+  useEffect(() => {
+    setState(prev => ({
+      ...prev,
+      auth: {
+        user: auth.user,
+        profile: auth.profile,
+        isAuthenticated: auth.isAuthenticated,
+        loading: auth.loading,
+      },
+    }));
+  }, [auth.user, auth.profile, auth.isAuthenticated, auth.loading]);
+
+  // Track if playback state change came from remote source (prevent broadcast loop)
+  const isRemotePlaybackChangeRef = React.useRef(false);
 
   // Integrate useMusicalScale hook
   const musicalScale = useMusicalScale({
@@ -247,6 +299,57 @@ export const GlobalMusicProvider: React.FC<GlobalMusicProviderProps> = ({ childr
     audioEngine.syncTransportBPM(state.tempo);
     console.log('[GlobalMusicContext] Synced tempo with AudioEngine Transport:', state.tempo);
   }, [state.tempo]);
+
+  // Broadcast colorMode changes to session participants (Story 17.2)
+  useEffect(() => {
+    if (supabaseSessionService.isInSession()) {
+      supabaseSessionService.broadcastColorMode(state.colorMode);
+    }
+  }, [state.colorMode]);
+
+  // Subscribe to remote colorMode changes (Story 17.2)
+  useEffect(() => {
+    const unsubscribe = supabaseSessionService.onColorModeChange((mode: string) => {
+      console.log('[GlobalMusicContext] Remote color mode change:', mode);
+      setState(prev => ({ ...prev, colorMode: mode as ColorMode }));
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Broadcast isPlaying (global transport) changes to session participants
+  useEffect(() => {
+    // Don't broadcast if the change came from a remote source (prevent loop)
+    if (isRemotePlaybackChangeRef.current) {
+      isRemotePlaybackChangeRef.current = false;
+      return;
+    }
+
+    if (supabaseSessionService.isInSession()) {
+      supabaseSessionService.broadcastPlayback(state.isPlaying);
+    }
+  }, [state.isPlaying]);
+
+  // Subscribe to remote playback changes (global transport sync)
+  useEffect(() => {
+    const unsubscribe = supabaseSessionService.onPlaybackChange((playing: boolean) => {
+      console.log('[GlobalMusicContext] Remote playback change:', playing);
+
+      // Mark this as a remote change to prevent broadcast loop
+      isRemotePlaybackChangeRef.current = true;
+
+      setState(prev => ({ ...prev, isPlaying: playing }));
+
+      // Sync with Tone.js Transport via AudioEngine
+      if (playing) {
+        audioEngine.startTransport();
+      } else {
+        audioEngine.stopTransport();
+      }
+    });
+
+    return unsubscribe;
+  }, []);
 
   /**
    * Update tempo with validation (40-300 BPM)

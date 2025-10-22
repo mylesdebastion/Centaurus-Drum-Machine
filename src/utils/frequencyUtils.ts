@@ -21,24 +21,29 @@ export const frequencyToMidi = (frequency: number): number => {
  * Get the dominant frequency for a drum instrument based on its name
  */
 export const getDrumFrequency = (drumName: string): number => {
+  // Normalize drum name to lowercase and remove spaces/dashes for flexible matching
+  const normalized = drumName.toLowerCase().replace(/[\s-]/g, '');
+
   const drumFrequencyMap: Record<string, number> = {
-    'Kick': 80,
-    'Snare': 550,      // Adjusted for yellow color mapping
-    'Hi-Hat': 10000,
-    'Open Hat': 8000,
-    'Perc': 1500,
-    'Crash': 12000,
-    'Ride': 4000,
-    'Tom': 150,
-    'Hi Tom': 200,
-    'Mid Tom': 150,
-    'Lo Tom': 100,
-    'Clap': 2200,      // Adjusted for green-blue/cyan color mapping
-    'Cowbell': 800,
-    'Shaker': 6000
+    'kick': 80,
+    'snare': 550,      // Adjusted for yellow color mapping
+    'hihat': 10000,    // High frequency for purple color mapping
+    'closedhihat': 10000,
+    'openhat': 8000,
+    'openhihat': 8000,
+    'perc': 1500,
+    'crash': 12000,
+    'ride': 4000,
+    'tom': 150,
+    'hitom': 200,
+    'midtom': 150,
+    'lotom': 100,
+    'clap': 2200,      // Adjusted for green-blue/cyan color mapping
+    'cowbell': 800,
+    'shaker': 6000
   };
 
-  return drumFrequencyMap[drumName] || 1000; // Default to 1kHz
+  return drumFrequencyMap[normalized] || 1000; // Default to 1kHz
 };
 
 /**

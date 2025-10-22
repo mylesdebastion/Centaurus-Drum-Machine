@@ -67,6 +67,18 @@ export interface LessonStep {
   expectedPattern?: boolean[];
   hint?: string;
   completed: boolean;
+  educationConfig?: EducationConfig; // For embedded isometric sequencer lessons
+}
+
+// Education Config for embedded IsometricSequencer (Story 20.6 & 20.5)
+export interface EducationConfig {
+  visibleLanes: string[];              // ['C', 'G'] - which note lanes to show
+  pattern: Record<string, boolean[]>;  // Note -> 8 or 16-step pattern
+  tempo: number;                       // BPM (90 for rhythm practice, etc.)
+  enableCountIn: boolean;              // Show 4-beat count-in
+  showTimeline?: boolean;              // Show beat markers
+  showBeatCounter?: boolean;           // Show "1, 2, 3, 4" counter
+  loopCount?: number;                  // Number of times to loop before enabling "Next"
 }
 
 // Responsive Layout Types

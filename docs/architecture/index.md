@@ -51,3 +51,12 @@
   - [Next Steps](./next-steps.md)
     - [Story Manager Handoff](./next-steps.md#story-manager-handoff)
     - [Developer Handoff](./next-steps.md#developer-handoff)
+
+## Additional Architecture Documents
+
+- [Remote WLED State Sync](./remote-wled-state-sync.md) - Epic 17 architecture for remote WLED control via jam sessions
+- [LED Compositor Design](./led-compositor-design.md) - Epic 14 LED compositor system
+- [Jam Session Backend](./jam-session-backend.md) - Epic 7 real-time collaboration infrastructure
+- [WLED Integration Analysis](./wled-integration-analysis.md) - WLED hardware integration patterns
+- [Brownfield Module Refactoring](./brownfield-module-refactoring.md) - Module adapter system patterns
+- [Responsive Component Patterns](./responsive-component-patterns.md) - Mobile-first UI patterns

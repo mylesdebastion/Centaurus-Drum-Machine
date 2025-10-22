@@ -186,8 +186,12 @@ export class WaveformVisualization {
     ctx.globalAlpha = opacity;
 
     for (let i = 0; i < timeData.length; i++) {
-      const v = timeData[i] / 128.0; // Normalize to 0-2
-      const y = (v * height) / 2; // Scale to canvas height
+      // Center waveform (128 is zero point in 0-255 range)
+      const centered = (timeData[i] - 128); // -128 to +127
+      // Increase sensitivity by dividing by smaller value (64 instead of 128 = 2x sensitivity)
+      const normalized = centered / 64.0; // -2 to +2 range
+      // Center on canvas and scale to height
+      const y = height / 2 + (normalized * height / 2);
 
       if (i === 0) {
         ctx.moveTo(x, y);
@@ -236,8 +240,12 @@ export class WaveformVisualization {
 
     for (let i = 0; i < timeData.length; i++) {
       const dataIndex = (triggerIndex + i) % timeData.length;
-      const v = timeData[dataIndex] / 128.0;
-      const y = (v * height) / 2;
+      // Center waveform (128 is zero point in 0-255 range)
+      const centered = (timeData[dataIndex] - 128); // -128 to +127
+      // Increase sensitivity by dividing by smaller value (64 instead of 128 = 2x sensitivity)
+      const normalized = centered / 64.0; // -2 to +2 range
+      // Center on canvas and scale to height
+      const y = height / 2 + (normalized * height / 2);
 
       if (i === 0) {
         ctx.moveTo(x, y);
