@@ -38,7 +38,16 @@
       "mcp__supabase__list_tables",
       "Bash(npm install:*)",
       "Read(//d/**)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(git branch -r --contains \"onChordMelodyTest\")",
+      "Bash(if not exist supabasemigrations mkdir supabasemigrations)",
+      "mcp__supabase__apply_migration",
+      "Bash(test:*)",
+      "Bash(git branch:*)",
+      "Bash(npx replace-in-file:*)",
+      "WebFetch(domain:fael-downloads-prod.focusrite.com)",
+      "WebFetch(domain:www.manualslib.com)",
+      "Bash(ls \"D:\\Github\\Centaurus-Drum-Machine\\docs\\stories\"\" | grep \"^8. \")"
     ],
     "deny": [],
     "ask": []

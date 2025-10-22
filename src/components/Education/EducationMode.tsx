@@ -4,7 +4,11 @@ import { BookOpen, Play, Pause, Check, ArrowRight, RotateCcw, Star } from 'lucid
 import * as Tone from 'tone';
 import { EducationLesson, VisualizerSettings, MIDINote } from '../../types';
 import { audioEngine } from '../../utils/audioEngine';
-import { CompactVisualizer } from '../Visualizer/CompactVisualizer';
+import { LiveAudioVisualizer } from '../LiveAudioVisualizer/LiveAudioVisualizer';
+import type { VisualizationMode } from '../LiveAudioVisualizer/VisualizationEngine';
+import { SingleLaneVisualizer } from '../../utils/SingleLaneVisualizer';
+import type { LEDStripConfig } from '../../types/led';
+import { IsometricSequencer } from '../IsometricSequencer/IsometricSequencer';
 
 interface EducationModeProps {
   onExitEducation: () => void;
@@ -15,6 +19,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [userPattern, setUserPattern] = useState<boolean[]>(new Array(16).fill(false));
   const [snarePattern, setSnarePattern] = useState<boolean[]>(new Array(16).fill(false));
+  const [hihatPattern, setHihatPattern] = useState<boolean[]>(new Array(16).fill(false));
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPlayStep, setCurrentPlayStep] = useState(0);
   const [tempo] = useState(120); // Fixed tempo for education mode
@@ -24,8 +29,20 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     ledMatrixEnabled: false,
     ledMatrixIP: ''
   });
-  const [midiNotes, setMidiNotes] = useState<MIDINote[]>([]);
-  const [colorModeStep, setColorModeStep] = useState(0);
+  const [_midiNotes, setMidiNotes] = useState<MIDINote[]>([]); // Reserved for future visualization
+  const [_colorModeStep, setColorModeStep] = useState(0); // Reserved for color mode tracking
+  const [drumsPlayed, setDrumsPlayed] = useState<Set<string>>(new Set());
+  const [vizMode, setVizMode] = useState<VisualizationMode>('spectrum');
+  const [audioInitialized, setAudioInitialized] = useState(false);
+  const [hasToggledVizMode, setHasToggledVizMode] = useState(false);
+
+  // Isometric Sequencer play controls (Story 20.6)
+  const [isoSeqPlaying, setIsoSeqPlaying] = useState(false);
+  const [isoSeqTogglePlay, setIsoSeqTogglePlay] = useState<(() => void) | null>(null);
+
+  // LED Strip visualization for Lesson 3 (multi-lane sequencer)
+  const ledVisualizerRef = React.useRef<SingleLaneVisualizer | null>(null);
+  const ledAnimationRef = React.useRef<number | null>(null);
 
   // Initialize audio engine on component mount
   useEffect(() => {
@@ -36,9 +53,199 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         console.error('Failed to initialize audio:', error);
       }
     };
-    
+
     initAudio();
   }, []);
+
+  // Configure FrequencySourceManager for drum visualization in lesson 2
+  useEffect(() => {
+    if (selectedLesson?.id === '2') {
+      const sourceManager = (window as any).frequencySourceManager;
+      if (sourceManager && sourceManager.setMixMode) {
+        sourceManager.setMixMode('drums-only');
+      }
+      // Reset all lesson 2 state when starting
+      setDrumsPlayed(new Set());
+      setColorModeStep(0);
+      setVizMode('ripple'); // Start in ripple mode
+      setHasToggledVizMode(false); // Reset toggle state
+      setVisualizerSettings(prev => ({
+        ...prev,
+        colorMode: 'spectrum'
+      }));
+    }
+  }, [selectedLesson]);
+
+  // Reset drums played when advancing to step 2 in lesson 2
+  useEffect(() => {
+    if (selectedLesson?.id === '2' && currentStepIndex === 1) {
+      setDrumsPlayed(new Set());
+    }
+  }, [selectedLesson, currentStepIndex]);
+
+  // Initialize LED strip visualization for Lesson 1 (single-lane kick)
+  useEffect(() => {
+    if (selectedLesson?.id === '1') {
+      // Create LED strip config for single-lane kick drum
+      const ledConfig: LEDStripConfig = {
+        id: 'education-lesson1',
+        ipAddress: '192.168.8.158', // Default WLED IP
+        ledCount: 90,
+        laneIndex: 0, // Lane 0 = Red (kick)
+        multiNotesMode: false, // Single lane mode
+        assignedLanes: [],
+        reverseDirection: true, // Reverse direction: step 0 at LED 0
+        status: 'disconnected',
+        enabled: true,
+        studentName: 'Education-Student'
+      };
+
+      // Create visualizer
+      const visualizer = new SingleLaneVisualizer(ledConfig, 16, {
+        updateRate: 30,
+        brightness: 0.8,
+        visualizationMode: 'static', // Static step sequencer mode
+        protocol: 'udp' // Use WebSocket bridge for pixel-perfect control
+      });
+
+      ledVisualizerRef.current = visualizer;
+
+      // Test connection (silent)
+      visualizer.testConnection();
+
+      // Start LED animation loop
+      const updateLEDs = () => {
+        if (!ledVisualizerRef.current) return;
+
+        // Update LED strip with kick pattern
+        ledVisualizerRef.current.updateStrip(
+          userPattern, // Single pattern array
+          currentPlayStep,
+          isPlaying,
+          '#ff0000', // Red for kick
+          false, // solo
+          false, // muted
+          0, // beatProgress
+          false, // smoothScrolling
+          Date.now() // globalTimestamp
+        ).catch(error => {
+          console.warn('[Education] LED update error:', error);
+        });
+
+        ledAnimationRef.current = requestAnimationFrame(updateLEDs);
+      };
+
+      // Start animation
+      updateLEDs();
+
+      // Cleanup on unmount or lesson change
+      return () => {
+        if (ledAnimationRef.current) {
+          cancelAnimationFrame(ledAnimationRef.current);
+        }
+        ledVisualizerRef.current = null;
+      };
+    } else {
+      // Clean up LED visualizer when leaving lesson 1
+      if (ledAnimationRef.current) {
+        cancelAnimationFrame(ledAnimationRef.current);
+        ledAnimationRef.current = null;
+      }
+      ledVisualizerRef.current = null;
+    }
+  }, [selectedLesson]); // Only recreate when lesson changes - animation loop accesses current state via closure
+
+  // Initialize LED strip visualization for Lesson 5 (multi-lane, formerly Lesson 3)
+  useEffect(() => {
+    if (selectedLesson?.id === '5') {
+      // Create LED strip config (same defaults as lesson 2)
+      const ledConfig: LEDStripConfig = {
+        id: 'education-lesson5',
+        ipAddress: '192.168.8.158', // Default WLED IP
+        ledCount: 90,
+        laneIndex: 0,
+        multiNotesMode: true, // Enable multi-lane mode
+        assignedLanes: [0, 6, 11], // Kick (red/C), Snare (green/F#), Hi-hat (purple/B)
+        reverseDirection: true, // Reverse direction: step 0 at LED 0
+        status: 'disconnected',
+        enabled: true,
+        studentName: 'Education-Student'
+      };
+
+      // Create visualizer
+      const visualizer = new SingleLaneVisualizer(ledConfig, 16, {
+        updateRate: 30,
+        brightness: 0.8,
+        visualizationMode: 'static', // Static step sequencer mode
+        protocol: 'udp' // Use WebSocket bridge for pixel-perfect control
+      });
+
+      ledVisualizerRef.current = visualizer;
+
+      // Test connection (silent)
+      visualizer.testConnection();
+
+      // Start LED animation loop
+      const updateLEDs = () => {
+        if (!ledVisualizerRef.current) return;
+
+        // Build 2D pattern array [kick, snare, hihat]
+        const patterns: boolean[][] = [
+          userPattern,    // Lane 0 (red/C)
+          snarePattern,   // Lane 6 (green/F#)
+          hihatPattern    // Lane 11 (purple/B)
+        ];
+
+        // Update LED strip
+        ledVisualizerRef.current.updateStrip(
+          patterns,
+          currentPlayStep,
+          isPlaying,
+          '#ff0000', // Not used in multi-notes mode
+          false, // solo
+          false, // muted
+          0, // beatProgress
+          false, // smoothScrolling
+          Date.now() // globalTimestamp for color cycling
+        ).catch(error => {
+          console.warn('[Education] LED update error:', error);
+        });
+
+        ledAnimationRef.current = requestAnimationFrame(updateLEDs);
+      };
+
+      // Start animation
+      updateLEDs();
+
+      // Cleanup on unmount or lesson change
+      return () => {
+        if (ledAnimationRef.current) {
+          cancelAnimationFrame(ledAnimationRef.current);
+        }
+        ledVisualizerRef.current = null;
+      };
+    } else {
+      // Clean up LED visualizer when leaving lesson 3
+      if (ledAnimationRef.current) {
+        cancelAnimationFrame(ledAnimationRef.current);
+        ledAnimationRef.current = null;
+      }
+      ledVisualizerRef.current = null;
+    }
+  }, [selectedLesson]); // Only recreate when lesson changes - animation loop accesses current state via closure
+
+  // Auto-start playing when pattern becomes correct in Lesson 5
+  useEffect(() => {
+    if (selectedLesson?.id === '5' && !isPlaying) {
+      const isCorrect = checkPattern();
+      if (isCorrect) {
+        // Pattern is correct! Start playing automatically
+        setTimeout(() => {
+          setIsPlaying(true);
+        }, 300);
+      }
+    }
+  }, [selectedLesson, userPattern, snarePattern, hihatPattern, currentStepIndex, isPlaying]);
 
   const lessons: EducationLesson[] = [
     {
@@ -64,36 +271,133 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       steps: [
         {
           id: '2-1',
-          instruction: 'Click the drum buttons below to see how different sounds create different colors in the visualizer',
-          hint: 'Notice how low sounds like kick drums appear as red, while high sounds appear as blue/violet',
+          instruction: 'Try all 4 drum sounds and watch the ripple visualization respond to each one',
+          hint: 'Click each drum button to fill it in. Each sound creates different ripple patterns!',
           completed: false
         },
         {
           id: '2-2',
-          instruction: 'Now try switching between the different color modes to see how the same sounds can be displayed differently',
-          hint: 'Spectrum mode shows frequency (low=red, high=violet), Chromatic shows note names, Harmonic shows musical relationships',
+          instruction: 'Switch to Spectrum mode and try all 4 drums again to see frequency bars',
+          hint: 'Toggle to spectrum mode, then click all 4 drums again to see how different sounds appear as frequency bars',
           completed: false
         }
       ]
     },
     {
       id: '3',
-      title: 'Rhythm Patterns',
-      description: 'Learn to create a complete 4/4 beat with kick and snare',
-      difficulty: 'intermediate',
+      title: 'Rhythm & Timekeeping',
+      description: 'Learn to keep steady beat and count in time',
+      difficulty: 'beginner',
       steps: [
         {
           id: '3-1',
+          instruction: 'Keep the steady beat! Hit your boomwhacker on every beat.',
+          hint: '💡 Listen to the count: 1, 2, 3, 4. Keep the same speed all the way through!',
+          completed: false,
+          educationConfig: {
+            visibleLanes: ['C'],
+            pattern: {
+              C: [true, true, true, true, true, true, true, true] // Every beat
+            },
+            tempo: 90,
+            enableCountIn: true,
+            showBeatCounter: true,
+            loopCount: 2
+          }
+        },
+        {
+          id: '3-2',
+          instruction: 'Team Sunrise plays warm colors, then Team Ocean plays cool colors! Take turns!',
+          hint: '💡 Warm colors (red, orange, yellow), then Cool colors (green, blue)! Call and response!',
+          completed: false,
+          educationConfig: {
+            visibleLanes: ['C', 'D', 'E', 'F', 'G', 'A'], // All 6, but grouped visually
+            pattern: {
+              // Team Sunrise (warm colors) - beat 1, then beat 5
+              C: [true, false, false, false, true, false, false, false],
+              D: [true, false, false, false, true, false, false, false],
+              E: [true, false, false, false, true, false, false, false],
+              // Team Ocean (cool colors) - beat 3, then beat 7
+              F: [false, false, true, false, false, false, true, false],
+              G: [false, false, true, false, false, false, true, false],
+              A: [false, false, true, false, false, false, true, false]
+              // Pattern: Sunrise-rest-Ocean-rest-Sunrise-rest-Ocean-rest
+            },
+            tempo: 90,
+            enableCountIn: true,
+            showBeatCounter: true,
+            loopCount: 2
+          }
+        },
+        {
+          id: '3-3',
+          instruction: 'Each of you plays YOUR note at YOUR time. Stay quiet on empty beats!',
+          hint: '💡 Empty beats are just as important as the notes! Count them silently.',
+          completed: false,
+          educationConfig: {
+            visibleLanes: ['C', 'D', 'E', 'F', 'G', 'A'], // All 6 lanes visible
+            pattern: {
+              C: [true, false, false, false, false, false, false, false],  // Beat 1
+              // Beat 2: rest
+              D: [false, false, true, false, false, false, false, false],  // Beat 3
+              // Beat 4: rest
+              E: [false, false, false, false, true, false, false, false],  // Beat 5
+              // Beat 6: rest
+              G: [false, false, false, false, false, false, true, false]   // Beat 7
+              // Beat 8: rest
+              // F and A don't play this pattern (but they count!)
+            },
+            tempo: 90,
+            enableCountIn: true,
+            showBeatCounter: true,
+            showTimeline: true
+          }
+        },
+        {
+          id: '3-4',
+          instruction: 'Advanced rhythm! Watch carefully - some notes play twice, some beats are silent.',
+          hint: '💡 This rhythm is like Twinkle Twinkle! Double notes + rests = musical magic!',
+          completed: false,
+          educationConfig: {
+            visibleLanes: ['C', 'D', 'E', 'F', 'G', 'A'],
+            pattern: {
+              C: [true, true, false, false, false, false, false, false],
+              G: [false, false, false, true, false, false, false, true],
+              A: [false, false, false, false, true, true, false, false]
+            },
+            tempo: 90,
+            enableCountIn: true,
+            showBeatCounter: true,
+            showTimeline: true
+          }
+        }
+      ]
+    },
+    {
+      id: '5',
+      title: 'Rhythm Patterns',
+      description: 'Learn to create a complete 4/4 beat with kick, snare, and hi-hat',
+      difficulty: 'intermediate',
+      steps: [
+        {
+          id: '5-1',
           instruction: 'First, create a kick drum pattern on steps 1, 5, 9, and 13',
           expectedPattern: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
           hint: 'The kick drum should hit on every quarter note (beats 1, 2, 3, 4)',
           completed: false
         },
         {
-          id: '3-2',
+          id: '5-2',
           instruction: 'Now add a snare track below. Click on steps 5 and 13 for the snare (beats 2 and 4)',
           expectedPattern: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
           hint: 'Snare typically goes on the backbeat (beats 2 and 4)',
+          completed: false
+        },
+        {
+          id: '5-3',
+          instruction: 'Finally, add hi-hats on every other step (1, 3, 5, 7, 9, 11, 13, 15) to complete the beat',
+          expectedPattern: [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false],
+          hint: 'Hi-hats on the 8th notes create the groove - click the odd-numbered steps',
           completed: false
         }
       ]
@@ -111,12 +415,18 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     const currentStep = selectedLesson.steps[currentStepIndex];
     if (!currentStep) return false;
     if (!currentStep.expectedPattern) return true;
-    
-    // For the second step of Rhythm Patterns lesson (snare track)
-    if (selectedLesson.id === '3' && currentStepIndex === 1) {
-      return JSON.stringify(snarePattern) === JSON.stringify(currentStep.expectedPattern);
+
+    // For Rhythm Patterns lesson, check the appropriate track
+    if (selectedLesson.id === '5') {
+      if (currentStepIndex === 1) {
+        // Step 2: Check snare pattern
+        return JSON.stringify(snarePattern) === JSON.stringify(currentStep.expectedPattern);
+      } else if (currentStepIndex === 2) {
+        // Step 3: Check hi-hat pattern
+        return JSON.stringify(hihatPattern) === JSON.stringify(currentStep.expectedPattern);
+      }
     }
-    
+
     return JSON.stringify(userPattern) === JSON.stringify(currentStep.expectedPattern);
   };
 
@@ -124,20 +434,49 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     if (!selectedLesson) return;
     const currentStep = selectedLesson.steps[currentStepIndex];
     if (!currentStep) return;
-    
+
     if (currentStepIndex < selectedLesson.steps.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
-      // Don't reset kick pattern when moving to snare step
-      if (!(selectedLesson.id === '3' && currentStepIndex === 0)) {
+
+      // For Rhythm Patterns lesson, preserve previous tracks
+      if (selectedLesson.id === '5') {
+        // Stop playing when advancing to new track (steps 2 and 3)
+        // This gives a clean slate for the new drum element
+        setIsPlaying(false);
+
+        // When moving to snare step (step 2), keep kick pattern
+        // When moving to hi-hat step (step 3), keep kick and snare patterns
+        if (currentStepIndex === 0) {
+          // Moving from step 1 to step 2 - clear snare
+          setSnarePattern(new Array(16).fill(false));
+        } else if (currentStepIndex === 1) {
+          // Moving from step 2 to step 3 - clear hi-hat
+          setHihatPattern(new Array(16).fill(false));
+        }
+
+        // Don't auto-start playing - wait for pattern completion
+      } else if (selectedLesson.id === '2') {
+        // For Color and Pitch lesson, reset drums played for next step
+        setDrumsPlayed(new Set());
+      } else {
+        // For other lessons, reset pattern
         setUserPattern(new Array(16).fill(false));
+        setSnarePattern(new Array(16).fill(false));
       }
-      setSnarePattern(new Array(16).fill(false));
     } else {
-      // Lesson completed
+      // Lesson completed - reset all state
       setSelectedLesson(null);
       setCurrentStepIndex(0);
       setUserPattern(new Array(16).fill(false));
       setSnarePattern(new Array(16).fill(false));
+      setHihatPattern(new Array(16).fill(false));
+      setDrumsPlayed(new Set());
+      setColorModeStep(0);
+      setVizMode('spectrum');
+      setVisualizerSettings(prev => ({
+        ...prev,
+        colorMode: 'spectrum'
+      }));
     }
   };
 
@@ -145,10 +484,16 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
     if (!selectedLesson) return;
     const currentStep = selectedLesson.steps[currentStepIndex];
     if (!currentStep) return;
-    
-    // For the second step of Rhythm Patterns lesson (snare track)
-    if (selectedLesson?.id === '3' && currentStepIndex === 1) {
-      setSnarePattern(new Array(16).fill(false));
+
+    // For Rhythm Patterns lesson, reset the appropriate track
+    if (selectedLesson?.id === '5') {
+      if (currentStepIndex === 1) {
+        setSnarePattern(new Array(16).fill(false));
+      } else if (currentStepIndex === 2) {
+        setHihatPattern(new Array(16).fill(false));
+      } else {
+        setUserPattern(new Array(16).fill(false));
+      }
     } else {
       setUserPattern(new Array(16).fill(false));
     }
@@ -174,15 +519,20 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       if (userPattern[stepIndex]) {
         audioEngine.playDrum('kick', 0.8);
       }
-      
+
       // Play snare if snare pattern is active (for Rhythm Patterns lesson)
-      if (selectedLesson?.id === '3' && snarePattern[stepIndex]) {
+      if (selectedLesson?.id === '5' && snarePattern[stepIndex]) {
         audioEngine.playDrum('snare', 0.8);
       }
-      
+
+      // Play hi-hat if hi-hat pattern is active (for Rhythm Patterns lesson)
+      if (selectedLesson?.id === '5' && hihatPattern[stepIndex]) {
+        audioEngine.playDrum('hihat', 0.6);
+      }
+
       // Update visual step indicator
       setCurrentPlayStep(stepIndex);
-      
+
       stepIndex = (stepIndex + 1) % 16;
     }, "16n", 0); // 16th note intervals starting immediately
     
@@ -192,7 +542,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       Tone.Transport.stop();
       Tone.Transport.cancel(scheduleId);
     };
-  }, [isPlaying, tempo, userPattern, snarePattern, selectedLesson]);
+  }, [isPlaying, tempo, userPattern, snarePattern, hihatPattern, selectedLesson]);
 
   const handlePlayPattern = () => {
     setIsPlaying(!isPlaying);
@@ -201,7 +551,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
   const playDrumSound = (drumName: string, midiNote: number) => {
     // Play the drum sound
     audioEngine.playDrum(drumName, 0.8);
-    
+
     // Add MIDI note for visualization
     const note: MIDINote = {
       note: midiNote,
@@ -210,44 +560,61 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
       timestamp: Date.now(),
       userId: 'education'
     };
-    
+
     setMidiNotes(prev => [...prev.slice(-10), note]);
-    
-    // Mark first step as completed when any drum is played
-    if (selectedLesson?.id === '2' && currentStepIndex === 0) {
-      // Auto-advance after playing a few different sounds
-      setTimeout(() => {
-        if (currentStepIndex === 0) {
-          setCurrentStepIndex(1);
-        }
-      }, 3000);
+
+    // Send drum hit to FrequencySourceManager for LiveAudioVisualizer
+    const sourceManager = (window as any).frequencySourceManager;
+    if (sourceManager && sourceManager.addDrumHit) {
+      sourceManager.addDrumHit(drumName, 0.8);
+    }
+
+    // Track which drums have been played in lesson 2
+    if (selectedLesson?.id === '2') {
+      // In step 1, track immediately
+      // In step 2, only track if student has switched to spectrum mode
+      if (currentStepIndex === 0 || (currentStepIndex === 1 && hasToggledVizMode)) {
+        const updatedDrums = new Set(drumsPlayed).add(drumName);
+        setDrumsPlayed(updatedDrums);
+      }
     }
   };
 
-  const switchColorMode = () => {
-    const modes: Array<'spectrum' | 'chromatic' | 'harmonic'> = ['spectrum', 'chromatic', 'harmonic'];
-    const currentIndex = modes.indexOf(visualizerSettings.colorMode);
-    const nextIndex = (currentIndex + 1) % modes.length;
-    
-    setVisualizerSettings(prev => ({
-      ...prev,
-      colorMode: modes[nextIndex]
-    }));
-    
-    setColorModeStep(prev => prev + 1);
-    
-    // Mark second step as completed after trying all color modes
-    if (selectedLesson?.id === '2' && currentStepIndex === 1 && colorModeStep >= 2) {
-      setTimeout(() => {
-        nextStep();
-      }, 1000);
+  const switchVisualizationMode = () => {
+    // Switch to spectrum mode (big button in step 2)
+    setVizMode('spectrum');
+
+    // Mark that visualization mode has been toggled (for drum tracking in step 2)
+    setHasToggledVizMode(true);
+  };
+
+  // Handle viz mode changes from the mode buttons
+  const handleVizModeChange = (mode: VisualizationMode) => {
+    setVizMode(mode);
+    // Mark as toggled if switching to spectrum in step 2
+    if (currentStepIndex === 1 && mode === 'spectrum') {
+      setHasToggledVizMode(true);
     }
   };
+
+  // Reserved for future color mode switching UI
+  // const switchColorMode = () => {
+  //   const modes: Array<'spectrum' | 'chromatic' | 'harmonic'> = ['spectrum', 'chromatic', 'harmonic'];
+  //   const currentIndex = modes.indexOf(visualizerSettings.colorMode);
+  //   const nextIndex = (currentIndex + 1) % modes.length;
+  //
+  //   setVisualizerSettings(prev => ({
+  //     ...prev,
+  //     colorMode: modes[nextIndex]
+  //   }));
+  //
+  //   setColorModeStep(prev => prev + 1);
+  // };
 
   if (!selectedLesson) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4 sm:p-6">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           {/* Header */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
             <div className="flex items-center gap-3">
@@ -324,7 +691,7 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4 sm:p-6">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
@@ -372,113 +739,203 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
           )}
         </div>
 
+        {/* Embedded Isometric Sequencer for Lesson 3 (Rhythm & Timekeeping) - Story 20.6 */}
+        {selectedLesson?.id === '3' && currentStep.educationConfig && (
+          <div className="space-y-6 mb-6">
+            {/* Isometric Sequencer without controls */}
+            <IsometricSequencer
+              onBack={() => {}} // Disabled in education mode
+              educationConfig={currentStep.educationConfig}
+              onPlayStateChange={(isPlaying, togglePlay) => {
+                setIsoSeqPlaying(isPlaying);
+                setIsoSeqTogglePlay(() => togglePlay);
+              }}
+            />
+
+            {/* Unified Control Bar: Play/Pause and Next Step */}
+            <div className="flex items-center justify-center gap-4 p-4 bg-gradient-to-r from-gray-900 to-gray-800 rounded-lg border border-gray-700">
+              {/* Play/Pause Button */}
+              <button
+                onClick={() => isoSeqTogglePlay?.()}
+                className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 rounded-lg transition-all transform hover:scale-105 font-semibold text-lg touch-target"
+              >
+                {isoSeqPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
+                {isoSeqPlaying ? 'Pause' : 'Play Pattern'}
+              </button>
+
+              {/* Next Step Button */}
+              <button
+                onClick={nextStep}
+                className="btn-accent flex items-center gap-2 px-8 py-4 text-lg font-semibold touch-target"
+              >
+                <span>{currentStepIndex < selectedLesson.steps.length - 1 ? 'Next Step' : 'Complete Lesson'}</span>
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Interactive Drum Pattern */}
         {(currentStep.expectedPattern || selectedLesson?.id === '2') && (
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 sm:p-6 mb-6 border border-white/20">
             {selectedLesson?.id === '2' ? (
               // Color and Pitch lesson content
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg sm:text-xl font-bold text-white">🎨 Sound and Color Explorer</h3>
-                  {currentStepIndex === 1 && (
-                    <button
-                      onClick={switchColorMode}
-                      className="btn-accent flex items-center gap-2 touch-target"
-                    >
-                      Switch to {visualizerSettings.colorMode === 'spectrum' ? 'Chromatic' : 
-                                visualizerSettings.colorMode === 'chromatic' ? 'Harmonic' : 'Spectrum'} Mode
-                    </button>
-                  )}
-                </div>
+                <h3 className="text-lg sm:text-xl font-bold text-white mb-4">🎨 Sound and Color Explorer</h3>
 
                 {/* Visualizer */}
                 <div className="mb-6">
-                  <CompactVisualizer
-                    settings={visualizerSettings}
-                    onSettingsChange={setVisualizerSettings}
-                    midiNotes={midiNotes}
+                  <LiveAudioVisualizer
+                    embedded={true}
+                    currentMode={vizMode}
+                    onModeChange={handleVizModeChange}
+                    colorMode={visualizerSettings.colorMode}
+                    className="mb-6"
+                    hideControls={true}
+                    frequencySource="drums-only"
+                    onInitialized={setAudioInitialized}
+                    showModeButtons={currentStepIndex === 1}
                   />
                 </div>
 
-                {currentStepIndex === 0 && (
-                  // Step 1: Play different drums to see colors
+                {/* Drum Buttons - Only visible when audio is initialized */}
+                {audioInitialized && (
                   <div>
-                    <h4 className="text-white font-medium mb-3">Click the drums to hear sounds and see colors:</h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <button
-                        onClick={() => playDrumSound('kick', 36)}
-                        className="bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-lg transition-colors touch-target"
-                      >
-                        🥁 Kick<br/>
-                        <span className="text-xs opacity-75">(Low/Red)</span>
-                      </button>
-                      <button
-                        onClick={() => playDrumSound('snare', 38)}
-                        className="bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg transition-colors touch-target"
-                      >
-                        🥁 Snare<br/>
-                        <span className="text-xs opacity-75">(Mid/Green)</span>
-                      </button>
-                      <button
-                        onClick={() => playDrumSound('hihat', 42)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg transition-colors touch-target"
-                      >
-                        🎩 Hi-Hat<br/>
-                        <span className="text-xs opacity-75">(High/Blue)</span>
-                      </button>
-                      <button
-                        onClick={() => playDrumSound('crash', 49)}
-                        className="bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg transition-colors touch-target"
-                      >
-                        💥 Crash<br/>
-                        <span className="text-xs opacity-75">(Very High/Purple)</span>
-                      </button>
-                    </div>
+                    <h4 className="text-white font-medium mb-3">
+                      {currentStepIndex === 0 && 'Click each drum to try it out (buttons will fill in when clicked):'}
+                      {currentStepIndex === 1 && 'Try all 4 drums again in Spectrum mode:'}
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                    <button
+                      onClick={() => playDrumSound('kick', 36)}
+                      className={`py-3 px-4 rounded-lg transition-colors touch-target relative min-w-[140px] border-4 ${
+                        (currentStepIndex === 0 ? drumsPlayed.has('kick') : drumsPlayed.has('kick') && hasToggledVizMode)
+                          ? 'bg-red-600 hover:bg-red-700 border-red-600 text-white'
+                          : 'bg-gray-800 hover:bg-gray-900 border-red-600 text-red-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <Check className={`w-4 h-4 text-white transition-opacity ${(currentStepIndex === 0 ? drumsPlayed.has('kick') : drumsPlayed.has('kick') && hasToggledVizMode) ? 'opacity-100' : 'opacity-0'}`} />
+                        <div className="flex-1 text-center">
+                          🥁 Kick<br/>
+                          <span className="text-xs opacity-75">(Low/Red)</span>
+                        </div>
+                        <div className="w-4"></div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => playDrumSound('snare', 38)}
+                      className={`py-3 px-4 rounded-lg transition-colors touch-target relative min-w-[140px] border-4 ${
+                        (currentStepIndex === 0 ? drumsPlayed.has('snare') : drumsPlayed.has('snare') && hasToggledVizMode)
+                          ? 'bg-green-600 hover:bg-green-700 border-green-600 text-white'
+                          : 'bg-gray-800 hover:bg-gray-900 border-green-600 text-green-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <Check className={`w-4 h-4 text-white transition-opacity ${(currentStepIndex === 0 ? drumsPlayed.has('snare') : drumsPlayed.has('snare') && hasToggledVizMode) ? 'opacity-100' : 'opacity-0'}`} />
+                        <div className="flex-1 text-center">
+                          🥁 Snare<br/>
+                          <span className="text-xs opacity-75">(Mid/Green)</span>
+                        </div>
+                        <div className="w-4"></div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => playDrumSound('clap', 39)}
+                      className={`py-3 px-4 rounded-lg transition-colors touch-target relative min-w-[140px] border-4 ${
+                        (currentStepIndex === 0 ? drumsPlayed.has('clap') : drumsPlayed.has('clap') && hasToggledVizMode)
+                          ? 'bg-blue-600 hover:bg-blue-700 border-blue-600 text-white'
+                          : 'bg-gray-800 hover:bg-gray-900 border-blue-600 text-blue-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <Check className={`w-4 h-4 text-white transition-opacity ${(currentStepIndex === 0 ? drumsPlayed.has('clap') : drumsPlayed.has('clap') && hasToggledVizMode) ? 'opacity-100' : 'opacity-0'}`} />
+                        <div className="flex-1 text-center">
+                          👏 Clap<br/>
+                          <span className="text-xs opacity-75">(High/Blue)</span>
+                        </div>
+                        <div className="w-4"></div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => playDrumSound('hihat', 42)}
+                      className={`py-3 px-4 rounded-lg transition-colors touch-target relative min-w-[140px] border-4 ${
+                        (currentStepIndex === 0 ? drumsPlayed.has('hihat') : drumsPlayed.has('hihat') && hasToggledVizMode)
+                          ? 'bg-purple-600 hover:bg-purple-700 border-purple-600 text-white'
+                          : 'bg-gray-800 hover:bg-gray-900 border-purple-600 text-purple-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <Check className={`w-4 h-4 text-white transition-opacity ${(currentStepIndex === 0 ? drumsPlayed.has('hihat') : drumsPlayed.has('hihat') && hasToggledVizMode) ? 'opacity-100' : 'opacity-0'}`} />
+                        <div className="flex-1 text-center">
+                          🎩 Hi-Hat<br/>
+                          <span className="text-xs opacity-75">(Very High/Purple)</span>
+                        </div>
+                        <div className="w-4"></div>
+                      </div>
+                    </button>
                   </div>
+
+                  {/* Step 1 Completion: All drums played in ripple mode */}
+                  {currentStepIndex === 0 && drumsPlayed.size === 4 && (
+                    <button
+                      onClick={nextStep}
+                      className="btn-primary w-full flex items-center justify-center gap-2 touch-target mb-4"
+                    >
+                      <span>Next Step</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  {/* Step 2 Completion: All drums played in spectrum mode */}
+                  {currentStepIndex === 1 && drumsPlayed.size === 4 && vizMode === 'spectrum' && (
+                    <button
+                      onClick={nextStep}
+                      className="btn-accent w-full flex items-center justify-center gap-2 touch-target mb-4"
+                    >
+                      <span>Complete Lesson</span>
+                      <Check className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
                 )}
 
+                {/* Step 2: Toggle Visualization Mode and Explanation */}
                 {currentStepIndex === 1 && (
-                  // Step 2: Switch color modes
                   <div>
-                    <h4 className="text-white font-medium mb-3">Current Color Mode: <span className="text-yellow-400 capitalize">{visualizerSettings.colorMode}</span></h4>
-                    <div className="bg-black/30 rounded-lg p-4 mb-4">
+                    {/* Big toggle button - only show until first toggle */}
+                    {!hasToggledVizMode && (
+                      <button
+                        onClick={switchVisualizationMode}
+                        className="btn-primary w-full mb-4 touch-target"
+                      >
+                        Switch to Spectrum Mode
+                      </button>
+                    )}
+
+                    {/* Explanation box - always visible, updates based on current mode */}
+                    <div className="bg-black/30 rounded-lg p-4">
                       <p className="text-white/80 text-sm">
-                        {visualizerSettings.colorMode === 'spectrum' && 
-                          '🌈 Spectrum Mode: Colors represent frequency - low sounds are red, high sounds are violet'}
-                        {visualizerSettings.colorMode === 'chromatic' && 
-                          '🎵 Chromatic Mode: Each musical note has its own color that stays the same across octaves'}
-                        {visualizerSettings.colorMode === 'harmonic' && 
-                          '🎼 Harmonic Mode: Musically related notes have similar colors based on the circle of fifths'}
+                        {vizMode === 'ripple' ? (
+                          <>
+                            🌊 <strong>Current: Ripple Mode</strong> - Audio energy shown as expanding circles.
+                            <br /><br />
+                            📊 Switch to <strong>Spectrum mode</strong> to see frequency bars - low frequencies on the left, high frequencies on the right.
+                          </>
+                        ) : vizMode === 'spectrum' ? (
+                          <>
+                            📊 <strong>Current: Spectrum Mode</strong> - Frequency bars showing sound across the spectrum.
+                            <br /><br />
+                            🌊 Switch to <strong>Ripple mode</strong> to see audio energy as expanding circles.
+                          </>
+                        ) : (
+                          <>
+                            📈 <strong>Current: Waveform Mode</strong> - Time-domain oscilloscope view showing the actual sound wave.
+                            <br /><br />
+                            📊 Switch to <strong>Spectrum mode</strong> for frequency analysis, or 🌊 <strong>Ripple mode</strong> for energy visualization.
+                          </>
+                        )}
                       </p>
-                    </div>
-                    <p className="text-white/70 text-sm mb-4">
-                      Try the same drum sounds in different color modes to see how the visualization changes:
-                    </p>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <button
-                        onClick={() => playDrumSound('kick', 36)}
-                        className="bg-gray-600 hover:bg-gray-700 text-white py-2 px-3 rounded-lg transition-colors touch-target"
-                      >
-                        🥁 Kick
-                      </button>
-                      <button
-                        onClick={() => playDrumSound('snare', 38)}
-                        className="bg-gray-600 hover:bg-gray-700 text-white py-2 px-3 rounded-lg transition-colors touch-target"
-                      >
-                        🥁 Snare
-                      </button>
-                      <button
-                        onClick={() => playDrumSound('hihat', 42)}
-                        className="bg-gray-600 hover:bg-gray-700 text-white py-2 px-3 rounded-lg transition-colors touch-target"
-                      >
-                        🎩 Hi-Hat
-                      </button>
-                      <button
-                        onClick={() => playDrumSound('crash', 49)}
-                        className="bg-gray-600 hover:bg-gray-700 text-white py-2 px-3 rounded-lg transition-colors touch-target"
-                      >
-                        💥 Crash
-                      </button>
                     </div>
                   </div>
                 )}
@@ -498,23 +955,59 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                 </div>
 
                 {/* Step Numbers */}
-                <div className="grid grid-cols-8 sm:flex sm:gap-2 gap-1 mb-3 sm:ml-4">
-                  {Array.from({ length: 16 }, (_, i) => (
-                    <div
-                      key={i}
-                      className={`h-6 flex items-center justify-center text-xs font-mono ${
-                        i % 4 === 0 ? 'text-yellow-400' : 'text-white/60'
-                      }`}
-                    >
-                      {i + 1}
-                    </div>
-                  ))}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-3">
+                  <div className="w-full sm:w-16"></div>
+                  <div className="grid grid-cols-8 sm:flex sm:gap-1.5 gap-1 w-full sm:w-auto">
+                    {Array.from({ length: 16 }, (_, i) => {
+                      // Determine color based on lesson and step
+                      let numberColor = 'text-white/60'; // Default for non-beat steps
+                      let animateClass = ''; // For alternating animation
+
+                      // Lesson 1 and Lesson 3 Step 1: Kick on 1, 5, 9, 13 (all red)
+                      if (selectedLesson.id === '1' || (selectedLesson.id === '3' && currentStepIndex === 0)) {
+                        if (i % 4 === 0) { // Steps 1, 5, 9, 13 (indices 0, 4, 8, 12)
+                          numberColor = 'text-red-500'; // Kick color
+                        }
+                      }
+
+                      // Lesson 3 Step 2: Kick on 1, 9 (red), Steps 5, 13 alternate (both kick+snare)
+                      if (selectedLesson.id === '3' && currentStepIndex === 1) {
+                        if (i === 0 || i === 8) { // Steps 1, 9 (kick only)
+                          numberColor = 'text-red-500'; // Kick color
+                        } else if (i === 4 || i === 12) { // Steps 5, 13 (both kick and snare)
+                          animateClass = 'animate-kick-snare'; // Alternate red/green
+                        }
+                      }
+
+                      // Lesson 3 Step 3: Complete pattern with hi-hats on odd steps
+                      if (selectedLesson.id === '3' && currentStepIndex === 2) {
+                        const isOddStep = i % 2 === 0; // Odd-numbered steps (indices 0, 2, 4...)
+
+                        if (i === 0 || i === 8) { // Steps 1, 9 (kick + hi-hat)
+                          animateClass = 'animate-kick-hihat'; // Alternate red/purple
+                        } else if (i === 4 || i === 12) { // Steps 5, 13 (kick + snare + hi-hat)
+                          animateClass = 'animate-kick-snare-hihat'; // Alternate red/green/purple
+                        } else if (isOddStep) { // Other odd steps (hi-hat only)
+                          numberColor = 'text-purple-500'; // Hi-hat color
+                        }
+                      }
+
+                      return (
+                        <div
+                          key={i}
+                          className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center text-xs font-mono ${numberColor} ${animateClass}`}
+                        >
+                          {i + 1}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Pattern Grid */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                   <div className="w-full sm:w-16 text-white font-medium text-center sm:text-left">Kick</div>
-                  <div className="grid grid-cols-8 sm:flex sm:gap-2 gap-1 w-full sm:w-auto">
+                  <div className="grid grid-cols-8 sm:flex sm:gap-1.5 gap-1 w-full sm:w-auto">
                     {userPattern.map((active, index) => (
                       <button
                         key={index}
@@ -533,11 +1026,11 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                   </div>
                 </div>
 
-                {/* Snare Track for Rhythm Patterns lesson step 2 */}
-                {selectedLesson.id === '3' && currentStepIndex === 1 && (
+                {/* Snare Track for Rhythm Patterns lesson step 2 and 3 */}
+                {selectedLesson.id === '5' && (currentStepIndex === 1 || currentStepIndex === 2) && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-4">
                     <div className="w-full sm:w-16 text-white font-medium text-center sm:text-left">Snare</div>
-                    <div className="grid grid-cols-8 sm:flex sm:gap-2 gap-1 w-full sm:w-auto">
+                    <div className="grid grid-cols-8 sm:flex sm:gap-1.5 gap-1 w-full sm:w-auto">
                       {snarePattern.map((active, index) => (
                         <button
                           key={index}
@@ -552,6 +1045,34 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                           style={{
                             backgroundColor: active ? '#10b981' : undefined,
                             borderColor: active ? '#10b981' : undefined
+                          }}
+                        >
+                          {active && <div className="w-2 h-2 rounded-full bg-white" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Hi-hat Track for Rhythm Patterns lesson step 3 */}
+                {selectedLesson.id === '5' && currentStepIndex === 2 && (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-4">
+                    <div className="w-full sm:w-16 text-white font-medium text-center sm:text-left">Hi-hat</div>
+                    <div className="grid grid-cols-8 sm:flex sm:gap-1.5 gap-1 w-full sm:w-auto">
+                      {hihatPattern.map((active, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            const newPattern = [...hihatPattern];
+                            newPattern[index] = !newPattern[index];
+                            setHihatPattern(newPattern);
+                          }}
+                          className={`step-button-compact ${active ? 'active' : ''} ${
+                            isPlaying && index === currentPlayStep ? 'ring-2 ring-yellow-400' : ''
+                          } touch-target`}
+                          style={{
+                            backgroundColor: active ? '#a855f7' : undefined,
+                            borderColor: active ? '#a855f7' : undefined
                           }}
                         >
                           {active && <div className="w-2 h-2 rounded-full bg-white" />}

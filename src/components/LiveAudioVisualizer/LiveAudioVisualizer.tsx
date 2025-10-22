@@ -24,13 +24,27 @@ interface LiveAudioVisualizerProps {
   embedded?: boolean; // When true, renders in a compact embedded mode
   layout?: 'mobile' | 'desktop'; // Layout hint for responsive rendering (does NOT cause remount)
   className?: string; // Additional CSS classes for visibility control
+  currentMode?: VisualizationMode; // Controlled mode (optional, for parent control)
+  onModeChange?: (mode: VisualizationMode) => void; // Mode change callback for controlled mode
+  colorMode?: 'spectrum' | 'chromatic' | 'harmonic'; // Color mode for spectrum visualization
+  hideControls?: boolean; // When true, hides controls until settings button is clicked (Education Mode)
+  showModeButtons?: boolean; // When true, shows mode toggle buttons even if hideControls is true
+  frequencySource?: FrequencyMixMode; // Override frequency source (for Education Mode)
+  onInitialized?: (initialized: boolean) => void; // Callback when audio is initialized/stopped
 }
 
 export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
   onBack,
   embedded = false,
   layout: _layout = 'desktop', // Reserved for future mobile-specific optimizations
-  className = ''
+  className = '',
+  currentMode: controlledMode,
+  onModeChange,
+  colorMode,
+  hideControls = false,
+  showModeButtons = false,
+  frequencySource: controlledFrequencySource,
+  onInitialized
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioManagerRef = useRef<AudioInputManager | null>(null);
@@ -43,7 +57,11 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
-  const [currentMode, setCurrentMode] = useState<VisualizationMode>('ripple');
+  const [internalMode, setInternalMode] = useState<VisualizationMode>('ripple');
+
+  // Use controlled mode if provided, otherwise use internal state
+  const currentMode = controlledMode ?? internalMode;
+
   const [gain, setGain] = useState(0.5); // 50%
   const [frequencyScale, setFrequencyScale] = useState<'log' | 'linear' | 'quadratic'>('log');
   const [showSettings, setShowSettings] = useState(false);
@@ -57,6 +75,48 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
 
   // FPS calculation
   const fpsCounterRef = useRef({ frames: 0, lastTime: Date.now() });
+
+  // Auto-adjust gain and visualization mode when mode changes externally (controlled mode)
+  useEffect(() => {
+    if (controlledMode !== undefined) {
+      // Update visualization engine mode
+      if (vizEngineRef.current) {
+        vizEngineRef.current.setMode(controlledMode);
+      }
+
+      // Auto-adjust gain based on mode
+      let modeGain = 1.0;
+      if (controlledMode === 'ripple') {
+        modeGain = 0.5; // 50% for ripple
+      } else if (controlledMode === 'waveform') {
+        modeGain = 2.0; // 200% for waveform
+      } else if (controlledMode === 'spectrum') {
+        modeGain = 1.0; // 100% for spectrum
+      }
+
+      setGain(modeGain);
+      if (audioManagerRef.current) {
+        audioManagerRef.current.setGain(modeGain);
+      }
+    }
+  }, [controlledMode]);
+
+  // Sync frequency source when controlled externally (Education Mode)
+  useEffect(() => {
+    if (controlledFrequencySource !== undefined) {
+      setFrequencySource(controlledFrequencySource);
+      if (sourceManagerRef.current) {
+        sourceManagerRef.current.setMixMode(controlledFrequencySource);
+      }
+    }
+  }, [controlledFrequencySource]);
+
+  // Notify parent when initialization state changes
+  useEffect(() => {
+    if (onInitialized) {
+      onInitialized(isInitialized);
+    }
+  }, [isInitialized, onInitialized]);
 
   // Initialize visualization engine and frequency source manager
   useEffect(() => {
@@ -227,11 +287,48 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
     return () => window.removeEventListener('resize', resizeCanvas);
   }, []);
 
+  // Update color mode when prop changes
+  useEffect(() => {
+    if (colorMode && vizEngineRef.current) {
+      vizEngineRef.current.setColorMode(colorMode);
+    }
+  }, [colorMode]);
+
+  // Auto-start visualization in embedded mode (no mic input required for drums-only)
+  useEffect(() => {
+    if (embedded && vizEngineRef.current && adapterRef.current && !animationFrameRef.current) {
+      console.log('[LiveAudioVisualizer] Auto-starting visualization for embedded mode');
+      startVisualization();
+    }
+  }, [embedded]);
+
   // Handle mode change
   const handleModeChange = (mode: VisualizationMode) => {
-    setCurrentMode(mode);
+    // Update controlled or internal state
+    if (onModeChange) {
+      onModeChange(mode);
+    } else {
+      setInternalMode(mode);
+    }
+
+    // Update visualization engine
     if (vizEngineRef.current) {
       vizEngineRef.current.setMode(mode);
+    }
+
+    // Auto-adjust gain based on visualization mode
+    let modeGain = 1.0; // Default 100%
+    if (mode === 'ripple') {
+      modeGain = 0.5; // 50% for ripple
+    } else if (mode === 'waveform') {
+      modeGain = 2.0; // 200% for waveform
+    } else if (mode === 'spectrum') {
+      modeGain = 1.0; // 100% for spectrum
+    }
+
+    setGain(modeGain);
+    if (audioManagerRef.current) {
+      audioManagerRef.current.setGain(modeGain);
     }
   };
 
@@ -360,7 +457,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
 
         {isInitialized && (
           <>
-            <div className="bg-gray-900 rounded-lg overflow-hidden mb-4" style={{ height: '256px' }}>
+            <div className="bg-gray-900 rounded-lg overflow-hidden mb-4" style={{ height: '320px' }}>
               <canvas
                 ref={canvasRef}
                 className="w-full h-full cursor-crosshair"
@@ -369,8 +466,10 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
             </div>
 
             <div className="bg-gray-700 rounded-lg p-3 space-y-3">
-              <div className="flex items-center gap-3 flex-wrap text-sm">
-                <div className="flex gap-1">
+              {/* Mode buttons - show if not hiding controls OR if showModeButtons is explicitly true */}
+              {(!hideControls || showModeButtons || showSettings) && (
+                <div className="flex items-center gap-3 flex-wrap text-sm">
+                  <div className="flex gap-1">
                   <button
                     onClick={() => handleModeChange('spectrum')}
                     className={`px-3 py-2 text-xs rounded transition-colors min-h-[44px] flex items-center justify-center ${
@@ -438,38 +537,44 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                   </div>
                 )}
 
-                <div className="flex items-center gap-2 border-l border-gray-600 pl-3 ml-auto">
-                  <span className="text-gray-400 text-xs">Gain:</span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="2"
-                    step="0.1"
-                    value={gain}
-                    onChange={(e) => handleGainChange(parseFloat(e.target.value))}
-                    className="w-24"
-                  />
-                  <span className="text-white font-mono text-xs w-10 text-right">
-                    {(gain * 100).toFixed(0)}%
-                  </span>
-                </div>
+                {(!hideControls || showSettings) && (
+                  <>
+                    <div className="flex items-center gap-2 border-l border-gray-600 pl-3 ml-auto">
+                      <span className="text-gray-400 text-xs">Gain:</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="2"
+                        step="0.1"
+                        value={gain}
+                        onChange={(e) => handleGainChange(parseFloat(e.target.value))}
+                        className="w-24"
+                      />
+                      <span className="text-white font-mono text-xs w-10 text-right">
+                        {(gain * 100).toFixed(0)}%
+                      </span>
+                    </div>
 
-                <div className="flex items-center gap-2 border-l border-gray-600 pl-3">
-                  <span className="text-gray-400 text-xs">Scale:</span>
-                  <select
-                    value={frequencyScale}
-                    onChange={(e) => setFrequencyScale(e.target.value as 'log' | 'linear' | 'quadratic')}
-                    className="px-2 py-1 text-xs bg-gray-600 text-gray-300 rounded border border-gray-500 focus:border-primary-500 focus:outline-none"
-                  >
-                    <option value="log">Log</option>
-                    <option value="quadratic">Quad</option>
-                    <option value="linear">Linear</option>
-                  </select>
-                </div>
+                    <div className="flex items-center gap-2 border-l border-gray-600 pl-3">
+                      <span className="text-gray-400 text-xs">Scale:</span>
+                      <select
+                        value={frequencyScale}
+                        onChange={(e) => setFrequencyScale(e.target.value as 'log' | 'linear' | 'quadratic')}
+                        className="px-2 py-1 text-xs bg-gray-600 text-gray-300 rounded border border-gray-500 focus:border-primary-500 focus:outline-none"
+                      >
+                        <option value="log">Log</option>
+                        <option value="quadratic">Quad</option>
+                        <option value="linear">Linear</option>
+                      </select>
+                    </div>
+                  </>
+                )}
               </div>
+              )}
 
               {/* Frequency Source Selector - Second Row */}
-              <div className="flex items-center gap-2 flex-wrap text-sm pt-2 border-t border-gray-600">
+              {(!hideControls || showSettings) && (
+                <div className="flex items-center gap-2 flex-wrap text-sm pt-2 border-t border-gray-600">
                 <span className="text-gray-400 text-xs">Source:</span>
                 <div className="flex gap-1">
                   <button
@@ -532,6 +637,12 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                   </button>
                 </div>
               </div>
+              )}
+            </div>
+
+            {/* LED Matrix Manager - Always rendered for LED output (hidden from UI) */}
+            <div style={{ display: 'none' }}>
+              <LEDMatrixManager />
             </div>
 
             {showSettings && (
@@ -558,6 +669,8 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                         </p>
                       )}
                     </div>
+
+                    {/* LED Matrix Manager UI - Shown in settings panel */}
                     <LEDMatrixManager />
                   </div>
                 </CollapsiblePanel>
