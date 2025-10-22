@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Launchpad Pro MK1 - Light Show Controller</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-bottom: 2px solid #ff6b6b;
+            box-shadow: 0 4px 20px rgba(255, 107, 107, 0.3);
+        }
+
+        .header h1 {
+            text-align: center;
+            font-size: 2em;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            padding: 20px;
+            gap: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .left-panel {
+            flex: 1;
+            min-width: 600px;
+        }
+
+        .right-panel {
+            flex: 0 0 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel {
+            background: rgba(30, 30, 30, 0.9);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .panel h2 {
+            margin-bottom: 15px;
+            color: #4ecdc4;
+            font-size: 1.3em;
+            border-bottom: 2px solid rgba(78, 205, 196, 0.3);
+            padding-bottom: 10px;
+        }
+
+        /* Launchpad Grid */
+        .launchpad-container {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .launchpad-top-controls {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .launchpad-main {
+            display: flex;
+            gap: 15px;
+        }
+
+        .launchpad-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 60px);
+            grid-template-rows: repeat(8, 60px);
+            gap: 8px;
+        }
+
+        .launchpad-scene {
+            display: grid;
+            grid-template-rows: repeat(8, 60px);
+            gap: 8px;
+        }
+
+        .pad {
+            border-radius: 8px;
+            border: 2px solid #333;
+            background: radial-gradient(circle at center, rgba(50, 50, 50, 0.8), rgba(20, 20, 20, 0.9));
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .pad:hover {
+            transform: scale(0.95);
+            border-color: #666;
+        }
+
+        .pad.active {
+            animation: padPulse 0.3s ease;
+        }
+
+        .pad.lit {
+            box-shadow: 0 0 20px currentColor, inset 0 0 20px currentColor;
+            border-color: currentColor;
+        }
+
+        .pad::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.8), transparent);
+            transition: width 0.3s, height 0.3s;
+        }
+
+        .pad.pressed::before {
+            width: 100%;
+            height: 100%;
+        }
+
+        .control-pad {
+            width: 80px;
+            height: 35px;
+            font-size: 9px;
+        }
+
+        .scene-pad {
+            width: 60px;
+            height: 60px;
+        }
+
+        @keyframes padPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.9); }
+            100% { transform: scale(1); }
+        }
+
+        /* Control Panels */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.danger {
+            background: linear-gradient(135deg, #f93b3b 0%, #d91a1a 100%);
+        }
+
+        button.success {
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+        }
+
+        select, input {
+            width: 100%;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: white;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        select option {
+            background: #2a2a2a;
+        }
+
+        .color-presets {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .color-preset {
+            width: 100%;
+            height: 40px;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .color-preset:hover {
+            border-color: white;
+            transform: scale(1.05);
+        }
+
+        /* Status and Logging */
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4444;
+        }
+
+        .status-dot.connected {
+            background: #44ff44;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .log-container {
+            height: 200px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            padding: 2px 4px;
+            border-left: 3px solid #4ecdc4;
+        }
+
+        .log-entry.error {
+            border-color: #ff4444;
+            color: #ff6666;
+        }
+
+        .log-entry.success {
+            border-color: #44ff44;
+            color: #66ff66;
+        }
+
+        /* Effects Controls */
+        .effect-button {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            margin: 5px 0;
+        }
+
+        .slider-container {
+            margin: 15px 0;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            border: none;
+        }
+
+        /* Tab Navigation */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            color: #aaa;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .tab.active {
+            color: #4ecdc4;
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #4ecdc4;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .right-panel {
+                flex: 1;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎹 Launchpad Pro MK1 - Light Show Controller 🎹</h1>
+        <div style="text-align: center; margin-top: 10px; font-size: 12px; color: #ff9999; font-weight: 600;">
+            ⚠️ WIP: Requires Ableton Live open to initialize Launchpad. Use Channel 3 dropdown for LED control (mapping needs verification).
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="left-panel">
+            <div class="panel">
+                <h2>Launchpad Virtual Interface</h2>
+                
+                <div class="status-bar">
+                    <div class="status-indicator">
+                        <div class="status-dot" id="midiStatus"></div>
+                        <span id="midiStatusText">MIDI Disconnected</span>
+                    </div>
+                    <div>
+                        <select id="midiOutput">
+                            <option value="">Select MIDI Output...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="launchpad-container">
+                    <!-- Top Control Buttons -->
+                    <div class="launchpad-top-controls">
+                        <div class="pad control-pad" data-note="108" data-type="control">Session</div>
+                        <div class="pad control-pad" data-note="109" data-type="control">Note</div>
+                        <div class="pad control-pad" data-note="110" data-type="control">Device</div>
+                        <div class="pad control-pad" data-note="111" data-type="control">User</div>
+                        <div class="pad control-pad" data-note="112" data-type="control">Ctrl 5</div>
+                        <div class="pad control-pad" data-note="113" data-type="control">Ctrl 6</div>
+                        <div class="pad control-pad" data-note="114" data-type="control">Ctrl 7</div>
+                        <div class="pad control-pad" data-note="115" data-type="control">Ctrl 8</div>
+                    </div>
+
+                    <div class="launchpad-main">
+                        <!-- 8x8 Grid -->
+                        <div class="launchpad-grid" id="mainGrid"></div>
+                        
+                        <!-- Scene Launch Buttons -->
+                        <div class="launchpad-scene" id="sceneButtons"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>MIDI Monitor</h2>
+                <div class="log-container" id="midiLog"></div>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div class="panel">
+                <h2>Quick Controls</h2>
+                <div class="controls-grid">
+                    <button onclick="controller.connectMIDI()" class="success">Connect MIDI</button>
+                    <button onclick="controller.clearAll()" class="danger">Clear All</button>
+                    <button onclick="controller.testPattern()">Test Pattern</button>
+                    <button onclick="controller.randomColors()">Random Colors</button>
+                </div>
+                
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Master Brightness</span>
+                        <span id="brightnessValue">100%</span>
+                    </div>
+                    <input type="range" id="brightness" min="0" max="100" value="100">
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('colors')">Colors</button>
+                    <button class="tab" onclick="switchTab('effects')">Effects</button>
+                    <button class="tab" onclick="switchTab('sequences')">Sequences</button>
+                </div>
+
+                <div class="tab-content active" id="colorsTab">
+                    <h3 style="margin-bottom: 10px;">Color Palette</h3>
+                    <div class="color-presets" id="colorPresets"></div>
+                    
+                    <div style="margin-top: 15px;">
+                        <label>Custom RGB (Red + Green only):</label>
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Red</span>
+                                <span id="redValue">0</span>
+                            </div>
+                            <input type="range" id="redSlider" min="0" max="63" value="0">
+                        </div>
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Green</span>
+                                <span id="greenValue">0</span>
+                            </div>
+                            <input type="range" id="greenSlider" min="0" max="63" value="0">
+                        </div>
+                        <button onclick="controller.applyCustomColor()">Apply to Selected</button>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="effectsTab">
+                    <h3 style="margin-bottom: 10px;">Light Effects</h3>
+                    <button class="effect-button" onclick="controller.effect('wave')">Wave Effect</button>
+                    <button class="effect-button" onclick="controller.effect('spiral')">Spiral Effect</button>
+                    <button class="effect-button" onclick="controller.effect('rain')">Rain Effect</button>
+                    <button class="effect-button" onclick="controller.effect('strobe')">Strobe Effect</button>
+                    <button class="effect-button" onclick="controller.effect('pulse')">Pulse Effect</button>
+                    <button class="effect-button" onclick="controller.effect('chase')">Chase Effect</button>
+                    
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>Effect Speed</span>
+                            <span id="speedValue">50ms</span>
+                        </div>
+                        <input type="range" id="effectSpeed" min="10" max="500" value="50">
+                    </div>
+                </div>
+
+                <div class="tab-content" id="sequencesTab">
+                    <h3 style="margin-bottom: 10px;">Sequences</h3>
+                    <button onclick="controller.recordSequence()">🔴 Record</button>
+                    <button onclick="controller.playSequence()">▶️ Play</button>
+                    <button onclick="controller.stopSequence()">⏹️ Stop</button>
+                    <button onclick="controller.clearSequence()">🗑️ Clear</button>
+                    
+                    <div style="margin-top: 15px;">
+                        <label>BPM Sync:</label>
+                        <input type="number" id="bpm" value="120" min="60" max="200" style="width: 80px;">
+                        <button onclick="controller.syncToBPM()">Sync</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>MIDI Settings</h2>
+                <label>MIDI Channel:</label>
+                <select id="midiChannel">
+                    <option value="1">Channel 1 - Static</option>
+                    <option value="2">Channel 2 - Flashing</option>
+                    <option value="3">Channel 3 - Pulsing</option>
+                    <option value="6" selected>Channel 6 - User Mode</option>
+                </select>
+                
+                <label style="margin-top: 10px; display: block;">Input Device:</label>
+                <select id="midiInput">
+                    <option value="">Select MIDI Input...</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Launchpad Pro MK1 Controller Class
+        class LaunchpadController {
+            constructor() {
+                this.midiAccess = null;
+                this.midiOutput = null;
+                this.midiInput = null;
+                this.selectedPads = new Set();
+                this.isRecording = false;
+                this.sequence = [];
+                this.sequenceStartTime = 0;
+                this.effectInterval = null;
+                this.currentChannel = 6;
+                
+                // Color palette from research document (velocity values)
+                this.colors = {
+                    off: { velocity: 12, rgb: 'rgb(0, 0, 0)', name: 'Off' },
+                    red: { velocity: 75, rgb: 'rgb(255, 0, 0)', name: 'Red' },
+                    orange: { velocity: 123, rgb: 'rgb(255, 128, 0)', name: 'Orange' },
+                    yellow: { velocity: 91, rgb: 'rgb(255, 255, 0)', name: 'Yellow' },
+                    lime: { velocity: 127, rgb: 'rgb(128, 255, 0)', name: 'Lime' },
+                    green: { velocity: 124, rgb: 'rgb(0, 255, 0)', name: 'Green' },
+                    cyan: { velocity: 60, rgb: 'rgb(0, 255, 255)', name: 'Cyan' },
+                    purple: { velocity: 44, rgb: 'rgb(128, 0, 255)', name: 'Purple' },
+                    magenta: { velocity: 107, rgb: 'rgb(255, 0, 255)', name: 'Magenta' }
+                };
+                
+                this.currentColor = this.colors.red;
+                this.initializeGrid();
+                this.initializeColorPresets();
+                this.setupEventListeners();
+                this.log('System initialized', 'success');
+            }
+            
+            // Calculate velocity from RGB values (Red + Green only, 0-63 range)
+            rgbToVelocity(red, green) {
+                const flags = 12; // Normal LED display
+                return (16 * green) + red + flags;
+            }
+            
+            // Initialize the virtual grid
+            initializeGrid() {
+                const mainGrid = document.getElementById('mainGrid');
+                const sceneButtons = document.getElementById('sceneButtons');
+                
+                // Create 8x8 main grid (notes 36-99)
+                for (let row = 7; row >= 0; row--) {
+                    for (let col = 0; col < 8; col++) {
+                        const note = 36 + (row * 8) + col;
+                        const pad = document.createElement('div');
+                        pad.className = 'pad';
+                        pad.dataset.note = note;
+                        pad.dataset.row = row;
+                        pad.dataset.col = col;
+                        pad.dataset.type = 'grid';
+                        pad.textContent = note;
+                        pad.onclick = () => this.padClick(note, pad);
+                        mainGrid.appendChild(pad);
+                    }
+                }
+                
+                // Create scene buttons (notes 89-96)
+                for (let i = 0; i < 8; i++) {
+                    const note = 89 + i;
+                    const pad = document.createElement('div');
+                    pad.className = 'pad scene-pad';
+                    pad.dataset.note = note;
+                    pad.dataset.type = 'scene';
+                    pad.textContent = `S${8-i}`;
+                    pad.onclick = () => this.padClick(note, pad);
+                    sceneButtons.appendChild(pad);
+                }
+            }
+            
+            // Initialize color preset buttons
+            initializeColorPresets() {
+                const container = document.getElementById('colorPresets');
+                Object.entries(this.colors).forEach(([key, color]) => {
+                    if (key !== 'off') {
+                        const btn = document.createElement('div');
+                        btn.className = 'color-preset';
+                        btn.style.background = color.rgb;
+                        btn.title = color.name;
+                        btn.onclick = () => {
+                            this.currentColor = color;
+                            this.applyColorToSelected();
+                        };
+                        container.appendChild(btn);
+                    }
+                });
+            }
+            
+            // Setup event listeners
+            setupEventListeners() {
+                // Brightness control
+                document.getElementById('brightness').addEventListener('input', (e) => {
+                    document.getElementById('brightnessValue').textContent = e.target.value + '%';
+                    this.updateBrightness(e.target.value / 100);
+                });
+                
+                // RGB sliders
+                document.getElementById('redSlider').addEventListener('input', (e) => {
+                    document.getElementById('redValue').textContent = e.target.value;
+                });
+                
+                document.getElementById('greenSlider').addEventListener('input', (e) => {
+                    document.getElementById('greenValue').textContent = e.target.value;
+                });
+                
+                // Effect speed
+                document.getElementById('effectSpeed').addEventListener('input', (e) => {
+                    document.getElementById('speedValue').textContent = e.target.value + 'ms';
+                });
+                
+                // MIDI Channel selection
+                document.getElementById('midiChannel').addEventListener('change', (e) => {
+                    this.currentChannel = parseInt(e.target.value);
+                    this.log(`Switched to MIDI Channel ${this.currentChannel}`);
+                });
+            }
+            
+            // Connect to Web MIDI API
+            async connectMIDI() {
+                try {
+                    if (!navigator.requestMIDIAccess) {
+                        throw new Error('Web MIDI API not supported in this browser');
+                    }
+                    
+                    this.midiAccess = await navigator.requestMIDIAccess();
+                    this.log('MIDI Access granted', 'success');
+                    
+                    // Populate device selectors
+                    this.updateMIDIDevices();
+                    
+                    // Auto-select first available devices
+                    const outputs = Array.from(this.midiAccess.outputs.values());
+                    const inputs = Array.from(this.midiAccess.inputs.values());
+                    
+                    if (outputs.length > 0) {
+                        this.midiOutput = outputs[0];
+                        document.getElementById('midiOutput').value = outputs[0].id;
+                        this.log(`Connected to output: ${outputs[0].name}`, 'success');
+                    }
+                    
+                    if (inputs.length > 0) {
+                        this.midiInput = inputs[0];
+                        document.getElementById('midiInput').value = inputs[0].id;
+                        this.setupMIDIInput(inputs[0]);
+                        this.log(`Connected to input: ${inputs[0].name}`, 'success');
+                    }
+                    
+                    // Update status
+                    document.getElementById('midiStatus').classList.add('connected');
+                    document.getElementById('midiStatusText').textContent = 'MIDI Connected';
+                    
+                } catch (error) {
+                    this.log(`MIDI Error: ${error.message}`, 'error');
+                }
+            }
+            
+            // Update MIDI device dropdowns
+            updateMIDIDevices() {
+                const outputSelect = document.getElementById('midiOutput');
+                const inputSelect = document.getElementById('midiInput');
+                
+                // Clear existing options
+                outputSelect.innerHTML = '<option value="">Select MIDI Output...</option>';
+                inputSelect.innerHTML = '<option value="">Select MIDI Input...</option>';
+                
+                // Add outputs
+                this.midiAccess.outputs.forEach(output => {
+                    const option = document.createElement('option');
+                    option.value = output.id;
+                    option.textContent = output.name;
+                    outputSelect.appendChild(option);
+                });
+                
+                // Add inputs
+                this.midiAccess.inputs.forEach(input => {
+                    const option = document.createElement('option');
+                    option.value = input.id;
+                    option.textContent = input.name;
+                    inputSelect.appendChild(option);
+                });
+                
+                // Setup change handlers
+                outputSelect.onchange = (e) => {
+                    this.midiOutput = this.midiAccess.outputs.get(e.target.value);
+                    this.log(`Output changed to: ${this.midiOutput?.name || 'None'}`);
+                };
+                
+                inputSelect.onchange = (e) => {
+                    if (this.midiInput) {
+                        this.midiInput.onmidimessage = null;
+                    }
+                    this.midiInput = this.midiAccess.inputs.get(e.target.value);
+                    if (this.midiInput) {
+                        this.setupMIDIInput(this.midiInput);
+                        this.log(`Input changed to: ${this.midiInput.name}`);
+                    }
+                };
+            }
+            
+            // Setup MIDI input handling
+            setupMIDIInput(input) {
+                input.onmidimessage = (event) => {
+                    const [status, note, velocity] = event.data;
+                    const messageType = status & 0xF0;
+                    const channel = (status & 0x0F) + 1;
+                    
+                    // Log incoming MIDI
+                    this.log(`IN: CH${channel} ${messageType === 0x90 ? 'Note On' : 'Note Off'} ${note} vel:${velocity}`);
+                    
+                    // Handle Note On messages
+                    if (messageType === 0x90 && velocity > 0) {
+                        this.handleIncomingNote(note, velocity);
+                    } else if (messageType === 0x80 || (messageType === 0x90 && velocity === 0)) {
+                        this.handleNoteOff(note);
+                    }
+                };
+            }
+            
+            // Handle incoming MIDI notes
+            handleIncomingNote(note, velocity) {
+                const pad = document.querySelector(`.pad[data-note="${note}"]`);
+                if (pad) {
+                    pad.classList.add('pressed', 'lit');
+                    
+                    // Map velocity to color
+                    const color = this.velocityToColor(velocity);
+                    pad.style.color = color;
+                    pad.style.backgroundColor = color + '33';
+                    
+                    // Record if recording
+                    if (this.isRecording) {
+                        this.sequence.push({
+                            time: Date.now() - this.sequenceStartTime,
+                            note: note,
+                            velocity: velocity
+                        });
+                    }
+                    
+                    setTimeout(() => pad.classList.remove('pressed'), 200);
+                }
+            }
+            
+            // Handle note off
+            handleNoteOff(note) {
+                const pad = document.querySelector(`.pad[data-note="${note}"]`);
+                if (pad) {
+                    pad.classList.remove('pressed');
+                }
+            }
+            
+            // Map velocity to RGB color for display
+            velocityToColor(velocity) {
+                // Reverse engineer the velocity formula
+                const adjustedVel = velocity - 12;
+                if (adjustedVel <= 0) return 'rgb(0, 0, 0)';
+                
+                const green = Math.floor(adjustedVel / 16);
+                const red = adjustedVel % 16;
+                
+                // Scale to 0-255 for display
+                const displayRed = Math.min(255, red * 4);
+                const displayGreen = Math.min(255, green * 36);
+                
+                return `rgb(${displayRed}, ${displayGreen}, 0)`;
+            }
+            
+            // Send MIDI message
+            sendMIDI(note, velocity, channel = null) {
+                if (!this.midiOutput) {
+                    this.log('No MIDI output connected', 'error');
+                    return;
+                }
+                
+                const ch = channel || this.currentChannel;
+                const statusByte = 0x90 + (ch - 1);
+                const message = [statusByte, note, velocity];
+                
+                this.midiOutput.send(message);
+                this.log(`OUT: CH${ch} Note ${note} vel:${velocity}`);
+            }
+            
+            // Handle pad clicks
+            padClick(note, element) {
+                element.classList.toggle('active');
+                
+                if (element.classList.contains('active')) {
+                    this.selectedPads.add(note);
+                    element.classList.add('lit');
+                    element.style.color = this.currentColor.rgb;
+                    element.style.backgroundColor = this.currentColor.rgb + '33';
+                    this.sendMIDI(note, this.currentColor.velocity);
+                } else {
+                    this.selectedPads.delete(note);
+                    element.classList.remove('lit');
+                    element.style.color = '';
+                    element.style.backgroundColor = '';
+                    this.sendMIDI(note, 0);
+                }
+                
+                // Record if recording
+                if (this.isRecording) {
+                    this.sequence.push({
+                        time: Date.now() - this.sequenceStartTime,
+                        note: note,
+                        velocity: element.classList.contains('active') ? this.currentColor.velocity : 0
+                    });
+                }
+            }
+            
+            // Apply custom RGB color
+            applyCustomColor() {
+                const red = parseInt(document.getElementById('redSlider').value);
+                const green = parseInt(document.getElementById('greenSlider').value);
+                const velocity = this.rgbToVelocity(red, green);
+                
+                if (velocity > 127) {
+                    this.log(`Velocity ${velocity} exceeds 127! Reduce color values.`, 'error');
+                    return;
+                }
+                
+                const rgb = `rgb(${red * 4}, ${green * 36}, 0)`;
+                this.currentColor = { velocity, rgb, name: 'Custom' };
+                this.applyColorToSelected();
+            }
+            
+            // Apply color to selected pads
+            applyColorToSelected() {
+                this.selectedPads.forEach(note => {
+                    const pad = document.querySelector(`.pad[data-note="${note}"]`);
+                    if (pad) {
+                        pad.style.color = this.currentColor.rgb;
+                        pad.style.backgroundColor = this.currentColor.rgb + '33';
+                        this.sendMIDI(note, this.currentColor.velocity);
+                    }
+                });
+            }
+            
+            // Clear all pads
+            clearAll() {
+                document.querySelectorAll('.pad').forEach(pad => {
+                    pad.classList.remove('active', 'lit', 'pressed');
+                    pad.style.color = '';
+                    pad.style.backgroundColor = '';
+                    const note = parseInt(pad.dataset.note);
+                    if (note) {
+                        this.sendMIDI(note, 0);
+                    }
+                });
+                this.selectedPads.clear();
+                this.log('All pads cleared');
+            }
+            
+            // Test pattern
+            testPattern() {
+                const colors = Object.values(this.colors).filter(c => c.name !== 'Off');
+                let index = 0;
+                
+                // Light up grid in a pattern
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        const note = 36 + (row * 8) + col;
+                        const color = colors[(row + col) % colors.length];
+                        
+                        setTimeout(() => {
+                            this.sendMIDI(note, color.velocity);
+                            const pad = document.querySelector(`.pad[data-note="${note}"]`);
+                            if (pad) {
+                                pad.classList.add('lit');
+                                pad.style.color = color.rgb;
+                                pad.style.backgroundColor = color.rgb + '33';
+                            }
+                        }, index * 10);
+                        
+                        index++;
+                    }
+                }
+                
+                this.log('Test pattern activated');
+            }
+            
+            // Random colors
+            randomColors() {
+                const colors = Object.values(this.colors).filter(c => c.name !== 'Off');
+                
+                document.querySelectorAll('.pad[data-type="grid"]').forEach(pad => {
+                    const color = colors[Math.floor(Math.random() * colors.length)];
+                    const note = parseInt(pad.dataset.note);
+                    
+                    this.sendMIDI(note, color.velocity);
+                    pad.classList.add('lit');
+                    pad.style.color = color.rgb;
+                    pad.style.backgroundColor = color.rgb + '33';
+                });
+                
+                this.log('Random colors applied');
+            }
+            
+            // Light effects
+            effect(type) {
+                // Clear any existing effect
+                if (this.effectInterval) {
+                    clearInterval(this.effectInterval);
+                }
+                
+                const speed = parseInt(document.getElementById('effectSpeed').value);
+                
+                switch(type) {
+                    case 'wave':
+                        this.waveEffect(speed);
+                        break;
+                    case 'spiral':
+                        this.spiralEffect(speed);
+                        break;
+                    case 'rain':
+                        this.rainEffect(speed);
+                        break;
+                    case 'strobe':
+                        this.strobeEffect(speed);
+                        break;
+                    case 'pulse':
+                        this.pulseEffect(speed);
+                        break;
+                    case 'chase':
+                        this.chaseEffect(speed);
+                        break;
+                }
+                
+                this.log(`${type} effect started`);
+            }
+            
+            // Wave effect
+            waveEffect(speed) {
+                let col = 0;
+                const colors = Object.values(this.colors).filter(c => c.name !== 'Off');
+                
+                this.effectInterval = setInterval(() => {
+                    // Clear previous column
+                    const prevCol = (col - 1 + 8) % 8;
+                    for (let row = 0; row < 8; row++) {
+                        const note = 36 + (row * 8) + prevCol;
+                        this.sendMIDI(note, 0);
+                        const pad = document.querySelector(`.pad[data-note="${note}"]`);
+                        if (pad) {
+                            pad.classList.remove('lit');
+                            pad.style.color = '';
+                            pad.style.backgroundColor = '';
+                        }
+                    }
+                    
+                    // Light current column
+                    for (let row = 0; row < 8; row++) {
+                        const note = 36 + (row * 8) + col;
+                        const color = colors[col % colors.length];
+                        this.sendMIDI(note, color.velocity);
+                        const pad = document.querySelector(`.pad[data-note="${note}"]`);
+                        if (pad) {
+                            pad.classList.add('lit');
+                            pad.style.color = color.rgb;
+                            pad.style.backgroundColor = color.rgb + '33';
+                        }
+                    }
+                    
+                    col = (col + 1) % 8;
+                }, speed);
+            }
+            
+            // Spiral effect
+            spiralEffect(speed) {
+                const spiral = [
+                    [0,0],[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7],
+                    [1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],
+                    [7,6],[7,5],[7,4],[7,3],[7,2],[7,1],[7,0],
+                    [6,0],[5,0],[4,0],[3,0],[2,0],[1,0],
+                    [1,1],[1,2],[1,3],[1,4],[1,5],[1,6],
+                    [2,6],[3,6],[4,6],[5,6],[6,6],
+                    [6,5],[6,4],[6,3],[6,2],[6,1],
+                    [5,1],[4,1],[3,1],[2,1],
+                    [2,2],[2,3],[2,4],[2,5],
+                    [3,5],[4,5],[5,5],
+                    [5,4],[5,3],[5,2],
+                    [4,2],[3,2],
+                    [3,3],[3,4],
+                    [4,4],[4,3]
+                ];
+                
+                let index = 0;
+                const colors = Object.values(this.colors).filter(c => c.name !== 'Off');
+                
+                this.effectInterval = setInterval(() => {
+                    // Clear previous
+                    if (index > 0) {
+                        const [prevRow, prevCol] = spiral[index - 1];
+                        const prevNote = 36 + (prevRow * 8) + prevCol;
+                        this.sendMIDI(prevNote, 0);
+                        const prevPad = document.querySelector(`.pad[data-note="${prevNote}"]`);
+                        if (prevPad) {
+                            prevPad.classList.remove('lit');
+                            prevPad.style.color = '';
+                            prevPad.style.backgroundColor = '';
+                        }
+                    }
+                    
+                    // Light current
+                    const [row, col] = spiral[index];
+                    const note = 36 + (row * 8) + col;
+                    const color = colors[index % colors.length];
+                    this.sendMIDI(note, color.velocity);
+                    const pad = document.querySelector(`.pad[data-note="${note}"]`);
+                    if (pad) {
+                        pad.classList.add('lit');
+                        pad.style.color = color.rgb;
+                        pad.style.backgroundColor = color.rgb + '33';
+                    }
+                    
+                    index = (index + 1) % spiral.length;
+                }, speed);
+            }
+            
+            // Rain effect
+            rainEffect(speed) {
+                const drops = [];
+                const colors = Object.values(this.colors).filter(c => c.name !== 'Off');
+                
+                this.effectInterval = setInterval(() => {
+                    // Clear old drops
+                    drops.forEach(drop => {
+                        if (drop.row >= 0) {
+                            const note = 36 + (drop.row * 8) + drop.col;
+                            this.sendMIDI(note, 0);
+                            const pad = document.querySelector(`.pad[data-note="${note}"]`);
+                            if (pad) {
+                                pad.classList.remove('lit');
+                                pad.style.color = '';
+                                pad.style.backgroundColor = '';
+                            }
+                        }
+                    });
+                    
+                    // Move drops down
+                    drops.forEach(drop => drop.row--);
+                    
+                    // Remove finished drops
+                    for (let i = drops.length - 1; i >= 0; i--) {
+                        if (drops[i].row < 0) {
+                            drops.splice(i, 1);
+                        }
+                    }
+                    
+                    // Add new drop randomly
+                    if (Math.random() > 0.3) {
+                        drops.push({
+                            row: 7,
+                            col: Math.floor(Math.random() * 8),
+                            color: colors[Math.floor(Math.random() * colors.length)]
+                        });
+                    }
+                    
+                    // Draw drops
+                    drops.forEach(drop => {
+                        if (drop.row >= 0) {
+                            const note = 36 + (drop.row * 8) + drop.col;
+                            this.sendMIDI(note, drop.color.velocity);
+                            const pad = document.querySelector(`.pad[data-note="${note}"]`);
+                            if (pad) {
+                                pad.classList.add('lit');
+                                pad.style.color = drop.color.rgb;
+                                pad.style.backgroundColor = drop.color.rgb + '33';
+                            }
+                        }
+                    });
+                }, speed * 2);
+            }
+            
+            // Strobe effect
+            strobeEffect(speed) {
+                let on = false;
+                const color = this.currentColor;
+                
+                this.effectInterval = setInterval(() => {
+                    for (let note = 36; note <= 99; note++) {
+                        this.sendMIDI(note, on ? color.velocity : 0);
+                        const pad = document.querySelector(`.pad[data-note="${note}"]`);
+                        if (pad) {
+                            if (on) {
+                                pad.classList.add('lit');
+                                pad.style.color = color.rgb;
+                                pad.style.backgroundColor = color.rgb + '33';
+                            } else {
+                                pad.classList.remove('lit');
+                                pad.style.color = '';
+                                pad.style.backgroundColor = '';
+                            }
+                        }
+                    }
+                    on = !on;
+                }, speed);
+            }
+            
+            // Pulse effect
+            pulseEffect(speed) {
+                // Switch to channel 3 for pulsing
+                const originalChannel = this.currentChannel;
+                this.currentChannel = 3;
+                
+                const colors = Object.values(this.colors).filter(c => c.name !== 'Off');
+                
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        const note = 36 + (row * 8) + col;
+                        const color = colors[(row + col) % colors.length];
+                        this.sendMIDI(note, color.velocity, 3);
+                        
+                        const pad = document.querySelector(`.pad[data-note="${note}"]`);
+                        if (pad) {
+                            pad.classList.add('lit');
+                            pad.style.color = color.rgb;
+                            pad.style.backgroundColor = color.rgb + '33';
+                            pad.style.animation = `pulse ${speed * 10}ms infinite`;
+                        }
+                    }
+                }
+                
+                this.currentChannel = originalChannel;
+                this.log('Pulse effect activated (Channel 3)');
+            }
+            
+            // Chase effect
+            chaseEffect(speed) {
+                const sequence = [];
+                for (let i = 0; i < 64; i++) {
+                    sequence.push(36 + i);
+                }
+                
+                let index = 0;
+                const trailLength = 8;
+                const colors = Object.values(this.colors).filter(c => c.name !== 'Off');
+                
+                this.effectInterval = setInterval(() => {
+                    // Clear oldest in trail
+                    const oldIndex = (index - trailLength + 64) % 64;
+                    const oldNote = sequence[oldIndex];
+                    this.sendMIDI(oldNote, 0);
+                    const oldPad = document.querySelector(`.pad[data-note="${oldNote}"]`);
+                    if (oldPad) {
+                        oldPad.classList.remove('lit');
+                        oldPad.style.color = '';
+                        oldPad.style.backgroundColor = '';
+                    }
+                    
+                    // Light current with trail
+                    for (let i = 0; i < trailLength; i++) {
+                        const trailIndex = (index - i + 64) % 64;
+                        const note = sequence[trailIndex];
+                        const intensity = Math.floor((trailLength - i) / trailLength * 63);
+                        const velocity = this.rgbToVelocity(intensity, 0);
+                        
+                        this.sendMIDI(note, velocity);
+                        const pad = document.querySelector(`.pad[data-note="${note}"]`);
+                        if (pad) {
+                            pad.classList.add('lit');
+                            const opacity = (trailLength - i) / trailLength;
+                            pad.style.color = `rgba(255, 0, 0, ${opacity})`;
+                            pad.style.backgroundColor = `rgba(255, 0, 0, ${opacity * 0.2})`;
+                        }
+                    }
+                    
+                    index = (index + 1) % 64;
+                }, speed);
+            }
+            
+            // Update brightness
+            updateBrightness(factor) {
+                // This would typically be done via SysEx or by adjusting velocity values
+                document.querySelectorAll('.pad.lit').forEach(pad => {
+                    const currentOpacity = pad.style.opacity || 1;
+                    pad.style.opacity = factor;
+                });
+            }
+            
+            // Sequence recording
+            recordSequence() {
+                this.isRecording = !this.isRecording;
+                if (this.isRecording) {
+                    this.sequence = [];
+                    this.sequenceStartTime = Date.now();
+                    this.log('Recording started...', 'success');
+                } else {
+                    this.log(`Recording stopped. ${this.sequence.length} events captured.`);
+                }
+            }
+            
+            // Play sequence
+            playSequence() {
+                if (this.sequence.length === 0) {
+                    this.log('No sequence to play', 'error');
+                    return;
+                }
+                
+                this.log(`Playing sequence with ${this.sequence.length} events...`);
+                
+                this.sequence.forEach(event => {
+                    setTimeout(() => {
+                        this.sendMIDI(event.note, event.velocity);
+                        const pad = document.querySelector(`.pad[data-note="${event.note}"]`);
+                        if (pad) {
+                            if (event.velocity > 0) {
+                                pad.classList.add('lit', 'pressed');
+                                const color = this.velocityToColor(event.velocity);
+                                pad.style.color = color;
+                                pad.style.backgroundColor = color + '33';
+                                setTimeout(() => pad.classList.remove('pressed'), 200);
+                            } else {
+                                pad.classList.remove('lit');
+                                pad.style.color = '';
+                                pad.style.backgroundColor = '';
+                            }
+                        }
+                    }, event.time);
+                });
+            }
+            
+            // Stop sequence
+            stopSequence() {
+                // Clear all timeouts
+                if (this.effectInterval) {
+                    clearInterval(this.effectInterval);
+                    this.effectInterval = null;
+                }
+                this.log('Sequence stopped');
+            }
+            
+            // Clear sequence
+            clearSequence() {
+                this.sequence = [];
+                this.log('Sequence cleared');
+            }
+            
+            // Sync to BPM
+            syncToBPM() {
+                const bpm = parseInt(document.getElementById('bpm').value);
+                const beatMs = 60000 / bpm;
+                
+                // Flash on the beat
+                let beat = 0;
+                if (this.effectInterval) {
+                    clearInterval(this.effectInterval);
+                }
+                
+                this.effectInterval = setInterval(() => {
+                    // Flash scene buttons on beat
+                    const sceneNote = 89 + (beat % 8);
+                    this.sendMIDI(sceneNote, this.colors.green.velocity, 2); // Channel 2 for flashing
+                    
+                    const pad = document.querySelector(`.pad[data-note="${sceneNote}"]`);
+                    if (pad) {
+                        pad.classList.add('lit');
+                        pad.style.color = this.colors.green.rgb;
+                        pad.style.backgroundColor = this.colors.green.rgb + '33';
+                        
+                        setTimeout(() => {
+                            this.sendMIDI(sceneNote, 0);
+                            pad.classList.remove('lit');
+                            pad.style.color = '';
+                            pad.style.backgroundColor = '';
+                        }, beatMs / 2);
+                    }
+                    
+                    beat++;
+                }, beatMs);
+                
+                this.log(`Synced to ${bpm} BPM`);
+            }
+            
+            // Logging
+            log(message, type = 'info') {
+                const logContainer = document.getElementById('midiLog');
+                const entry = document.createElement('div');
+                entry.className = `log-entry ${type}`;
+                entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                logContainer.appendChild(entry);
+                logContainer.scrollTop = logContainer.scrollHeight;
+                
+                // Keep only last 50 entries
+                while (logContainer.children.length > 50) {
+                    logContainer.removeChild(logContainer.firstChild);
+                }
+            }
+        }
+        
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+        }
+        
+        // Initialize controller
+        const controller = new LaunchpadController();
+        
+        // Auto-connect on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                controller.connectMIDI();
+            }, 500);
+        });
+    </script>
+</body>
+</html>
