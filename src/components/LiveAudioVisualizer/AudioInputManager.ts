@@ -62,7 +62,12 @@ export class AudioInputManager {
    */
   async initialize(deviceId?: string): Promise<void> {
     try {
+      // Detect iOS devices (iPad, iPhone, iPod)
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
       // Request microphone access with flexible configuration
+      // Note: iOS Safari has much lower raw mic levels than desktop browsers
+      // when AGC is disabled. Enable AGC on iOS for consistent audio levels.
       const constraints: MediaStreamConstraints = {
         audio: deviceId
           ? {
@@ -70,13 +75,13 @@ export class AudioInputManager {
               channelCount: { ideal: 2 }, // Prefer stereo but allow mono
               echoCancellation: false,
               noiseSuppression: false,
-              autoGainControl: false,
+              autoGainControl: isIOS, // Enable AGC on iOS, disable on desktop
             }
           : {
               channelCount: { ideal: 2 },
               echoCancellation: false,
               noiseSuppression: false,
-              autoGainControl: false,
+              autoGainControl: isIOS, // Enable AGC on iOS, disable on desktop
             },
       };
 
@@ -93,7 +98,7 @@ export class AudioInputManager {
       const audioTrack = this.mediaStream.getAudioTracks()[0];
       const settings = audioTrack.getSettings();
       const channelCount = settings.channelCount || 1;
-      console.log(`🎤 Audio input: ${channelCount} channel(s)`);
+      console.log(`🎤 Audio input: ${channelCount} channel(s), AGC: ${isIOS ? 'enabled (iOS)' : 'disabled'}`);
 
       // Create gain node for volume control (default gain = 1.0)
       this.gainNode = this.audioContext.createGain();
