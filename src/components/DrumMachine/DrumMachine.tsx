@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Grid3x3 } from 'lucide-react';
 import { DrumTrack, ColorMode } from '../../types';
 import { TrackRow } from './TrackRow';
 import { TransportControls } from './TransportControls';
@@ -27,6 +27,9 @@ interface DrumMachineProps {
   onAddTrack: (track: DrumTrack) => void;
   onRemoveTrack: (trackId: string) => void;
   onLoadDefaultPattern: () => void;
+  // Optional: Launchpad layout orientation toggle (Story 8.2)
+  launchpadOrientation?: 'horizontal' | 'vertical';
+  onToggleLaunchpadOrientation?: () => void;
 }
 
 export const DrumMachine: React.FC<DrumMachineProps> = ({
@@ -44,10 +47,12 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
   onStop,
   onTempoChange,
   onClearTrack,
- onClearAll,
+  onClearAll,
   onAddTrack,
   onRemoveTrack,
-  onLoadDefaultPattern
+  onLoadDefaultPattern,
+  launchpadOrientation,
+  onToggleLaunchpadOrientation
 }) => {
   // Register module capability for WLED routing
   React.useEffect(() => {
@@ -116,6 +121,16 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold">Drum Machine</h2>
         <div className="flex items-center gap-4">
+          {onToggleLaunchpadOrientation && (
+            <button
+              onClick={onToggleLaunchpadOrientation}
+              className="flex items-center gap-2 text-sm text-purple-400 hover:text-purple-300 transition-colors"
+              title={`Launchpad Layout: ${launchpadOrientation || 'horizontal'}`}
+            >
+              <Grid3x3 className="w-4 h-4" />
+              {launchpadOrientation === 'vertical' ? 'Vertical' : 'Horizontal'}
+            </button>
+          )}
           <button
             onClick={onLoadDefaultPattern}
             className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"

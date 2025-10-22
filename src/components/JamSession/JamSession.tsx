@@ -9,6 +9,8 @@ import { supabaseSessionService } from '../../services/supabaseSession';
 import { ConnectionStatus } from './ConnectionStatus';
 import { UserList } from './UserList';
 import type { Participant, ConnectionStatus as StatusType, DrumStepEvent } from '../../types/session';
+import { useControllerSelection, useLaunchpadDrumIntegration } from '../../hardware';
+import { HardwareControllerSelector } from '../Hardware/HardwareControllerSelector';
 
 /**
  * New Jam Session (Epic 4)
@@ -41,6 +43,9 @@ export const JamSession: React.FC<JamSessionProps> = ({
 
   // Debounce timer for drum step broadcasts (Story 17.1)
   const drumStepDebounceTimerRef = useRef<number | null>(null);
+
+  // Hardware controller integration (Story 8.2)
+  const { activeController, selectedType } = useControllerSelection();
 
   // Subscribe to Supabase session updates
   useEffect(() => {
@@ -270,6 +275,17 @@ export const JamSession: React.FC<JamSessionProps> = ({
     setTracks(createDefaultPattern());
   };
 
+  // Launchpad Pro integration (Story 8.2) - placed after handlers
+  const { toggleOrientation, orientation } = useLaunchpadDrumIntegration({
+    controller: selectedType === 'launchpad-pro-mk3' ? activeController : undefined,
+    tracks,
+    currentStep,
+    isPlaying,
+    colorMode: music.colorMode,
+    onStepToggle: handleStepToggle,
+    onVelocityChange: handleVelocityChange,
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       {/* Global Music Header */}
@@ -390,6 +406,9 @@ export const JamSession: React.FC<JamSessionProps> = ({
         <div className="max-w-7xl mx-auto">
           {activeTab === 'drum' && (
             <div className="space-y-4">
+              {/* Hardware Controller Selection (Story 8.2) */}
+              <HardwareControllerSelector />
+
               {/* Drum Machine Toggle */}
               <div className="bg-gray-800 rounded-lg border border-gray-700">
                 <button
@@ -433,6 +452,8 @@ export const JamSession: React.FC<JamSessionProps> = ({
                       onAddTrack={handleAddTrack}
                       onRemoveTrack={handleRemoveTrack}
                       onLoadDefaultPattern={handleLoadDefaultPattern}
+                      launchpadOrientation={selectedType === 'launchpad-pro-mk3' ? orientation : undefined}
+                      onToggleLaunchpadOrientation={selectedType === 'launchpad-pro-mk3' ? toggleOrientation : undefined}
                     />
                   </div>
                 )}

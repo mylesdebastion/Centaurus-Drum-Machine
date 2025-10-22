@@ -49,3 +49,27 @@ export type {
 // Launchpad Pro Hardware Controller
 export { LaunchpadProController } from './launchpad/LaunchpadProController';
 export type { LaunchpadModel } from './launchpad/LaunchpadProController';
+export { LayoutManager } from './launchpad/LayoutManager';
+export type { LayoutOrientation, OrientationChangedEvent } from './launchpad/LayoutManager';
+export {
+  stepToNote_Horizontal,
+  stepToNote_Vertical,
+  noteToStep_Horizontal,
+  noteToStep_Vertical,
+  isValidGridNote,
+} from './launchpad/layoutMapping';
+export type { StepCoordinates } from './launchpad/layoutMapping';
+export {
+  getSpectrumColor,
+  getChromaticColor,
+  getHarmonicColor,
+  getTrackColor,
+  applyVelocityBrightness,
+  toLaunchpadRGB,
+  fromLaunchpadRGB,
+  PLAYBACK_COLOR,
+  OFF_COLOR,
+} from './launchpad/colorMapping';
+export type { LaunchpadRGB } from './launchpad/colorMapping';
+export { useLaunchpadDrumIntegration } from './launchpad/useLaunchpadDrumIntegration';
+export type { UseLaunchpadDrumIntegrationOptions } from './launchpad/useLaunchpadDrumIntegration';

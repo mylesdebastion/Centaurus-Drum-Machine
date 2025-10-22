@@ -22,6 +22,7 @@ import { ChordMelodyArranger } from './components/Studio/modules/ChordMelodyArra
 import { UsernameModal, getStoredUsername } from './components/JamSession/UsernameModal';
 import { supabaseSessionService } from './services/supabaseSession';
 import { AuthTest } from './components/AuthTest';
+import { LaunchpadProExperiment } from './components/LaunchpadProExperiment';
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
@@ -247,6 +248,14 @@ function App() {
     navigate('/');
   };
 
+  const handleLaunchpadTest = () => {
+    navigate('/launchpad-test');
+  };
+
+  const handleExitLaunchpadTest = () => {
+    navigate('/');
+  };
+
   return (
     <GlobalMusicProvider>
       <HardwareManager>
@@ -278,6 +287,7 @@ function App() {
               onStudio={handleStudio}
               onSupabaseTest={handleSupabaseTest}
               onChordMelodyTest={handleChordMelodyTest}
+              onLaunchpadTest={handleLaunchpadTest}
             />
           }
         />
@@ -410,6 +420,14 @@ function App() {
                 embedded={false}
               />
             </div>
+          }
+        />
+        <Route
+          path="/launchpad-test"
+          element={
+            <LaunchpadProExperiment
+              onBack={handleExitLaunchpadTest}
+            />
           }
         />
         <Route

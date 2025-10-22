@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2, Piano, Guitar, Database } from 'lucide-react';
+import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2, Piano, Guitar, Database, Grid2x2 } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onStartJam: () => void;
@@ -18,6 +18,7 @@ interface WelcomeScreenProps {
   onStudio?: () => void;
   onSupabaseTest?: () => void;
   onChordMelodyTest?: () => void;
+  onLaunchpadTest?: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
@@ -36,7 +37,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onHeaderTest,
   onStudio,
   onSupabaseTest,
-  onChordMelodyTest
+  onChordMelodyTest,
+  onLaunchpadTest
 }) => {
   const [joinCode, setJoinCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
@@ -290,6 +292,27 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 <Play className="w-4 h-4" />
               </div>
             </button>
+
+            {/* Launchpad Pro Test */}
+            {onLaunchpadTest && (
+              <button
+                onClick={onLaunchpadTest}
+                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-yellow-500/50 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <Grid2x2 className="w-6 h-6 text-yellow-400" />
+                  <h3 className="font-semibold text-white">Launchpad Pro Test</h3>
+                  <span className="text-xs bg-yellow-600/30 text-yellow-300 px-2 py-1 rounded">NEW</span>
+                </div>
+                <p className="text-sm text-gray-400 mb-4">
+                  Test Novation Launchpad Pro (Mk3/2015) MIDI connection, LED control, and button mapping
+                </p>
+                <div className="flex items-center gap-2 text-sm text-yellow-400 group-hover:text-yellow-300">
+                  <span>Launch Test</span>
+                  <Play className="w-4 h-4" />
+                </div>
+              </button>
+            )}
 
             {/* Global Music Header Test */}
             {onHeaderTest && (
