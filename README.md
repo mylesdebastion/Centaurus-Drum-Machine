@@ -6,37 +6,10 @@ A modern web-based drum machine with hardware controller support, built with Rea
 
 - 🥁 **Interactive Drum Sequencer**: Create beats with an intuitive step sequencer interface
 - 🎛️ **Hardware Controller Support**: Connect MIDI controllers for hands-on beat creation
-- 💡 **Intelligent WLED LED Routing**: Automatic visualization routing to LED hardware (Epic 18)
 - 🔧 **Browser Compatibility**: Works across modern browsers with graceful degradation
 - 🎵 **High-Quality Audio**: Powered by Tone.js for professional audio processing
 - 📱 **Responsive Design**: Optimized for desktop and mobile devices
 - ♿ **Accessibility**: Built with accessibility best practices
-
-### 💡 Epic 18: Intelligent WLED Visualization Routing
-
-**Configure hardware once, visualize any module automatically**
-
-The WLED routing system automatically routes module visualizations to physical LED devices based on device capabilities and module requirements. No manual device selection needed!
-
-**Key Features:**
-- **Automatic Routing**: Modules automatically find and use compatible LED devices
-- **Multi-Device Support**: Route different modules to different devices simultaneously
-- **Overlay Effects**: Audio reactive and ambient effects layer on top of primary visualizations
-- **Device Persistence**: WLED devices saved to Supabase, shared across jam sessions
-- **Context-Aware Rules**: Guitar on 2D grid gets exclusive access, drum machine prefers grids, etc.
-- **Real-Time Sync**: Device changes sync across all session participants in <200ms
-
-**Supported Visualizations:**
-- Step Sequencer (2D grid or 1D strip)
-- Piano Roll (1D strip with 88-key mapping)
-- Guitar Fretboard (2D grid)
-- Audio Reactive Ripple (overlay on any device)
-
-**Documentation:**
-- [WLED Manager User Guide](docs/guides/wled-manager-user-guide.md)
-- [Developer Guide](docs/guides/wled-routing-system.md)
-- [Architecture](docs/architecture/wled-visualization-routing.md)
-- [Test Scenarios](docs/testing/epic-18-test-scenarios.md)
 
 ## Hardware Controller Requirements
 

@@ -1,19 +1,14 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap, Lightbulb, Volume2, RotateCw, Settings } from 'lucide-react';
+import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap, Lightbulb, Gamepad2, Volume2, RotateCw } from 'lucide-react';
 import { SingleLaneVisualizer } from '../../utils/SingleLaneVisualizer';
 import { LEDStripManager } from '../LEDStripManager/LEDStripManager';
-import { APC40ButtonEvent } from '../../utils/APC40Controller';
-import { useHardwareContext } from '@/hardware';
-import { HardwareControllerSelector } from '../Hardware/HardwareControllerSelector';
+import { APC40Controller, APC40ButtonEvent } from '../../utils/APC40Controller';
 import { createSoundEngine, SoundEngine, SoundEngineType, soundEngineNames } from '../../utils/soundEngines';
 import { useModuleContext } from '../../hooks/useModuleContext';
 import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
-import type { EducationConfig } from '../../types';
 
 interface IsometricSequencerProps {
   onBack: () => void;
-  educationConfig?: EducationConfig; // Optional - undefined = standalone mode
-  onPlayStateChange?: (isPlaying: boolean, togglePlay: () => void) => void; // Expose play controls for education mode
 }
 
 // Vector3 class for 3D calculations
@@ -107,14 +102,11 @@ class Camera3D {
   }
 }
 
-export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, educationConfig, onPlayStateChange }) => {
+export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack }) => {
   // Module Adapter Pattern - Context Detection (Epic 14, Story 14.5)
   const context = useModuleContext();
   const globalMusic = useGlobalMusic();
   const isStandalone = context === 'standalone';
-
-  // Education Mode Detection (Story 20.6)
-  const isEducationMode = !!educationConfig;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
@@ -167,35 +159,6 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
   // const [mousePos, setMousePos] = useState<{x: number, y: number} | null>(null);
   const [hoveredNote, setHoveredNote] = useState<{lane: number, step: number} | null>(null);
 
-  // Load pattern from educationConfig when in education mode (Story 20.6)
-  useEffect(() => {
-    if (isEducationMode && educationConfig) {
-      const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-      const newPattern = Array(12).fill(null).map(() => Array(16).fill(false));
-
-      // Load each note's pattern from config
-      Object.entries(educationConfig.pattern).forEach(([noteName, notePattern]) => {
-        const laneIndex = noteNames.indexOf(noteName);
-        if (laneIndex !== -1 && notePattern) {
-          newPattern[laneIndex] = [...notePattern];
-          // Repeat pattern to fill 16 steps if pattern is only 8 steps
-          if (notePattern.length === 8) {
-            newPattern[laneIndex] = [...notePattern, ...notePattern];
-          }
-        }
-      });
-
-      setPattern(newPattern);
-    }
-  }, [isEducationMode, educationConfig]);
-
-  // Expose play controls to parent component in education mode (Story 20.6)
-  useEffect(() => {
-    if (isEducationMode && onPlayStateChange) {
-      onPlayStateChange(isPlaying, togglePlay);
-    }
-  }, [isEducationMode, isPlaying, onPlayStateChange]);
-
   // LED visualization state
   const [showLEDManager, setShowLEDManager] = useState(false);
   const [ledVisualizers, setLEDVisualizers] = useState<SingleLaneVisualizer[]>([]);
@@ -203,14 +166,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
   // Animation mode toggle (default to smooth scrolling for better musical flow)
   const [smoothScrolling, setSmoothScrolling] = useState(true);
 
-  // Hardware controller settings state
-  const [showHardwareSelector, setShowHardwareSelector] = useState(false);
-
-  // Hardware Manager integration (Story 8.0)
-  const { controllers } = useHardwareContext();
-  const activeController = controllers.find(c => c.connectionStatus === 'connected');
-  const apc40Controller = activeController; // For backward compatibility with existing code
-  const apc40Connected = activeController?.connectionStatus === 'connected';
+  // APC40 hardware control state
+  const [apc40Controller] = useState(() => new APC40Controller());
+  const [apc40Connected, setAPC40Connected] = useState(false);
   const [apc40Rotated, setAPC40Rotated] = useState(false);
 
   // Sound engine state
@@ -219,15 +177,14 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
   const soundEngineRef = useRef<SoundEngine | null>(null);
 
   // Melody generation mode state
-  type MelodyMode = 'melody' | 'random' | 'chords' | 'beats' | 'twinkle';
+  type MelodyMode = 'melody' | 'random' | 'chords' | 'beats';
   const [selectedMelodyMode, setSelectedMelodyMode] = useState<MelodyMode>('melody');
   const [showMelodyMenu, setShowMelodyMenu] = useState(false);
   const melodyModeNames: Record<MelodyMode, string> = {
     melody: 'Melody',
     random: 'Random',
     chords: 'Chords',
-    beats: 'Beats',
-    twinkle: 'Twinkle'
+    beats: 'Beats'
   };
 
   // Key/Scale menu state
@@ -379,14 +336,6 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
 
   // Get active lanes based on current mode
   const getActiveLanes = () => {
-    // Education Mode: Use visibleLanes from config (Story 20.6)
-    if (isEducationMode && educationConfig) {
-      const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-      return educationConfig.visibleLanes
-        .map(noteName => noteNames.indexOf(noteName))
-        .filter(idx => idx !== -1); // Filter out any invalid note names
-    }
-
     if (showAllNotes) {
       // All 12 chromatic notes - use effective lane order for Circle of Fifths
       return getEffectiveLaneOrder();
@@ -1166,22 +1115,30 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     }
   }, [ledEnabled, ledVisualizers, pattern, currentBeat, isPlaying, boomwhackerColors, showAllNotes, getActiveLanes, bpm]);
 
-  // Auto-sync hardware controller color mode with harmonic toggle
+  // APC40 hardware integration - setup/teardown
   useEffect(() => {
-    if (apc40Controller && 'setColorMode' in apc40Controller) {
-      const colorMode = useHarmonicMode ? 'harmonic' : 'chromatic';
-      (apc40Controller as any).setColorMode(colorMode);
-    }
+    // Set up APC40 event handlers
+    apc40Controller.setButtonPressHandler(handleAPC40ButtonPress);
+    apc40Controller.setConnectionChangeHandler(setAPC40Connected);
+
+    // Cleanup on unmount
+    return () => {
+      apc40Controller.disconnect();
+    };
+  }, [apc40Controller]);
+
+  // Auto-sync APC40 color mode with harmonic toggle
+  useEffect(() => {
+    const colorMode = useHarmonicMode ? 'harmonic' : 'chromatic';
+    apc40Controller.setColorMode(colorMode);
   }, [apc40Controller, useHarmonicMode]);
 
-  // Auto-sync hardware controller rotation setting
+  // Auto-sync APC40 rotation setting
   useEffect(() => {
-    if (apc40Controller && 'setRotation' in apc40Controller) {
-      (apc40Controller as any).setRotation(apc40Rotated);
-      // Clear LEDs when rotation changes to refresh the display
-      if (apc40Connected && 'clearAllLEDs' in apc40Controller) {
-        (apc40Controller as any).clearAllLEDs();
-      }
+    apc40Controller.setRotation(apc40Rotated);
+    // Clear LEDs when rotation changes to refresh the display
+    if (apc40Connected) {
+      apc40Controller.clearAllLEDs();
     }
   }, [apc40Controller, apc40Rotated, apc40Connected]);
 
@@ -1214,17 +1171,9 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     playNote(chromaticLane);
   }, [playNote, getActiveLanes, apc40Rotated, getEffectiveLaneOrder]);
 
-  // Hardware Manager integration - Set up event handlers (Story 8.0)
-  useEffect(() => {
-    if (apc40Controller && 'setButtonPressHandler' in apc40Controller) {
-      (apc40Controller as any).setButtonPressHandler(handleAPC40ButtonPress);
-    }
-  }, [apc40Controller, handleAPC40ButtonPress]);
-
-  // Update hardware controller LEDs when pattern or playback state changes
+  // Update APC40 LEDs when pattern or playback state changes
   const updateAPC40LEDs = useCallback(() => {
-    if (!apc40Connected || !apc40Controller) return;
-    if (!('updateSequencerLEDs' in apc40Controller)) return;
+    if (!apc40Connected) return;
 
     // Use effective lane ordering (respects Circle of Fifths when enabled)
     // In rotated mode, we need at least 8 lanes, so use all chromatic notes
@@ -1238,8 +1187,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
       return chromaticLane !== undefined ? (pattern[chromaticLane] || Array(16).fill(false)) : Array(16).fill(false);
     });
 
-    // Update hardware controller with current pattern and playback state
-    (apc40Controller as any).updateSequencerLEDs(
+    // Update APC40 with current pattern and playback state
+    apc40Controller.updateSequencerLEDs(
       apc40Pattern,
       currentBeat,
       isPlaying,
@@ -1248,7 +1197,21 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     );
   }, [apc40Connected, pattern, currentBeat, isPlaying, boomwhackerColors, getActiveLanes, apc40Controller, apc40Rotated]);
 
-  // Hardware controller connect/disconnect now handled by HardwareControllerSelector (Story 8.0)
+  // Connect APC40
+  const connectAPC40 = useCallback(async () => {
+    try {
+      await apc40Controller.connect();
+      console.log('🎛️ APC40 connected successfully');
+    } catch (error) {
+      console.error('🚫 Failed to connect APC40:', error);
+      alert('Failed to connect APC40: ' + (error as Error).message);
+    }
+  }, [apc40Controller]);
+
+  // Disconnect APC40
+  const disconnectAPC40 = useCallback(() => {
+    apc40Controller.disconnect();
+  }, [apc40Controller]);
 
   // Main render loop
   const render = useCallback(() => {
@@ -1371,9 +1334,6 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
   }, [isPlaying, bpm, currentBeat, steps, effectiveLanes, activeLanes, pattern, playNote]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Prevent editing in education mode (Story 20.6)
-    if (isEducationMode) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -1395,7 +1355,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
       // Play note for feedback
       playNote(chromaticLane);
     }
-  }, [getMouseWorldPosition, playNote, isEducationMode]);
+  }, [getMouseWorldPosition, playNote]);
 
   // Control handlers
   const togglePlay = () => {
@@ -1800,33 +1760,6 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     setPattern(newPattern);
   };
 
-  const generateTwinkle = () => {
-    // Clear current pattern
-    const newPattern: boolean[][] = Array(12).fill(null).map(() => Array(16).fill(false));
-
-    // Use the current root and scale
-    const currentScale = getCurrentScale();
-
-    // Twinkle Twinkle Little Star melody in scale degrees (1-indexed)
-    // "Twinkle twinkle little star, how I wonder what you are"
-    // C C G G A A G - F F E E D D C
-    // Scale degrees: 1 1 5 5 6 6 5 - 4 4 3 3 2 2 1
-    const scaleDegrees = [
-      1, 1, 5, 5, 6, 6, 5, 0, // Twinkle twinkle little star (0 = rest)
-      4, 4, 3, 3, 2, 2, 1, 0  // How I wonder what you are
-    ];
-
-    // Map scale degrees to actual notes in current scale
-    scaleDegrees.forEach((degree, step) => {
-      if (degree > 0 && degree <= currentScale.length) {
-        const noteIndex = currentScale[degree - 1]; // Convert 1-indexed to 0-indexed
-        newPattern[noteIndex][step] = true;
-      }
-    });
-
-    setPattern(newPattern);
-  };
-
   // Unified pattern generator based on selected mode
   const generatePattern = () => {
     switch (selectedMelodyMode) {
@@ -1841,9 +1774,6 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
         break;
       case 'beats':
         generateBeats();
-        break;
-      case 'twinkle':
-        generateTwinkle();
         break;
     }
   };
@@ -1860,7 +1790,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     setSelectedScale(randomScale);
 
     // Randomly select melody mode
-    const melodyModes: MelodyMode[] = ['melody', 'random', 'chords', 'beats', 'twinkle'];
+    const melodyModes: MelodyMode[] = ['melody', 'random', 'chords', 'beats'];
     const randomMelodyMode = melodyModes[Math.floor(Math.random() * melodyModes.length)];
     setSelectedMelodyMode(randomMelodyMode);
 
@@ -1884,24 +1814,20 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
         case 'beats':
           generateBeats();
           break;
-        case 'twinkle':
-          generateTwinkle();
-          break;
       }
     }, 50);
   };
 
   return (
-    <div className={`${isEducationMode ? 'h-[600px]' : 'min-h-screen'} bg-black flex flex-col`}>
-      {/* Header - hidden in education mode */}
-      {!isEducationMode && (
-        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 to-gray-800 border-b border-gray-700">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Back
+    <div className="min-h-screen bg-black flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 to-gray-800 border-b border-gray-700">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back
         </button>
 
         <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
@@ -1985,20 +1911,19 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
             </label>
           </div>
 
-          {/* Hardware Controller (Story 8.0) */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowHardwareSelector(!showHardwareSelector)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                showHardwareSelector
-                  ? 'bg-primary-600 hover:bg-primary-500'
+              onClick={apc40Connected ? disconnectAPC40 : connectAPC40}
+              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${
+                apc40Connected
+                  ? 'bg-green-600 hover:bg-green-500'
                   : 'bg-gray-700 hover:bg-gray-600'
               }`}
-              title="Hardware controller settings"
             >
-              <Settings className="w-4 h-4" />
-              {apc40Connected && <div className="w-2 h-2 rounded-full bg-green-500" />}
+              <Gamepad2 className="w-4 h-4" />
+              APC40
             </button>
+
             {apc40Connected && (
               <button
                 onClick={() => setAPC40Rotated(!apc40Rotated)}
@@ -2013,13 +1938,13 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
                 90°
               </button>
             )}
+
           </div>
         </div>
-        </div>
-      )}
+      </div>
 
-      {/* LED Strip Manager Panel - hidden in education mode */}
-      {!isEducationMode && showLEDManager && (
+      {/* LED Strip Manager Panel */}
+      {showLEDManager && (
         <div className="border-b border-gray-700">
           <LEDStripManager
             boomwhackerColors={getEffectiveColors()}
@@ -2031,15 +1956,6 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
             selectedRoot={selectedRoot}
             selectedScale={selectedScale}
           />
-        </div>
-      )}
-
-      {/* Hardware Controller Settings Panel (Story 8.0) - hidden in education mode */}
-      {!isEducationMode && showHardwareSelector && (
-        <div className="border-b border-gray-700 bg-gray-900">
-          <div className="p-4">
-            <HardwareControllerSelector />
-          </div>
         </div>
       )}
 
@@ -2057,16 +1973,15 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
 
       </div>
 
-      {/* Controls - hidden in education mode */}
-      {!isEducationMode && (
-        <div className="flex items-center justify-center gap-4 p-4 bg-gradient-to-r from-gray-900 to-gray-800 border-t border-gray-700">
-          <button
-            onClick={togglePlay}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 rounded-lg transition-all transform hover:scale-105 font-semibold"
-          >
-            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-            {isPlaying ? 'Pause' : 'Play'}
-          </button>
+      {/* Controls */}
+      <div className="flex items-center justify-center gap-4 p-4 bg-gradient-to-r from-gray-900 to-gray-800 border-t border-gray-700">
+        <button
+          onClick={togglePlay}
+          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 rounded-lg transition-all transform hover:scale-105 font-semibold"
+        >
+          {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+          {isPlaying ? 'Pause' : 'Play'}
+        </button>
 
         <button
           onClick={clearPattern}
@@ -2193,9 +2108,6 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
                         case 'beats':
                           generateBeats();
                           break;
-                        case 'twinkle':
-                          generateTwinkle();
-                          break;
                       }
                     }, 0);
                   }}
@@ -2254,12 +2166,10 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
           <Shuffle className="w-5 h-5" />
           Random
         </button>
-        </div>
-      )}
+      </div>
 
-      {/* Instructions - hidden in education mode */}
-      {!isEducationMode && (
-        <div className="text-center p-4 bg-gray-900 text-gray-400 text-sm">
+      {/* Instructions */}
+      <div className="text-center p-4 bg-gray-900 text-gray-400 text-sm">
         <div className="mb-2">
           Click anywhere on the 3D view to add/remove notes • Use Melody for musical patterns • Random for noise • Clear to reset
         </div>
@@ -2268,8 +2178,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
             🎛️ APC40 Connected: Use hardware buttons to control first 5 lanes (8 steps) • LEDs show pattern and playhead
           </div>
         )}
-        </div>
-      )}
+      </div>
     </div>
   );
 };

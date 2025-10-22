@@ -8,7 +8,7 @@
  * - Bin grouping and averaging for cleaner display
  */
 
-import { getFrequencyColor, type ColorMode } from '../../../utils/colorMapping';
+import { getFrequencyColor } from '../../../utils/colorMapping';
 import type { FrequencySourceManager } from '../../../utils/frequencySourceManager';
 
 export interface SpectrumConfig {
@@ -18,7 +18,6 @@ export interface SpectrumConfig {
   minOpacity: number; // Minimum opacity for quiet sounds (0.0 - 1.0)
   minBrightness: number; // Minimum brightness multiplier (0.0 - 1.0)
   scaleType: 'log' | 'linear' | 'quadratic'; // Frequency scaling type
-  colorMode: ColorMode; // Color mode for frequency mapping
 }
 
 export const DEFAULT_SPECTRUM_CONFIG: SpectrumConfig = {
@@ -28,7 +27,6 @@ export const DEFAULT_SPECTRUM_CONFIG: SpectrumConfig = {
   minOpacity: 0.3,
   minBrightness: 0.5,
   scaleType: 'log',
-  colorMode: 'spectrum',
 };
 
 export class SpectrumVisualization {
@@ -67,7 +65,7 @@ export class SpectrumVisualization {
     const sampleRate = 44100;
     const nyquist = sampleRate / 2;
     const minFreq = 50;   // 50 Hz (bass)
-    const maxFreq = 12000; // 12 kHz (extended range for hi-hat at 10kHz)
+    const maxFreq = 8000; // 8 kHz (high treble)
 
     // Clear canvas (pure black for LED output)
     ctx.fillStyle = '#000000';
@@ -137,11 +135,11 @@ export class SpectrumVisualization {
           color = midiColor;
         } else {
           // Fall back to frequency-based color mapping
-          color = getFrequencyColor(normalizedFrequency, this.config.colorMode, this.config.scaleType);
+          color = getFrequencyColor(normalizedFrequency, 'spectrum', this.config.scaleType);
         }
       } else {
         // No sourceManager - use frequency-based color mapping
-        color = getFrequencyColor(normalizedFrequency, this.config.colorMode, this.config.scaleType);
+        color = getFrequencyColor(normalizedFrequency, 'spectrum', this.config.scaleType);
       }
 
       // Apply amplitude to opacity AND brightness (quiet sounds are dimmer/more transparent)

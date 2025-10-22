@@ -4,7 +4,6 @@ import { CompactDrumMachine } from '../../DrumMachine/CompactDrumMachine';
 import { useGlobalMusic } from '../../../contexts/GlobalMusicContext';
 import { DrumTrack } from '../../../types';
 import { createDefaultPattern } from '../../../utils/drumPatterns';
-import { useControllerSelection, useLaunchpadDrumIntegration } from '../../../hardware';
 
 /**
  * DrumMachineModule - Wrapper for DrumMachine in Studio (Story 4.7)
@@ -30,20 +29,6 @@ export const DrumMachineModule: React.FC<DrumMachineModuleProps> = ({ layout = '
   const [currentStep, setCurrentStep] = useState(0);
   const [localIsPlaying, setLocalIsPlaying] = useState(false);
   const playbackTimerRef = useRef<number | null>(null);
-
-  // Hardware controller integration (Story 8.2)
-  const { activeController, selectedType } = useControllerSelection();
-
-  // Launchpad Pro integration (Story 8.2)
-  const { toggleOrientation, orientation } = useLaunchpadDrumIntegration({
-    controller: selectedType === 'launchpad-pro-mk3' ? activeController : undefined,
-    tracks,
-    currentStep,
-    isPlaying: localIsPlaying,
-    colorMode: music.colorMode,
-    onStepToggle: (trackId, stepIndex) => handleStepToggle(trackId, stepIndex),
-    onVelocityChange: (trackId, stepIndex, velocity) => handleVelocityChange(trackId, stepIndex, velocity),
-  });
 
   // Sync with global transport state (Epic 14 - Module Adapter Pattern)
   // Global play button controls all modules, but module buttons control only themselves
@@ -208,8 +193,6 @@ export const DrumMachineModule: React.FC<DrumMachineModuleProps> = ({ layout = '
       onAddTrack={handleAddTrack}
       onRemoveTrack={handleRemoveTrack}
       onLoadDefaultPattern={handleLoadDefaultPattern}
-      launchpadOrientation={selectedType === 'launchpad-pro-mk3' ? orientation : undefined}
-      onToggleLaunchpadOrientation={selectedType === 'launchpad-pro-mk3' ? toggleOrientation : undefined}
     />
   );
 };

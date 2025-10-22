@@ -5,15 +5,8 @@ template:
   version: 2.0
   output:
     format: markdown
-    # Naming Convention: {{epic_num}}.{{story_num}}-descriptive-kebab-case-title.md
-    # Examples:
-    #   - 15.1-chord-service-extraction.md
-    #   - 16.1-brightness-calculation-infrastructure.md
-    #   - 7.1-supabase-setup.md
-    # Preferred: Include brief descriptive title after story number (kebab-case)
-    # Legacy format (avoid): {{epic_num}}.{{story_num}}.story.md
-    filename: docs/stories/{{epic_num}}.{{story_num}}-{{story_title_short}}.md
-    title: "Story {{epic_num}}.{{story_num}}: {{story_title_long}}"
+    filename: docs/stories/{{epic_num}}.{{story_num}}.{{story_title_short}}.md
+    title: "Story {{epic_num}}.{{story_num}}: {{story_title_short}}"
 
 workflow:
   mode: interactive

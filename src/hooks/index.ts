@@ -10,7 +10,3 @@ export { ROOT_POSITIONS, SCALE_PATTERNS, ROOT_NOTES, SCALE_NAMES, SCALE_DISPLAY_
 // Module context hooks (Epic 14 - Module Adapter Pattern)
 export { useModuleContext } from './useModuleContext';
 export type { ModuleContext } from './useModuleContext';
-
-// Authentication hooks (Story 18.0 - User Authentication)
-export { useAuth } from './useAuth';
-export type { UseAuthReturn } from '../types/auth';

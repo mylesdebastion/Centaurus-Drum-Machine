@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2, Piano, Guitar, Database, Grid2x2 } from 'lucide-react';
+import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2, Piano, Guitar, Database } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onStartJam: () => void;
@@ -9,7 +9,6 @@ interface WelcomeScreenProps {
   onIsometricMode: () => void;
   onDJVisualizer: () => void;
   onWLEDExperiment: () => void;
-  onWLEDManager?: () => void;
   onMIDITest: () => void;
   onPianoRoll: () => void;
   onGuitarFretboard: () => void;
@@ -17,8 +16,6 @@ interface WelcomeScreenProps {
   onHeaderTest?: () => void;
   onStudio?: () => void;
   onSupabaseTest?: () => void;
-  onChordMelodyTest?: () => void;
-  onLaunchpadTest?: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
@@ -29,16 +26,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onIsometricMode,
   onDJVisualizer,
   onWLEDExperiment,
-  onWLEDManager,
   onMIDITest,
   onPianoRoll,
   onGuitarFretboard,
   onLumiTest,
   onHeaderTest,
   onStudio,
-  onSupabaseTest,
-  onChordMelodyTest,
-  onLaunchpadTest
+  onSupabaseTest
 }) => {
   const [joinCode, setJoinCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
@@ -253,27 +247,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               </div>
             </button>
 
-            {/* WLED Manager */}
-            {onWLEDManager && (
-              <button
-                onClick={onWLEDManager}
-                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-orange-500/50 transition-colors text-left"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <Activity className="w-6 h-6 text-orange-400" />
-                  <h3 className="font-semibold text-white">WLED Manager</h3>
-                  <span className="text-xs bg-orange-600/30 text-orange-300 px-2 py-1 rounded">Beta</span>
-                </div>
-                <p className="text-sm text-gray-400 mb-4">
-                  Configure LED hardware for intelligent visualization routing
-                </p>
-                <div className="flex items-center gap-2 text-sm text-orange-400 group-hover:text-orange-300">
-                  <span>Open Manager</span>
-                  <Play className="w-4 h-4" />
-                </div>
-              </button>
-            )}
-
             {/* LUMI SysEx Test */}
             <button
               onClick={onLumiTest}
@@ -292,27 +265,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 <Play className="w-4 h-4" />
               </div>
             </button>
-
-            {/* Launchpad Pro Test */}
-            {onLaunchpadTest && (
-              <button
-                onClick={onLaunchpadTest}
-                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-yellow-500/50 transition-colors text-left"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <Grid2x2 className="w-6 h-6 text-yellow-400" />
-                  <h3 className="font-semibold text-white">Launchpad Pro Test</h3>
-                  <span className="text-xs bg-yellow-600/30 text-yellow-300 px-2 py-1 rounded">NEW</span>
-                </div>
-                <p className="text-sm text-gray-400 mb-4">
-                  Test Novation Launchpad Pro (Mk3/2015) MIDI connection, LED control, and button mapping
-                </p>
-                <div className="flex items-center gap-2 text-sm text-yellow-400 group-hover:text-yellow-300">
-                  <span>Launch Test</span>
-                  <Play className="w-4 h-4" />
-                </div>
-              </button>
-            )}
 
             {/* Global Music Header Test */}
             {onHeaderTest && (
@@ -351,27 +303,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 </p>
                 <div className="flex items-center gap-2 text-sm text-indigo-400 group-hover:text-indigo-300">
                   <span>Launch Studio</span>
-                  <Play className="w-4 h-4" />
-                </div>
-              </button>
-            )}
-
-            {/* Chord Melody Arranger */}
-            {onChordMelodyTest && (
-              <button
-                onClick={onChordMelodyTest}
-                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-violet-500/50 transition-colors text-left"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <Music2 className="w-6 h-6 text-violet-400" />
-                  <h3 className="font-semibold text-white">Chord Melody Arranger</h3>
-                  <span className="text-xs bg-violet-600/30 text-violet-300 px-2 py-1 rounded">Beta</span>
-                </div>
-                <p className="text-sm text-gray-400 mb-4">
-                  Interactive chord progression sequencer with melody grid and harmonic guidance
-                </p>
-                <div className="flex items-center gap-2 text-sm text-violet-400 group-hover:text-violet-300">
-                  <span>Launch Arranger</span>
                   <Play className="w-4 h-4" />
                 </div>
               </button>
