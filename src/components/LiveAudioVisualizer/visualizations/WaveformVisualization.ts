@@ -59,7 +59,8 @@ export class WaveformVisualization {
     timeData: Uint8Array,
     width: number,
     height: number,
-    peakFrequency?: number // Optional peak frequency for color mapping
+    peakFrequency?: number, // Optional peak frequency for color mapping
+    sourceManager?: any // FrequencySourceManager for MIDI color support
   ): void {
     const { mode, showGrid, lineWidth, useFrequencyColors, colorMode, lineColor } = this.config;
 
@@ -72,9 +73,16 @@ export class WaveformVisualization {
       this.drawGrid(ctx, width, height);
     }
 
-    // Determine line color based on peak frequency
+    // Determine line color - Try MIDI color first, then frequency, then fallback
     let color = lineColor; // Fallback
-    if (useFrequencyColors && peakFrequency !== undefined) {
+    if (sourceManager) {
+      const midiColor = this.getMIDIColor(sourceManager);
+      if (midiColor) {
+        color = midiColor;
+      } else if (useFrequencyColors && peakFrequency !== undefined) {
+        color = this.getFrequencyBasedColor(peakFrequency, colorMode);
+      }
+    } else if (useFrequencyColors && peakFrequency !== undefined) {
       color = this.getFrequencyBasedColor(peakFrequency, colorMode);
     }
 
@@ -101,7 +109,8 @@ export class WaveformVisualization {
     rightData: Uint8Array,
     width: number,
     height: number,
-    peakFrequency?: number // Optional peak frequency for color mapping
+    peakFrequency?: number, // Optional peak frequency for color mapping
+    sourceManager?: any // FrequencySourceManager for MIDI color support
   ): void {
     const { stereoLayout, showGrid, useFrequencyColors, colorMode, stereoLeftColor, stereoRightColor } = this.config;
 
@@ -114,13 +123,24 @@ export class WaveformVisualization {
       this.drawGrid(ctx, width, height);
     }
 
-    // Determine colors based on peak frequency
+    // Determine colors - Try MIDI color first, then frequency, then fallback
     let leftColor = stereoLeftColor;
     let rightColor = stereoRightColor;
-    if (useFrequencyColors && peakFrequency !== undefined) {
+
+    if (sourceManager) {
+      const midiColor = this.getMIDIColor(sourceManager);
+      if (midiColor) {
+        leftColor = midiColor;
+        rightColor = this.adjustColorBrightness(midiColor, 0.8);
+      } else if (useFrequencyColors && peakFrequency !== undefined) {
+        const baseColor = this.getFrequencyBasedColor(peakFrequency, colorMode);
+        leftColor = baseColor;
+        rightColor = this.adjustColorBrightness(baseColor, 0.8);
+      }
+    } else if (useFrequencyColors && peakFrequency !== undefined) {
       const baseColor = this.getFrequencyBasedColor(peakFrequency, colorMode);
       leftColor = baseColor;
-      rightColor = this.adjustColorBrightness(baseColor, 0.8); // Slightly dimmer for right channel
+      rightColor = this.adjustColorBrightness(baseColor, 0.8);
     }
 
     if (stereoLayout === 'overlay') {
@@ -370,6 +390,39 @@ export class WaveformVisualization {
     const b = Math.round(parseInt(match[3]) * factor);
 
     return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  /**
+   * Get MIDI color from sourceManager (for MIDI mode visualization)
+   * Returns the averaged color of all active MIDI notes
+   */
+  private getMIDIColor(sourceManager: any): string | null {
+    const midiGenerator = sourceManager.getMidiGenerator();
+    if (!midiGenerator) return null;
+
+    const activeNotes = midiGenerator.getActiveNotes();
+    if (activeNotes.length === 0) return null;
+
+    // Average all active note colors
+    let totalR = 0, totalG = 0, totalB = 0;
+    let colorCount = 0;
+
+    activeNotes.forEach((note: any) => {
+      if (note.color) {
+        totalR += note.color.r;
+        totalG += note.color.g;
+        totalB += note.color.b;
+        colorCount++;
+      }
+    });
+
+    if (colorCount === 0) return null;
+
+    const avgR = Math.round(totalR / colorCount);
+    const avgG = Math.round(totalG / colorCount);
+    const avgB = Math.round(totalB / colorCount);
+
+    return `rgb(${avgR}, ${avgG}, ${avgB})`;
   }
 
   /**

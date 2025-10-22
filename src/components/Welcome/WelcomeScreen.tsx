@@ -1,20 +1,38 @@
 import React, { useState } from 'react';
-import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity } from 'lucide-react';
+import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2, Piano, Guitar, Database } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onStartJam: () => void;
   onJoinJam: (code: string) => void;
+  onStartJamLegacy?: () => void;
   onEducationMode: () => void;
   onIsometricMode: () => void;
   onDJVisualizer: () => void;
+  onWLEDExperiment: () => void;
+  onMIDITest: () => void;
+  onPianoRoll: () => void;
+  onGuitarFretboard: () => void;
+  onLumiTest: () => void;
+  onHeaderTest?: () => void;
+  onStudio?: () => void;
+  onSupabaseTest?: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onStartJam,
   onJoinJam,
+  onStartJamLegacy,
   onEducationMode,
   onIsometricMode,
-  onDJVisualizer
+  onDJVisualizer,
+  onWLEDExperiment,
+  onMIDITest,
+  onPianoRoll,
+  onGuitarFretboard,
+  onLumiTest,
+  onHeaderTest,
+  onStudio,
+  onSupabaseTest
 }) => {
   const [joinCode, setJoinCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
@@ -153,6 +171,164 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </p>
 
           <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+            {/* Piano Roll Visualizer */}
+            <button
+              onClick={onPianoRoll}
+              className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-green-500/50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <Piano className="w-6 h-6 text-green-400" />
+                <h3 className="font-semibold text-white">Piano Roll</h3>
+                <span className="text-xs bg-green-600/30 text-green-300 px-2 py-1 rounded">New</span>
+              </div>
+              <p className="text-sm text-gray-400 mb-4">
+                88-key interactive piano with MIDI input and WLED LED strip output
+              </p>
+              <div className="flex items-center gap-2 text-sm text-green-400 group-hover:text-green-300">
+                <span>Launch Piano</span>
+                <Play className="w-4 h-4" />
+              </div>
+            </button>
+
+            {/* Guitar Fretboard Visualizer */}
+            <button
+              onClick={onGuitarFretboard}
+              className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-amber-500/50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <Guitar className="w-6 h-6 text-amber-400" />
+                <h3 className="font-semibold text-white">Guitar Fretboard</h3>
+                <span className="text-xs bg-amber-600/30 text-amber-300 px-2 py-1 rounded">Beta</span>
+              </div>
+              <p className="text-sm text-gray-400 mb-4">
+                6×25 fretboard with chord progressions and LED matrix output
+              </p>
+              <div className="flex items-center gap-2 text-sm text-amber-400 group-hover:text-amber-300">
+                <span>Launch Guitar</span>
+                <Play className="w-4 h-4" />
+              </div>
+            </button>
+
+            {/* MIDI Input Test */}
+            <button
+              onClick={onMIDITest}
+              className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-blue-500/50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <Music2 className="w-6 h-6 text-blue-400" />
+                <h3 className="font-semibold text-white">MIDI Input Engine</h3>
+                <span className="text-xs bg-blue-600/30 text-blue-300 px-2 py-1 rounded">Test</span>
+              </div>
+              <p className="text-sm text-gray-400 mb-4">
+                Test Web MIDI API with live note visualization and keyboard fallback mode
+              </p>
+              <div className="flex items-center gap-2 text-sm text-blue-400 group-hover:text-blue-300">
+                <span>Launch Test</span>
+                <Play className="w-4 h-4" />
+              </div>
+            </button>
+
+            {/* WLED Direct Test */}
+            <button
+              onClick={onWLEDExperiment}
+              className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-purple-500/50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <Zap className="w-6 h-6 text-purple-400" />
+                <h3 className="font-semibold text-white">WLED Direct Test</h3>
+                <span className="text-xs bg-purple-600/30 text-purple-300 px-2 py-1 rounded">Experiment</span>
+              </div>
+              <p className="text-sm text-gray-400 mb-4">
+                Test direct mobile → WLED WebSocket connection without bridge
+              </p>
+              <div className="flex items-center gap-2 text-sm text-purple-400 group-hover:text-purple-300">
+                <span>Launch Test</span>
+                <Play className="w-4 h-4" />
+              </div>
+            </button>
+
+            {/* LUMI SysEx Test */}
+            <button
+              onClick={onLumiTest}
+              className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-pink-500/50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <Piano className="w-6 h-6 text-pink-400" />
+                <h3 className="font-semibold text-white">LUMI SysEx Test</h3>
+                <span className="text-xs bg-pink-600/30 text-pink-300 px-2 py-1 rounded">Debug</span>
+              </div>
+              <p className="text-sm text-gray-400 mb-4">
+                Test ROLI Piano M / LUMI Keys SysEx protocol in isolated environment
+              </p>
+              <div className="flex items-center gap-2 text-sm text-pink-400 group-hover:text-pink-300">
+                <span>Launch Test</span>
+                <Play className="w-4 h-4" />
+              </div>
+            </button>
+
+            {/* Global Music Header Test */}
+            {onHeaderTest && (
+              <button
+                onClick={onHeaderTest}
+                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <Music2 className="w-6 h-6 text-cyan-400" />
+                  <h3 className="font-semibold text-white">Music Header Test</h3>
+                  <span className="text-xs bg-cyan-600/30 text-cyan-300 px-2 py-1 rounded">NEW</span>
+                </div>
+                <p className="text-sm text-gray-400 mb-4">
+                  Test global music controls: tempo, key/scale, color mode, volume
+                </p>
+                <div className="flex items-center gap-2 text-sm text-cyan-400 group-hover:text-cyan-300">
+                  <span>Launch Test</span>
+                  <Play className="w-4 h-4" />
+                </div>
+              </button>
+            )}
+
+            {/* Music Studio */}
+            {onStudio && (
+              <button
+                onClick={onStudio}
+                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-indigo-500/50 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <Grid3x3 className="w-6 h-6 text-indigo-400" />
+                  <h3 className="font-semibold text-white">Music Studio</h3>
+                  <span className="text-xs bg-indigo-600/30 text-indigo-300 px-2 py-1 rounded">NEW</span>
+                </div>
+                <p className="text-sm text-gray-400 mb-4">
+                  Dynamic workspace with multiple music modules (Story 4.7)
+                </p>
+                <div className="flex items-center gap-2 text-sm text-indigo-400 group-hover:text-indigo-300">
+                  <span>Launch Studio</span>
+                  <Play className="w-4 h-4" />
+                </div>
+              </button>
+            )}
+
+            {/* Supabase Connection Test */}
+            {onSupabaseTest && (
+              <button
+                onClick={onSupabaseTest}
+                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-teal-500/50 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <Database className="w-6 h-6 text-teal-400" />
+                  <h3 className="font-semibold text-white">Supabase Test</h3>
+                  <span className="text-xs bg-teal-600/30 text-teal-300 px-2 py-1 rounded">Story 7.1</span>
+                </div>
+                <p className="text-sm text-gray-400 mb-4">
+                  Test Supabase Realtime connection and environment setup
+                </p>
+                <div className="flex items-center gap-2 text-sm text-teal-400 group-hover:text-teal-300">
+                  <span>Launch Test</span>
+                  <Play className="w-4 h-4" />
+                </div>
+              </button>
+            )}
+
             {/* DJ Visualizer */}
             <button
               onClick={onDJVisualizer}
@@ -177,10 +353,10 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               <div className="flex items-center gap-3 mb-3">
                 <Users className="w-6 h-6 text-purple-400" />
                 <h3 className="font-semibold text-white">Multiplayer Jam</h3>
-                <span className="text-xs bg-purple-600/30 text-purple-300 px-2 py-1 rounded">Beta</span>
+                <span className="text-xs bg-purple-600/30 text-purple-300 px-2 py-1 rounded">New</span>
               </div>
               <p className="text-sm text-gray-400 mb-4">
-                Sync with friends using room codes
+                Sync with friends using room codes (New version with global music controls)
               </p>
               <div className="space-y-2">
                 <button
@@ -188,7 +364,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                   className="btn-primary w-full text-sm px-4 py-2 flex items-center justify-center gap-2"
                 >
                   <Play className="w-4 h-4" />
-                  Create a Jam Room
+                  Create a Jam Room (New)
                 </button>
                 {!showJoinInput ? (
                   <button
@@ -216,6 +392,14 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                       Join
                     </button>
                   </form>
+                )}
+                {onStartJamLegacy && (
+                  <button
+                    onClick={onStartJamLegacy}
+                    className="w-full text-xs px-3 py-1.5 bg-gray-700/50 hover:bg-gray-700 text-gray-400 hover:text-gray-300 rounded transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>or use Legacy Version</span>
+                  </button>
                 )}
               </div>
             </div>

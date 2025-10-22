@@ -84,34 +84,61 @@ export const LEDMatrixManager: React.FC<LEDMatrixManagerProps> = ({
         return;
       }
 
-      // Try to connect to bridge on multiple ports
+      // Smart host detection for seamless desktop/mobile support
+      const hosts: string[] = [];
+
+      // 1. Try last successful host from localStorage (fastest for returning users)
+      const lastSuccessfulHost = localStorage.getItem('wledBridgeHost');
+      if (lastSuccessfulHost) {
+        hosts.push(lastSuccessfulHost);
+      }
+
+      // 2. Try localhost (works for desktop browsers)
+      if (!hosts.includes('localhost')) {
+        hosts.push('localhost');
+      }
+
+      // 3. Try window.location.hostname (works for mobile accessing dev server on network)
+      // Only if it's not localhost/127.0.0.1 (means we're accessing via network IP)
+      const pageHost = window.location.hostname;
+      if (pageHost !== 'localhost' && pageHost !== '127.0.0.1' && !hosts.includes(pageHost)) {
+        hosts.push(pageHost);
+      }
+
+      // Try to connect to bridge on multiple ports and hosts
       const ports = [8080, 21325, 21326, 21327, 21328, 21329];
 
-      for (const port of ports) {
-        try {
-          await tryConnect(port);
-          console.log(`🌉 Connected to WLED WebSocket bridge on port ${port}`);
-          return;
-        } catch (error) {
-          console.log(`⚠️ Port ${port} not available, trying next...`);
+      for (const host of hosts) {
+        for (const port of ports) {
+          try {
+            await tryConnect(host, port);
+            console.log(`🌉 Connected to WLED WebSocket bridge at ${host}:${port}`);
+            // Save successful host for future connections
+            localStorage.setItem('wledBridgeHost', host);
+            return;
+          } catch (error) {
+            console.log(`⚠️ ${host}:${port} not available, trying next...`);
+          }
         }
       }
 
-      console.error('❌ Could not connect to WLED WebSocket bridge on any port');
+      console.error('❌ Could not connect to WLED WebSocket bridge on any host:port combination');
+      console.log('💡 Make sure the bridge is running: node scripts/wled-websocket-bridge.cjs');
+      console.log('📱 Mobile users: Ensure your device is on the same Wi-Fi network as the bridge');
       setWsConnected(false);
     };
 
-    const tryConnect = (port: number): Promise<void> => {
+    const tryConnect = (host: string, port: number): Promise<void> => {
       return new Promise((resolve, reject) => {
         // Auto-detect protocol: use wss:// on HTTPS pages, ws:// on HTTP pages
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${protocol}//localhost:${port}`);
+        const ws = new WebSocket(`${protocol}//${host}:${port}`);
         let connected = false;
 
         const timeout = setTimeout(() => {
           if (!connected) {
             ws.close();
-            reject(new Error(`Connection timeout on port ${port}`));
+            reject(new Error(`Connection timeout on ${host}:${port}`));
           }
         }, 1000);
 
@@ -126,7 +153,7 @@ export const LEDMatrixManager: React.FC<LEDMatrixManagerProps> = ({
 
         ws.onerror = () => {
           clearTimeout(timeout);
-          reject(new Error(`Connection failed on port ${port}`));
+          reject(new Error(`Connection failed on ${host}:${port}`));
         };
 
         ws.onclose = () => {

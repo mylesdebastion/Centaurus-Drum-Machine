@@ -12,6 +12,8 @@ export interface NoteEvent {
   frequency: number;  // Hz
   velocity: number;   // 0-1
   timestamp: number;  // ms
+  midiNote?: number;  // MIDI note number (0-127) for color mapping
+  color?: { r: number; g: number; b: number };  // RGB color for this note
 }
 
 export interface SyntheticFrequencyConfig {
@@ -47,9 +49,20 @@ export class SyntheticFrequencyGenerator {
   /**
    * Add a MIDI note event
    */
-  addMidiNote(midiNote: number, velocity: number): void {
+  addMidiNote(midiNote: number, velocity: number, color?: { r: number; g: number; b: number }): void {
     const frequency = midiToFrequency(midiNote);
-    this.addNote(frequency, velocity);
+    this.activeNotes.push({
+      frequency,
+      velocity,
+      timestamp: Date.now(),
+      midiNote,
+      color
+    });
+
+    // Debug: Log when notes with colors are added
+    if (color) {
+      console.log('[SyntheticFreqGen] Added MIDI note', midiNote, 'with color:', color, 'freq:', frequency.toFixed(1), 'Hz');
+    }
   }
 
   /**
@@ -164,5 +177,54 @@ export class SyntheticFrequencyGenerator {
    */
   getConfig(): SyntheticFrequencyConfig {
     return { ...this.config };
+  }
+
+  /**
+   * Get color for a frequency bin (for MIDI mode visualization)
+   * Returns the color of the active note closest to this frequency
+   */
+  getColorForBin(bin: number): { r: number; g: number; b: number } | null {
+    const { sampleRate, fftSize } = this.config;
+    const binFrequency = (bin * sampleRate) / fftSize;
+
+    // Find the closest active note with a color
+    let closestNote: NoteEvent | null = null;
+    let minDistance = Infinity;
+
+    for (const note of this.activeNotes) {
+      if (note.color) {
+        const distance = Math.abs(Math.log2(note.frequency) - Math.log2(binFrequency));
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestNote = note;
+        }
+      }
+    }
+
+    // Debug: Log color queries for debugging
+    if (bin % 100 === 0) {
+      console.log('[SyntheticFreqGen] getColorForBin', bin, '(', binFrequency.toFixed(1), 'Hz)',
+                  '-> activeNotes:', this.activeNotes.length,
+                  '-> closestNote:', closestNote ? closestNote.frequency.toFixed(1) + 'Hz' : 'none',
+                  '-> minDist:', closestNote ? minDistance.toFixed(3) : 'N/A',
+                  '-> hasColor:', closestNote ? !!closestNote.color : false);
+    }
+
+    // Return color if found a close note (within 1 semitone)
+    const result = (closestNote && minDistance < 0.1) ? closestNote.color || null : null;
+
+    // Debug: Log when we actually return a color
+    if (result && bin % 20 === 0) {
+      console.log('[SyntheticFreqGen] 🎨 Returning color for bin', bin, ':', result);
+    }
+
+    return result;
+  }
+
+  /**
+   * Get all active notes (for debugging)
+   */
+  getActiveNotes(): NoteEvent[] {
+    return [...this.activeNotes];
   }
 }

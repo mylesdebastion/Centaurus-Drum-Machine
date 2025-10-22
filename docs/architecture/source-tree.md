@@ -4,21 +4,61 @@
 ```plaintext
 src/
 ├── components/
-│   ├── DrumMachine/        # Core sequencer components
-│   ├── Education/          # Educational mode
-│   ├── JamSession/         # Session management  
-│   ├── Layout/            # App layout components
-│   ├── Visualizer/        # Visual feedback system
-│   └── Welcome/           # Welcome screen
+│   ├── DrumMachine/              # Core sequencer components
+│   ├── Education/                # Educational mode
+│   ├── GlobalMusicHeader/        # Global music controls (Epic 4)
+│   ├── GlobalMusicHeaderTest.tsx # Test component for global controls
+│   ├── GuitarFretboard/          # Guitar fretboard visualizer (Epic 9)
+│   ├── IsometricSequencer/       # 3D isometric sequencer
+│   ├── JamSession/               # Multi-user session management
+│   ├── JamSessionLegacy/         # Legacy session (deprecated)
+│   ├── Layout/                   # App layout components (Story 5.1)
+│   │   ├── CollapsiblePanel.tsx  # Collapsible settings panel
+│   │   ├── MobileNavigation.tsx  # Mobile bottom tab navigation
+│   │   ├── MobileViewContainer.tsx # Mobile view wrapper
+│   │   ├── ResponsiveContainer.tsx # Responsive layout wrapper
+│   │   └── ResponsiveToolbar.tsx # Auto-reflow toolbar
+│   ├── LEDStripManager/          # LED strip device management (deprecated, see WLED/)
+│   ├── LiveAudioVisualizer/      # DJ-style audio visualizer
+│   ├── LumiTest/                 # ROLI LUMI testing component (Epic 11)
+│   ├── MIDI/                     # MIDI device components (Epic 9)
+│   │   └── MIDIDeviceSelector.tsx # MIDI device selection UI
+│   ├── Music/                    # Music theory components
+│   ├── PianoRoll/                # Piano roll visualizer (Epic 9)
+│   ├── Studio/                   # Module loading system (Story 4.7)
+│   │   ├── ModuleCanvas.tsx      # Dynamic module canvas
+│   │   ├── ModuleSelector.tsx    # Module selection panel
+│   │   ├── ModuleWrapper.tsx     # Module chrome wrapper
+│   │   ├── Studio.tsx            # Main studio container
+│   │   ├── moduleRegistry.ts     # Module registry and types
+│   │   └── useModuleManager.ts   # Module state management hook
+│   ├── Visualizer/               # Visual feedback system
+│   ├── Welcome/                  # Welcome screen
+│   ├── WLED/                     # WLED device management (Epic 6)
+│   │   ├── WLEDDeviceCard.tsx    # Device card UI
+│   │   ├── WLEDDeviceManager.tsx # Unified device manager
+│   │   ├── WLEDVirtualPreview.tsx # LED visualization
+│   │   └── types.ts              # WLED TypeScript interfaces
+│   └── WLEDExperiment/           # WLED testing/experiments
+├── contexts/
+│   └── GlobalMusicContext.tsx    # Global music state (Story 4.1)
+├── hooks/
+│   ├── index.ts                  # Hook barrel exports
+│   ├── useMusicalScale.ts        # Musical scale utilities
+│   ├── useMIDIInput.ts           # MIDI input hook (Epic 9)
+│   └── useResponsive.ts          # Responsive breakpoint hook (Story 5.1)
 ├── types/
-│   └── index.ts           # TypeScript interfaces
+│   └── index.ts                  # TypeScript interfaces
 ├── utils/
-│   ├── audioEngine.ts     # Tone.js audio singleton
-│   ├── colorMapping.ts    # Visual feedback utilities
-│   └── drumPatterns.ts    # Pattern generation
-├── App.tsx                # Root application component
-├── main.tsx              # Vite entry point
-└── index.css             # Global styles
+│   ├── audioEngine.ts            # Tone.js audio singleton (Story 4.3)
+│   ├── colorMapping.ts           # Visual feedback utilities (Story 4.5)
+│   ├── drumPatterns.ts           # Pattern generation
+│   ├── lumiController.ts         # ROLI LUMI SysEx control (Epic 11)
+│   ├── midiInputManager.ts       # Web MIDI API integration (Story 9.1)
+│   └── soundEngines.ts           # Sound engine factory (Epic 12)
+├── App.tsx                       # Root application component
+├── main.tsx                      # Vite entry point
+└── index.css                     # Global styles
 ```
 
 ## New File Organization

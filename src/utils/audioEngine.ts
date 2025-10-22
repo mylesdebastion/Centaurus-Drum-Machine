@@ -1,11 +1,23 @@
 import * as Tone from 'tone';
 
-// Audio engine for handling drum playback
+/**
+ * Transport state for persistence across navigation
+ */
+export interface TransportState {
+  state: 'started' | 'stopped' | 'paused';
+  position: string; // "bars:beats:sixteenths"
+  bpm: number;
+  timestamp: number; // performance.now() for debugging
+}
+
+// Audio engine for handling drum and melodic instrument playback
 export class AudioEngine {
   private static instance: AudioEngine;
   private isInitialized = false;
   private isInitializing = false;
   private drumSamples: { [key: string]: Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth } = {};
+  private pianoSynth: Tone.PolySynth | null = null;
+  private guitarSynth: Tone.PolySynth | null = null;
   private masterVolume: Tone.Volume;
 
   private constructor() {
@@ -104,10 +116,40 @@ export class AudioEngine {
         }).connect(this.masterVolume)
       };
 
+      console.log('[AudioEngine] Creating melodic instruments...');
+      // Create Piano PolySynth (bright, clear tone)
+      this.pianoSynth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: {
+          type: 'triangle'
+        },
+        envelope: {
+          attack: 0.005,
+          decay: 0.3,
+          sustain: 0.4,
+          release: 1.2
+        }
+      }).connect(this.masterVolume);
+      this.pianoSynth.volume.value = -8; // Slightly quieter than drums
+
+      // Create Guitar PolySynth (warmer, softer tone)
+      this.guitarSynth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: {
+          type: 'sawtooth'
+        },
+        envelope: {
+          attack: 0.008,
+          decay: 0.5,
+          sustain: 0.5,
+          release: 2.0
+        }
+      }).connect(this.masterVolume);
+      this.guitarSynth.volume.value = -10; // Quieter, more mellow
+
       this.isInitialized = true;
       this.isInitializing = false;
       console.log('[AudioEngine] ✅ Audio engine initialized successfully, isInitialized:', this.isInitialized);
       console.log('[AudioEngine] Drum samples created:', Object.keys(this.drumSamples));
+      console.log('[AudioEngine] Piano and Guitar synths created');
     } catch (error) {
       console.error('[AudioEngine] ❌ Failed to initialize audio engine:', error);
       this.isInitialized = false;
@@ -203,18 +245,330 @@ export class AudioEngine {
     }
   }
 
+  /**
+   * Play a MIDI note on piano synth
+   * @param note - MIDI note number (0-127)
+   * @param velocity - Note velocity (0-1)
+   * @param duration - Note duration (default: '8n')
+   */
+  public playPianoNote(note: number, velocity: number = 0.8, duration: string = '8n'): void {
+    if (!this.isInitialized || !this.pianoSynth) {
+      console.error('[AudioEngine] Piano synth not initialized');
+      return;
+    }
+
+    try {
+      const noteName = Tone.Frequency(note, 'midi').toNote();
+      const volume = this.velocityToDb(velocity);
+
+      this.pianoSynth.volume.value = volume - 8; // Apply velocity + base volume
+      this.pianoSynth.triggerAttackRelease(noteName, duration);
+
+      console.log(`[AudioEngine] Piano note: ${noteName} (MIDI ${note}), velocity: ${velocity}`);
+    } catch (error) {
+      console.error(`Error playing piano note ${note}:`, error);
+    }
+  }
+
+  /**
+   * Trigger piano note on (for sustained notes)
+   */
+  public triggerPianoNoteOn(note: number, velocity: number = 0.8): void {
+    if (!this.isInitialized || !this.pianoSynth) {
+      console.error('[AudioEngine] Piano synth not initialized');
+      return;
+    }
+
+    try {
+      const noteName = Tone.Frequency(note, 'midi').toNote();
+      const volume = this.velocityToDb(velocity);
+
+      this.pianoSynth.volume.value = volume - 8;
+      this.pianoSynth.triggerAttack(noteName);
+    } catch (error) {
+      console.error(`Error triggering piano note on ${note}:`, error);
+    }
+  }
+
+  /**
+   * Trigger piano note off (for sustained notes)
+   */
+  public triggerPianoNoteOff(note: number): void {
+    if (!this.isInitialized || !this.pianoSynth) {
+      return;
+    }
+
+    try {
+      const noteName = Tone.Frequency(note, 'midi').toNote();
+      this.pianoSynth.triggerRelease(noteName);
+    } catch (error) {
+      console.error(`Error triggering piano note off ${note}:`, error);
+    }
+  }
+
+  /**
+   * Play a MIDI note on guitar synth
+   */
+  public playGuitarNote(note: number, velocity: number = 0.8, duration: string = '4n'): void {
+    if (!this.isInitialized || !this.guitarSynth) {
+      console.error('[AudioEngine] Guitar synth not initialized');
+      return;
+    }
+
+    try {
+      const noteName = Tone.Frequency(note, 'midi').toNote();
+      const volume = this.velocityToDb(velocity);
+
+      this.guitarSynth.volume.value = volume - 10;
+      this.guitarSynth.triggerAttackRelease(noteName, duration);
+
+      console.log(`[AudioEngine] Guitar note: ${noteName} (MIDI ${note}), velocity: ${velocity}`);
+    } catch (error) {
+      console.error(`Error playing guitar note ${note}:`, error);
+    }
+  }
+
+  /**
+   * Trigger guitar note on (for sustained notes)
+   */
+  public triggerGuitarNoteOn(note: number, velocity: number = 0.8): void {
+    if (!this.isInitialized || !this.guitarSynth) {
+      console.error('[AudioEngine] Guitar synth not initialized');
+      return;
+    }
+
+    try {
+      const noteName = Tone.Frequency(note, 'midi').toNote();
+      const volume = this.velocityToDb(velocity);
+
+      this.guitarSynth.volume.value = volume - 10;
+      this.guitarSynth.triggerAttack(noteName);
+    } catch (error) {
+      console.error(`Error triggering guitar note on ${note}:`, error);
+    }
+  }
+
+  /**
+   * Trigger guitar note off (for sustained notes)
+   */
+  public triggerGuitarNoteOff(note: number): void {
+    if (!this.isInitialized || !this.guitarSynth) {
+      return;
+    }
+
+    try {
+      const noteName = Tone.Frequency(note, 'midi').toNote();
+      this.guitarSynth.triggerRelease(noteName);
+    } catch (error) {
+      console.error(`Error triggering guitar note off ${note}:`, error);
+    }
+  }
+
+  /**
+   * Get current Tone.js Transport state for persistence
+   * Captures playback state, position, and tempo
+   */
+  public getTransportState(): TransportState {
+    if (!this.isInitialized) {
+      console.warn('[AudioEngine] Not initialized, returning default transport state');
+      return {
+        state: 'stopped',
+        position: '0:0:0',
+        bpm: 120,
+        timestamp: performance.now(),
+      };
+    }
+
+    try {
+      const state: TransportState = {
+        state: Tone.Transport.state as 'started' | 'stopped' | 'paused',
+        position: Tone.Transport.position as string,
+        bpm: Tone.Transport.bpm.value,
+        timestamp: performance.now(),
+      };
+
+      console.log('[AudioEngine] Transport state captured:', state);
+      return state;
+    } catch (error) {
+      console.error('[AudioEngine] Error capturing transport state:', error);
+      return {
+        state: 'stopped',
+        position: '0:0:0',
+        bpm: 120,
+        timestamp: performance.now(),
+      };
+    }
+  }
+
+  /**
+   * Restore Tone.js Transport state after navigation
+   * Preserves playback position, tempo, and play/pause state
+   */
+  public restoreTransportState(state: TransportState): void {
+    if (!this.isInitialized) {
+      console.warn('[AudioEngine] Not initialized, cannot restore transport state');
+      return;
+    }
+
+    try {
+      console.log('[AudioEngine] Restoring transport state:', state);
+
+      // Set BPM first
+      Tone.Transport.bpm.value = state.bpm;
+
+      // Set position
+      Tone.Transport.position = state.position;
+
+      // Resume playback if it was playing
+      if (state.state === 'started' && Tone.Transport.state !== 'started') {
+        Tone.Transport.start();
+      } else if (state.state === 'stopped' && Tone.Transport.state !== 'stopped') {
+        Tone.Transport.stop();
+      } else if (state.state === 'paused' && Tone.Transport.state !== 'paused') {
+        Tone.Transport.pause();
+      }
+
+      console.log('[AudioEngine] Transport state restored successfully');
+    } catch (error) {
+      console.error('[AudioEngine] Failed to restore transport state:', error);
+    }
+  }
+
+  /**
+   * Get current audio context state
+   * Useful for detecting suspended contexts (browser autoplay policy)
+   */
+  public getAudioContextState(): AudioContextState {
+    try {
+      return Tone.context.state;
+    } catch (error) {
+      console.error('[AudioEngine] Error getting audio context state:', error);
+      return 'suspended';
+    }
+  }
+
+  /**
+   * Ensure audio context is running
+   * Resumes suspended contexts (required for browser autoplay policies)
+   */
+  public async ensureAudioContext(): Promise<void> {
+    try {
+      if (Tone.context.state === 'suspended') {
+        console.log('[AudioEngine] Audio context suspended, resuming...');
+        await Tone.context.resume();
+        console.log('[AudioEngine] Audio context resumed successfully');
+      }
+    } catch (error) {
+      console.error('[AudioEngine] Failed to resume audio context:', error);
+    }
+  }
+
+  /**
+   * Sync Tone.js Transport BPM with global tempo
+   * Should be called when global tempo changes
+   */
+  public syncTransportBPM(bpm: number): void {
+    if (!this.isInitialized) {
+      console.warn('[AudioEngine] Not initialized, cannot sync transport BPM');
+      return;
+    }
+
+    try {
+      Tone.Transport.bpm.value = bpm;
+      console.log(`[AudioEngine] Transport BPM synced to ${bpm}`);
+    } catch (error) {
+      console.error('[AudioEngine] Error syncing transport BPM:', error);
+    }
+  }
+
+  /**
+   * Start global transport (play)
+   * Epic 14, Story 14.2 - Transport control integration
+   * Idempotent - safe to call multiple times
+   */
+  public startTransport(): void {
+    if (!this.isInitialized) {
+      console.warn('[AudioEngine] Not initialized, cannot start transport');
+      return;
+    }
+
+    try {
+      if (Tone.Transport.state !== 'started') {
+        Tone.Transport.start();
+        console.log('[AudioEngine] Transport started');
+      } else {
+        console.log('[AudioEngine] Transport already started');
+      }
+    } catch (error) {
+      console.error('[AudioEngine] Error starting transport:', error);
+    }
+  }
+
+  /**
+   * Stop global transport (pause)
+   * Epic 14, Story 14.2 - Transport control integration
+   * Uses pause() instead of stop() to maintain Transport position
+   * Idempotent - safe to call multiple times
+   */
+  public stopTransport(): void {
+    if (!this.isInitialized) {
+      console.warn('[AudioEngine] Not initialized, cannot stop transport');
+      return;
+    }
+
+    try {
+      if (Tone.Transport.state === 'started') {
+        Tone.Transport.pause();
+        console.log('[AudioEngine] Transport paused');
+      } else {
+        console.log('[AudioEngine] Transport already stopped');
+      }
+    } catch (error) {
+      console.error('[AudioEngine] Error stopping transport:', error);
+    }
+  }
+
+  /**
+   * Get current transport playing state
+   * Epic 14, Story 14.2 - Transport control integration
+   * @returns true if transport is playing, false otherwise
+   */
+  public isTransportPlaying(): boolean {
+    if (!this.isInitialized) {
+      return false;
+    }
+
+    try {
+      return Tone.Transport.state === 'started';
+    } catch (error) {
+      console.error('[AudioEngine] Error checking transport state:', error);
+      return false;
+    }
+  }
+
   public async dispose(): Promise<void> {
     if (!this.isInitialized) return;
 
     try {
-      // Dispose of all samples
+      // Dispose of all drum samples
       Object.values(this.drumSamples).forEach(sample => {
         sample.dispose();
       });
-      
+
+      // Dispose of melodic synths
+      if (this.pianoSynth) {
+        this.pianoSynth.dispose();
+        this.pianoSynth = null;
+      }
+
+      if (this.guitarSynth) {
+        this.guitarSynth.dispose();
+        this.guitarSynth = null;
+      }
+
       this.drumSamples = {};
       this.isInitialized = false;
-      
+
       console.log('Audio engine disposed');
     } catch (error) {
       console.error('Error disposing audio engine:', error);

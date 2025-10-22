@@ -1,0 +1,16 @@
+{
+  "projectId": "prj_W7WQ04j0KokSEBZipjlZGtIii7Yf",
+  "orgId": "team_IJ1abltjpGu6BWkSlHxwwaym",
+  "projectName": "centaurus-drum-machine",
+  "settings": {
+    "createdAt": 1758835883793,
+    "framework": "vite",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "22.x"
+  }
+}

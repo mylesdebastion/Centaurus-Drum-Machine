@@ -57,16 +57,36 @@ export const rgbToHex = (color: RGBColor): string => {
 export const getNoteColor = (note: number, mode: ColorMode): RGBColor => {
   switch (mode) {
     case 'spectrum':
-      // Map note (0-127) to spectrum (red to violet)
-      // 0° = red, 60° = yellow, 120° = green, 180° = cyan, 240° = blue, 270° = violet
-      const hue = (note / 127) * 270; // 0° = red, 270° = violet
+      // Map note (12-120) to full visible spectrum (red to violet)
+      // MIDI 12 = C0 (16.35 Hz) - just below piano
+      // MIDI 120 = C9 (8372 Hz) - just above piano
+      // 0° = red, 60° = yellow, 120° = green, 180° = cyan, 240° = blue, 300° = violet/magenta
+      // Piano (21-108) uses ~89% of spectrum, Guitar (40-88) uses yellow→blue-violet
+      const clampedNote = Math.max(12, Math.min(120, note));
+      const hue = ((clampedNote - 12) / 108) * 300; // 0° = red, 300° = violet
       return hslToRgb(hue, 85, 55);
     
-    case 'chromatic':
-      // Map note to chromatic colors (12 colors repeating)
-      const chromatic = (note % 12) / 12;
-      const chromaticHue = chromatic * 360;
+    case 'chromatic': {
+      // Custom chromatic color mapping with smooth blends
+      // C = Red, D = Orange, E = Yellow, F# = Green, A = Blue, B = Violet
+      const chromaticHues = [
+        0,    // C  = Red
+        20,   // C# = Red-Orange (blend)
+        35,   // D  = Orange
+        50,   // D# = Orange-Yellow (blend)
+        60,   // E  = Yellow
+        85,   // F  = Yellow-Green (blend)
+        110,  // F# = Green
+        140,  // G  = Green-Cyan (blend)
+        170,  // G# = Cyan
+        220,  // A  = Blue
+        260,  // A# = Blue-Violet (blend)
+        300   // B  = Violet/Magenta
+      ];
+      const chromaticNoteClass = note % 12;
+      const chromaticHue = chromaticHues[chromaticNoteClass];
       return hslToRgb(chromaticHue, 80, 60);
+    }
     
     case 'harmonic':
       // Map based on circle of fifths
@@ -128,10 +148,10 @@ export const getFrequencyColor = (
         // Quadratic color mapping - emphasizes bass frequencies with smooth transitions
         // This spreads out low frequencies (0-250 Hz) in red-orange while maintaining
         // smooth color transitions without discontinuities
-        hue = Math.pow(frequency, 2) * 270;
+        hue = Math.pow(frequency, 2) * 300; // 0° = red, 300° = violet
       } else {
         // Linear color mapping for log and linear scale types
-        hue = frequency * 270; // 0 = red (0°), 1 = violet (270°)
+        hue = frequency * 300; // 0° = red, 300° = violet
       }
 
       return hslToRgb(hue, 85, 55);

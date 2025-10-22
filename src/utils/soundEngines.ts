@@ -3,13 +3,15 @@ import * as Tone from 'tone';
 /**
  * Sound engine types available for the IsometricSequencer
  */
-export type SoundEngineType = 'keys' | 'sine' | 'drums' | 'pluck' | 'pad' | 'fm-bell' | 'bass';
+export type SoundEngineType = 'keys' | 'sine' | 'drums' | 'pluck' | 'pad' | 'fm-bell' | 'bass' | 'guitar';
 
 /**
  * Interface for sound engine implementations
  */
 export interface SoundEngine {
   playNote(frequency: number, velocity?: number, duration?: number): void;
+  triggerAttack?(frequency: number, velocity?: number): void;  // For sustaining notes
+  triggerRelease?(frequency: number): void;  // For releasing sustained notes
   dispose(): void;
 }
 
@@ -269,7 +271,7 @@ class PadSoundEngine implements SoundEngine {
       envelope: {
         attack: 0.2,          // Slightly longer attack for smoother onset
         decay: 0.4,           // Slightly longer decay
-        sustain: 0.6,         // Higher sustain for fuller body
+        sustain: 0.7,         // Higher sustain for fuller body and held notes
         release: 1.5          // Extended release from 1.0 to 1.5 for longer tail
       }
     }).toDestination();
@@ -280,6 +282,16 @@ class PadSoundEngine implements SoundEngine {
   playNote(frequency: number, velocity: number = 0.6, duration: number = 1.0): void {
     const note = Tone.Frequency(frequency, 'hz').toNote();
     this.synth.triggerAttackRelease(note, duration, undefined, velocity);
+  }
+
+  triggerAttack(frequency: number, velocity: number = 0.6): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.synth.triggerAttack(note, undefined, velocity);
+  }
+
+  triggerRelease(frequency: number): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.synth.triggerRelease(note);
   }
 
   dispose(): void {
@@ -302,14 +314,14 @@ class FMBellSoundEngine implements SoundEngine {
       envelope: {
         attack: 0.001,       // Very fast attack for bell strike
         decay: 1.2,          // Longer decay for sustained shimmer
-        sustain: 0.05,       // Low sustain for realistic bell decay
+        sustain: 0.2,        // Higher sustain for held notes
         release: 1.5         // Extended release for lingering resonance
       },
       modulation: { type: 'sine' },  // Sine modulation for smoother harmonics
       modulationEnvelope: {
         attack: 0.0005,      // Instant modulation attack
         decay: 0.6,          // Longer decay for evolving timbre
-        sustain: 0.1,
+        sustain: 0.2,
         release: 0.8         // Extended release for complex harmonics
       }
     }).toDestination();
@@ -320,6 +332,16 @@ class FMBellSoundEngine implements SoundEngine {
   playNote(frequency: number, velocity: number = 0.7, duration: number = 1.0): void {
     const note = Tone.Frequency(frequency, 'hz').toNote();
     this.synth.triggerAttackRelease(note, duration, undefined, velocity);
+  }
+
+  triggerAttack(frequency: number, velocity: number = 0.7): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.synth.triggerAttack(note, undefined, velocity);
+  }
+
+  triggerRelease(frequency: number): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.synth.triggerRelease(note);
   }
 
   dispose(): void {
@@ -342,14 +364,14 @@ class RhodesSoundEngine implements SoundEngine {
       envelope: {
         attack: 0.005,       // Quick attack like struck tine
         decay: 0.8,          // Medium decay
-        sustain: 0.15,       // Low sustain for realistic piano decay
+        sustain: 0.4,        // Higher sustain for held notes
         release: 1.2         // Natural release
       },
       modulation: { type: 'sine' },
       modulationEnvelope: {
         attack: 0.002,
         decay: 0.4,
-        sustain: 0.2,
+        sustain: 0.3,
         release: 0.8
       }
     }).toDestination();
@@ -369,6 +391,16 @@ class RhodesSoundEngine implements SoundEngine {
   playNote(frequency: number, velocity: number = 0.7, duration: number = 1.2): void {
     const note = Tone.Frequency(frequency, 'hz').toNote();
     this.synth.triggerAttackRelease(note, duration, undefined, velocity);
+  }
+
+  triggerAttack(frequency: number, velocity: number = 0.7): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.synth.triggerAttack(note, undefined, velocity);
+  }
+
+  triggerRelease(frequency: number): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.synth.triggerRelease(note);
   }
 
   dispose(): void {
@@ -425,6 +457,67 @@ class BassSoundEngine implements SoundEngine {
 }
 
 /**
+ * Acoustic guitar sound engine using Tone.js Sampler
+ * Uses real acoustic guitar samples with reverb for spatial depth
+ */
+class GuitarSoundEngine implements SoundEngine {
+  private sampler: Tone.Sampler;
+  private reverb: Tone.Reverb;
+
+  constructor() {
+    // Create reverb for spatial depth
+    this.reverb = new Tone.Reverb({
+      decay: 1.8,
+      wet: 0.25
+    }).toDestination();
+
+    // Use Tone.Sampler with real acoustic guitar samples
+    // From Tonejs-Instruments library - verified available samples
+    this.sampler = new Tone.Sampler({
+      urls: {
+        A2: "A2.mp3",
+        A3: "A3.mp3",
+        A4: "A4.mp3",
+        C3: "C3.mp3",
+        C4: "C4.mp3",
+        C5: "C5.mp3",
+        "D#3": "Ds3.mp3",
+        "D#4": "Ds4.mp3",
+        "F#2": "Fs2.mp3",
+        "F#3": "Fs3.mp3",
+        "F#4": "Fs4.mp3",
+      },
+      baseUrl: "https://nbrosowsky.github.io/tonejs-instruments/samples/guitar-acoustic/",
+      onload: () => {
+        console.log('🎸 Acoustic guitar samples loaded successfully');
+      },
+      volume: -4,
+      release: 1
+    }).connect(this.reverb);
+  }
+
+  playNote(frequency: number, velocity: number = 0.8, duration: number = 1.0): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.sampler.triggerAttackRelease(note, duration, undefined, velocity);
+  }
+
+  triggerAttack(frequency: number, velocity: number = 0.8): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.sampler.triggerAttack(note, undefined, velocity);
+  }
+
+  triggerRelease(frequency: number): void {
+    const note = Tone.Frequency(frequency, 'hz').toNote();
+    this.sampler.triggerRelease(note);
+  }
+
+  dispose(): void {
+    this.sampler.dispose();
+    this.reverb.dispose();
+  }
+}
+
+/**
  * Factory function to create sound engines
  */
 export function createSoundEngine(
@@ -447,6 +540,8 @@ export function createSoundEngine(
       return new FMBellSoundEngine();
     case 'bass':
       return new BassSoundEngine();
+    case 'guitar':
+      return new GuitarSoundEngine();
     default:
       return new RhodesSoundEngine();
   }
@@ -462,5 +557,6 @@ export const soundEngineNames: Record<SoundEngineType, string> = {
   'pluck': 'Pluck',
   'pad': 'Pad',
   'fm-bell': 'FM Bell',
-  'bass': 'Bass'
+  'bass': 'Bass',
+  'guitar': 'Guitar'
 };

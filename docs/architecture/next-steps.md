@@ -4,7 +4,7 @@
 
 "**For Story Manager**: This brownfield architecture document provides the technical foundation for implementing APC40 hardware controller integration. Key implementation requirements:
 
-- **Reference Architecture**: Use this document (`docs/architecture.md`) and PRD (`docs/prd.md`) as technical specification
+- **Reference Architecture**: Use this document (`docs/architecture-legacy.md`) and PRD (`docs/prd-legacy.md`) as technical specification
 - **Integration Requirements Validated**: Hardware abstraction layer integrates through React Context, maintains complete isolation from existing components
 - **Existing System Constraints**: All new code in `src/hardware/` module, zero modifications to existing components, follows established TypeScript/Tailwind patterns
 - **First Story Priority**: Begin with **Story 1.1 - Hardware Abstraction Layer Foundation** to establish the architectural foundation before device-specific implementation
@@ -16,7 +16,7 @@ The architecture maintains existing system integrity through complete component 
 
 "**For Development Team**: Architecture and coding standards for APC40 hardware integration implementation:
 
-- **Architecture Reference**: Follow component architecture defined in `docs/architecture.md`, all interfaces and patterns based on actual project analysis
+- **Architecture Reference**: Follow component architecture defined in `docs/architecture-legacy.md`, all interfaces and patterns based on actual project analysis
 - **Integration Requirements**: Hardware abstraction layer uses React Context API, follows existing component patterns, integrates with current Tone.js timing system
 - **Technical Decisions**: Web MIDI API for hardware communication, TypeScript strict compliance, Tailwind CSS for consistency, localStorage for settings persistence
 - **Compatibility Requirements**: Zero modifications to existing files outside `src/hardware/` module, existing component interfaces unchanged, audio engine performance maintained

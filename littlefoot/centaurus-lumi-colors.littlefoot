@@ -1,0 +1,154 @@
+/*
+<metadata description="Centaurus Drum Machine - LUMI Color Control"
+          target="LUMI Keys"
+          tags="MIDI;Colors;Music Education">
+</metadata>
+*/
+
+/**
+ * Centaurus Drum Machine - LUMI Color Control Script
+ *
+ * This LittleFoot script enables full per-key color control for the ROLI Piano M / LUMI Keys.
+ * All keys start black and light up in colors based on velocity when played (physically or via MIDI).
+ *
+ * Features:
+ * - All keys start black (off)
+ * - Physical key presses light up in velocity-based colors
+ * - MIDI input lights up keys in colors
+ * - Keys turn off when released/note off
+ * - Velocity 0-127 maps to color spectrum (red → yellow → green → cyan → blue → purple → white)
+ *
+ * Installation:
+ * 1. Save this file as centaurus-lumi-colors.littlefoot
+ * 2. Open ROLI Dashboard
+ * 3. Drag and drop this file onto the LUMI keyboard image in the app
+ * 4. The script will upload and run on your LUMI
+ *
+ * To restore default behavior:
+ * - Click "Reset to default" in ROLI Dashboard
+ *
+ * Version: 1.0.0
+ * Author: Centaurus Drum Machine Team
+ */
+
+// Constants
+const int numKeys = 24;
+
+// State variables
+int channel[numKeys];
+int keyColors[numKeys];  // Store color for each key
+
+// Color lookup table (velocity to color)
+// Maps velocity 0-127 to 8 distinct colors
+const int colors[8];
+
+/**
+ * Initialize the LUMI Keys
+ * Called once when the script is loaded
+ */
+void initialise() {
+    // Disable default key handler to get full control
+    setUseDefaultKeyHandler(false);
+
+    // Initialize all keys to black (off)
+    for (int i = 0; i < numKeys; i++) {
+        keyColors[i] = 0x00000000;  // ARGB: fully transparent black
+        fillPixel(0x00000000, i, 0);
+    }
+
+    // Define velocity-to-color mapping
+    // Format: 0xAARRGGBB (Alpha, Red, Green, Blue)
+    colors[0] = 0xff000000;  // Black (off)
+    colors[1] = 0xffff5050;  // Red
+    colors[2] = 0xffffff50;  // Yellow
+    colors[3] = 0xff50ff50;  // Green
+    colors[4] = 0xff50ffff;  // Cyan
+    colors[5] = 0xff5050ff;  // Blue
+    colors[6] = 0xffff50ff;  // Purple/Magenta
+    colors[7] = 0xffffffff;  // White
+}
+
+/**
+ * Handle physical key strike (initial press)
+ * @param index - Key index (0-23)
+ * @param z - Current pressure value
+ * @param vz - Velocity (0-127)
+ */
+void keyStrike(int index, int z, int vz) {
+    // Map velocity (0-127) to color index (0-7)
+    int colorIndex = (vz * 7) / 127;
+    keyColors[index] = colors[colorIndex];
+
+    // Send MIDI Note On
+    int note = 48 + index;  // LUMI Keys start at MIDI note 48 (C3)
+    int chan = assignChannel(note);
+    channel[index] = chan;
+    sendNoteOn(chan, note, vz);
+}
+
+/**
+ * Handle physical key press (while held)
+ * @param index - Key index (0-23)
+ * @param z - Current pressure value (0-255)
+ * @param vz - Aftertouch value
+ */
+void keyPress(int index, int z, int vz) {
+    // Send polyphonic aftertouch
+    int note = 48 + index;
+    sendAftertouch(channel[index], note, z);
+}
+
+/**
+ * Handle physical key lift (release)
+ * @param index - Key index (0-23)
+ * @param z - Current pressure value
+ * @param vz - Release velocity
+ */
+void keyLift(int index, int z, int vz) {
+    // Turn off the key (back to black)
+    keyColors[index] = 0x00000000;
+
+    // Send MIDI Note Off
+    int note = 48 + index;
+    sendNoteOff(channel[index], note, vz);
+    deassignChannel(note, channel[index]);
+}
+
+/**
+ * Handle incoming MIDI messages
+ * Allows external MIDI input to light up keys
+ * @param byte0 - Status byte (command + channel)
+ * @param byte1 - Data byte 1 (usually note number)
+ * @param byte2 - Data byte 2 (usually velocity)
+ */
+void handleMIDI(int byte0, int byte1, int byte2) {
+    int status = (byte0 >> 4) & 0xf;
+    int note = byte1;
+    int velocity = byte2;
+
+    // Only handle notes in LUMI range (C3 to B4)
+    if (note < 48 || note > 71) return;
+
+    int keyIndex = note - 48;
+
+    // Note On
+    if (status == 0x9 && velocity > 0) {
+        int colorIndex = (velocity * 7) / 127;
+        keyColors[keyIndex] = colors[colorIndex];
+    }
+    // Note Off (or Note On with velocity 0)
+    else if (status == 0x8 || (status == 0x9 && velocity == 0)) {
+        keyColors[keyIndex] = 0x00000000;
+    }
+}
+
+/**
+ * Repaint function - called ~25 times per second
+ * Updates all key LEDs based on current state
+ */
+void repaint() {
+    // Update all keys with their current colors
+    for (int i = 0; i < numKeys; i++) {
+        fillPixel(keyColors[i], i, 0);
+    }
+}

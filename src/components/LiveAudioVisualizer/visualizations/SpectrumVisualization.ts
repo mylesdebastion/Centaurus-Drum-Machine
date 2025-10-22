@@ -3,12 +3,13 @@
  *
  * Features:
  * - Frequency bins displayed as vertical bars
- * - Color mapped to frequency (low=red, high=cyan)
+ * - Color mapped to frequency (low=red, high=cyan) OR note-based colors in MIDI mode
  * - Amplitude controls brightness and opacity
  * - Bin grouping and averaging for cleaner display
  */
 
 import { getFrequencyColor } from '../../../utils/colorMapping';
+import type { FrequencySourceManager } from '../../../utils/frequencySourceManager';
 
 export interface SpectrumConfig {
   numBars: number; // Number of frequency bars to display
@@ -32,6 +33,7 @@ export class SpectrumVisualization {
   private config: SpectrumConfig;
   private peakValues: number[] = [];
   private peakTimestamps: number[] = [];
+  private lastSourceManagerLog: number = 0; // Debug logging timestamp
 
   constructor(config: SpectrumConfig = DEFAULT_SPECTRUM_CONFIG) {
     this.config = config;
@@ -46,11 +48,18 @@ export class SpectrumVisualization {
     ctx: CanvasRenderingContext2D,
     frequencyData: Uint8Array,
     width: number,
-    height: number
+    height: number,
+    sourceManager?: FrequencySourceManager
   ): void {
     const { numBars, peakHold, peakFallSpeed, minOpacity, minBrightness } = this.config;
     const bufferLength = frequencyData.length;
     const barWidth = width / numBars;
+
+    // Debug: Log if sourceManager is available (only once per second)
+    if (!this.lastSourceManagerLog || Date.now() - this.lastSourceManagerLog > 1000) {
+      console.log('[SpectrumViz] Has sourceManager:', !!sourceManager);
+      this.lastSourceManagerLog = Date.now();
+    }
 
     // Logarithmic frequency scaling for musical range
     const sampleRate = 44100;
@@ -115,8 +124,23 @@ export class SpectrumVisualization {
       // Use position for color mapping (matches frequency distribution)
       const normalizedFrequency = i / (numBars - 1);
 
-      // Get color based on frequency (using existing colorMapping.ts)
-      const color = getFrequencyColor(normalizedFrequency, 'spectrum', this.config.scaleType);
+      // Try to get MIDI color for this bin if sourceManager is available
+      let color: { r: number; g: number; b: number };
+
+      // Query MIDI color only if we have a sourceManager
+      if (sourceManager) {
+        const midiColor = sourceManager.getMidiColorForBin(binIndex);
+        if (midiColor) {
+          // Use note-based color from MIDI notes (Piano/Guitar)
+          color = midiColor;
+        } else {
+          // Fall back to frequency-based color mapping
+          color = getFrequencyColor(normalizedFrequency, 'spectrum', this.config.scaleType);
+        }
+      } else {
+        // No sourceManager - use frequency-based color mapping
+        color = getFrequencyColor(normalizedFrequency, 'spectrum', this.config.scaleType);
+      }
 
       // Apply amplitude to opacity AND brightness (quiet sounds are dimmer/more transparent)
       const opacity = Math.max(minOpacity, normalizedAmplitude);

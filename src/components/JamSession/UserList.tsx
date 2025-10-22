@@ -1,100 +1,140 @@
+/**
+ * UserList Component
+ * Real-time participant list for jam sessions
+ * Story 7.3 - JamSession UI Integration
+ */
+
 import React from 'react';
-import { Crown, Mic, Volume2, UserX } from 'lucide-react';
-import { User } from '../../types';
+import { Crown, User } from 'lucide-react';
+import type { Participant } from '@/types/session';
 
 interface UserListProps {
-  users: User[];
-  currentUserId: string;
-  onUserKick?: (userId: string) => void;
+  /** Array of current participants */
+  participants: Participant[];
+  /** Current user's peer ID */
+  myPeerId: string | null;
 }
 
+/**
+ * Format relative time for join timestamps
+ * @param joinedAt - ISO timestamp string
+ * @returns Relative time string (e.g., "2m ago", "just now")
+ */
+function formatRelativeTime(joinedAt: string): string {
+  const now = new Date();
+  const joined = new Date(joinedAt);
+  const diffMs = now.getTime() - joined.getTime();
+  const diffSeconds = Math.floor(diffMs / 1000);
+
+  if (diffSeconds < 10) return 'just now';
+  if (diffSeconds < 60) return `${diffSeconds}s ago`;
+
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+}
+
+/**
+ * Generate avatar color based on participant ID
+ * Consistent color per user across sessions
+ */
+function getAvatarColor(id: string): string {
+  const colors = [
+    'bg-blue-500',
+    'bg-green-500',
+    'bg-purple-500',
+    'bg-pink-500',
+    'bg-yellow-500',
+    'bg-cyan-500',
+    'bg-indigo-500',
+    'bg-orange-500',
+  ];
+
+  // Hash participant ID to pick consistent color
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
+}
+
+/**
+ * Get first letter of name for avatar
+ */
+function getInitial(name: string): string {
+  return name.charAt(0).toUpperCase();
+}
+
+/**
+ * Display real-time participant list with presence updates
+ * Shows host badge, join times, and avatar initials
+ */
 export const UserList: React.FC<UserListProps> = ({
-  users,
-  currentUserId,
-  onUserKick
+  participants,
+  myPeerId,
 }) => {
-  const currentUser = users.find(user => user.id === currentUserId);
-  const isHost = currentUser?.isHost || false;
+  if (participants.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <User className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+        <p className="text-gray-400">No participants yet</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-        <span>Participants</span>
-        <span className="text-sm text-gray-400">({users.length})</span>
-      </h3>
+    <div className="space-y-3">
+      {participants.map((participant) => {
+        const isMe = participant.id === myPeerId;
+        const avatarColor = getAvatarColor(participant.id);
 
-      <div className="space-y-3">
-        {users.map((user) => (
+        return (
           <div
-            key={user.id}
-            className="flex items-center justify-between p-3 bg-gray-700 rounded-lg"
+            key={participant.id}
+            className={`flex items-center gap-3 p-4 rounded-lg border transition-all ${
+              isMe
+                ? 'bg-primary-900/30 border-primary-700/50'
+                : 'bg-gray-800/50 border-gray-700/50'
+            }`}
           >
-            <div className="flex items-center gap-3">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white font-medium text-sm"
-                style={{ backgroundColor: user.color }}
-              >
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-              
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">
-                    {user.name}
-                    {user.id === currentUserId && ' (You)'}
-                  </span>
-                  {user.isHost && (
-                    <Crown className="w-4 h-4 text-yellow-400" />
-                  )}
-                </div>
-                <div className="flex items-center gap-1 text-xs text-gray-400">
-                  <Volume2 className="w-3 h-3" />
-                  <span>Playing drums</span>
-                </div>
-              </div>
+            {/* Avatar */}
+            <div
+              className={`w-12 h-12 ${avatarColor} rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0`}
+            >
+              {getInitial(participant.name)}
             </div>
 
-            <div className="flex items-center gap-2">
-              {/* Mic Status */}
-              <button className="p-1 text-gray-400 hover:text-white transition-colors">
-                <Mic className="w-4 h-4" />
-              </button>
-
-              {/* Kick User (Host only) */}
-              {isHost && user.id !== currentUserId && onUserKick && (
-                <button
-                  onClick={() => onUserKick(user.id)}
-                  className="p-1 text-gray-400 hover:text-red-400 transition-colors"
-                  title="Remove user"
-                >
-                  <UserX className="w-4 h-4" />
-                </button>
-              )}
+            {/* User Info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className={`font-semibold ${isMe ? 'text-primary-200' : 'text-white'} truncate`}>
+                  {participant.name}
+                  {isMe && ' (You)'}
+                </span>
+                {participant.isHost && (
+                  <div
+                    className="flex items-center gap-1 bg-amber-900/30 border border-amber-700/50 px-2 py-0.5 rounded-full"
+                    title="Host"
+                  >
+                    <Crown className="w-3 h-3 text-amber-400" />
+                    <span className="text-xs text-amber-200 font-medium">Host</span>
+                  </div>
+                )}
+              </div>
+              <div className="text-sm text-gray-400 mt-0.5">
+                Joined {formatRelativeTime(participant.joinedAt)}
+              </div>
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* Invite Link */}
-      <div className="mt-4 pt-4 border-t border-gray-700">
-        <div className="text-sm text-gray-400 mb-2">Invite others:</div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={`${window.location.origin}/join/${users[0]?.id || 'ABC123'}`}
-            readOnly
-            className="flex-1 px-3 py-2 bg-gray-600 border border-gray-500 rounded text-sm text-white focus:outline-none"
-          />
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(`${window.location.origin}/join/${users[0]?.id || 'ABC123'}`);
-            }}
-            className="px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded transition-colors"
-          >
-            Copy
-          </button>
-        </div>
-      </div>
+        );
+      })}
     </div>
   );
 };

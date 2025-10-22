@@ -1,14 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { Header } from '../Layout/Header';
+import React, { useState, useEffect, useRef } from 'react';
+import { GlobalMusicHeader } from '../GlobalMusicHeader';
 import { DrumMachine } from '../DrumMachine/DrumMachine';
-import { CompactDrumMachine } from '../DrumMachine/CompactDrumMachine';
-import { LiveAudioVisualizer } from '../LiveAudioVisualizer/LiveAudioVisualizer';
-import { UserList } from './UserList';
-import { MobileNavigation } from '../Layout/MobileNavigation';
-import { ResponsiveContainer } from '../Layout/ResponsiveContainer';
-import { DrumTrack, VisualizerSettings, User, MIDINote } from '../../types';
+import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
+import { Users, Music, ArrowLeft, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
+import { DrumTrack } from '../../types';
 import { createDefaultPattern } from '../../utils/drumPatterns';
+import { supabaseSessionService } from '../../services/supabaseSession';
+import { ConnectionStatus } from './ConnectionStatus';
+import { UserList } from './UserList';
+import type { Participant, ConnectionStatus as StatusType } from '../../types/session';
 
+/**
+ * New Jam Session (Epic 4)
+ * Clean slate collaborative music session with global music controls
+ * Gradually integrating modules with GlobalMusicContext
+ */
 interface JamSessionProps {
   sessionCode: string;
   onLeaveSession: () => void;
@@ -16,151 +22,187 @@ interface JamSessionProps {
 
 export const JamSession: React.FC<JamSessionProps> = ({
   sessionCode,
-  onLeaveSession
+  onLeaveSession,
 }) => {
-  const [users, setUsers] = useState<User[]>([
-    { id: '1', name: 'You', color: '#3b82f6', isHost: true },
-    { id: '2', name: 'Alex', color: '#ef4444', isHost: false },
-    { id: '3', name: 'Sam', color: '#10b981', isHost: false }
-  ]);
+  const music = useGlobalMusic();
+  const [activeTab, setActiveTab] = useState<'drum' | 'piano' | 'users'>('drum');
+  const [showDrumMachine, setShowDrumMachine] = useState(true);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
+  // Supabase session state
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [connectionStatus, setConnectionStatus] = useState<StatusType>('disconnected');
+
+  // Drum Machine state
   const [tracks, setTracks] = useState<DrumTrack[]>(() => createDefaultPattern());
-
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [tempo, setTempo] = useState(120);
-  const [isConnected] = useState(true);
-  const [showSettings, setShowSettings] = useState(false);
-  const [_midiNotes, setMidiNotes] = useState<MIDINote[]>([]); // Reserved for future MIDI visualization integration
-  const [isMobile, setIsMobile] = useState(false);
-  const [activeView, setActiveView] = useState<'drum' | 'users' | 'settings'>('drum');
+  const playbackTimerRef = useRef<number | null>(null);
 
-  const [visualizerSettings, setVisualizerSettings] = useState<VisualizerSettings>({
-    colorMode: 'spectrum',
-    brightness: 0.8,
-    ledMatrixEnabled: false,
-    ledMatrixIP: ''
-  });
-
-  // Simulate playback
+  // Subscribe to Supabase session updates
   useEffect(() => {
-    const checkScreenSize = () => {
-      setIsMobile(window.innerWidth < 768);
+    console.log('[JamSession] Setting up Supabase subscriptions');
+
+    // Subscribe to presence updates (participant list)
+    const unsubscribePresence = supabaseSessionService.onPresenceSync((newParticipants) => {
+      console.log('[JamSession] Presence sync:', newParticipants);
+      setParticipants(newParticipants);
+    });
+
+    // Subscribe to connection status changes
+    const unsubscribeStatus = supabaseSessionService.onConnectionStatusChange((status) => {
+      console.log('[JamSession] Connection status:', status);
+      setConnectionStatus(status);
+    });
+
+    // Subscribe to tempo changes from other participants
+    const unsubscribeTempo = supabaseSessionService.onTempoChange((tempo) => {
+      console.log('[JamSession] Remote tempo change:', tempo);
+      music.updateTempo(tempo);
+    });
+
+    // Subscribe to playback control from other participants (future)
+    const unsubscribePlayback = supabaseSessionService.onPlaybackChange((playing) => {
+      console.log('[JamSession] Remote playback change:', playing);
+      // Future: sync playback state
+    });
+
+    // Subscribe to key/scale changes from other participants
+    const unsubscribeKeyScale = supabaseSessionService.onKeyScaleChange((key, scale) => {
+      console.log('[JamSession] Remote key/scale change:', key, scale);
+      music.updateKey(key);
+      music.updateScale(scale);
+    });
+
+    // Get initial connection status
+    setConnectionStatus(supabaseSessionService.connectionStatus);
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      console.log('[JamSession] Cleaning up Supabase subscriptions');
+      unsubscribePresence();
+      unsubscribeStatus();
+      unsubscribeTempo();
+      unsubscribePlayback();
+      unsubscribeKeyScale();
     };
+  }, [music]);
 
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
-
+  // Broadcast tempo changes to other participants
   useEffect(() => {
-    if (!isPlaying) return;
+    if (supabaseSessionService.isInSession()) {
+      supabaseSessionService.broadcastTempo(music.tempo);
+    }
+  }, [music.tempo]);
 
-    const interval = setInterval(() => {
-      setCurrentStep((prev) => (prev + 1) % 16);
+  // Broadcast key/scale changes to other participants
+  useEffect(() => {
+    if (supabaseSessionService.isInSession()) {
+      supabaseSessionService.broadcastKeyScale(music.key, music.scale);
+    }
+  }, [music.key, music.scale]);
 
-      // Generate MIDI notes for active steps (for future visualization integration)
-      tracks.forEach((track, trackIndex) => {
-        if (track.steps[currentStep] && !track.muted) {
-          const note: MIDINote = {
-            note: 36 + trackIndex * 2, // MIDI note numbers
-            velocity: track.velocities[currentStep],
-            channel: 10, // Drum channel
-            timestamp: Date.now(),
-            userId: '1'
-          };
+  // Playback timer - synced with global tempo
+  useEffect(() => {
+    if (isPlaying) {
+      const stepDuration = (60 / music.tempo / 4) * 1000; // 16th note duration
+      playbackTimerRef.current = window.setInterval(() => {
+        setCurrentStep((prev) => (prev + 1) % 16);
+      }, stepDuration);
+    } else if (playbackTimerRef.current) {
+      clearInterval(playbackTimerRef.current);
+      playbackTimerRef.current = null;
+    }
 
-          setMidiNotes(prev => [...prev.slice(-10), note]); // Keep last 10 notes
-        }
-      });
-    }, (60 / tempo / 4) * 1000); // 16th note timing
+    return () => {
+      if (playbackTimerRef.current) {
+        clearInterval(playbackTimerRef.current);
+      }
+    };
+  }, [isPlaying, music.tempo]);
 
-    return () => clearInterval(interval);
-  }, [isPlaying, tempo, currentStep, tracks]);
-
-  const handleStepToggle = (trackId: string, stepIndex: number) => {
-    setTracks(prev => prev.map(track => 
-      track.id === trackId
-        ? {
-            ...track,
-            steps: track.steps.map((step, index) => 
-              index === stepIndex ? !step : step
-            )
-          }
-        : track
-    ));
-  };
-
-  const handleVelocityChange = (trackId: string, stepIndex: number, velocity: number) => {
-    setTracks(prev => prev.map(track => 
-      track.id === trackId
-        ? {
-            ...track,
-            velocities: track.velocities.map((vel, index) => 
-              index === stepIndex ? velocity : vel
-            )
-          }
-        : track
-    ));
-  };
-
-  const handleTrackMute = (trackId: string) => {
-    setTracks(prev => prev.map(track => 
-      track.id === trackId ? { ...track, muted: !track.muted } : track
-    ));
-  };
-
-  const handleTrackSolo = (trackId: string) => {
-    setTracks(prev => prev.map(track => 
-      track.id === trackId ? { ...track, solo: !track.solo } : track
-    ));
-  };
-
-  const handleTrackVolumeChange = (trackId: string, volume: number) => {
-    setTracks(prev => prev.map(track => 
-      track.id === trackId ? { ...track, volume } : track
-    ));
-  };
-
-  const handlePlay = () => {
-    setIsPlaying(true);
-  };
-
+  // Drum Machine handlers
+  const handlePlay = () => setIsPlaying(true);
   const handleStop = () => {
     setIsPlaying(false);
     setCurrentStep(0);
   };
 
-  const handleTempoChange = (newTempo: number) => {
-    setTempo(Math.max(60, Math.min(200, newTempo)));
+  const handleStepToggle = (trackId: string, stepIndex: number) => {
+    setTracks((prev) =>
+      prev.map((track) =>
+        track.id === trackId
+          ? { ...track, steps: track.steps.map((s, i) => (i === stepIndex ? !s : s)) }
+          : track
+      )
+    );
+  };
+
+  const handleVelocityChange = (trackId: string, stepIndex: number, velocity: number) => {
+    setTracks((prev) =>
+      prev.map((track) =>
+        track.id === trackId
+          ? {
+              ...track,
+              velocities: track.velocities.map((v, i) => (i === stepIndex ? velocity : v)),
+            }
+          : track
+      )
+    );
+  };
+
+  const handleTrackMute = (trackId: string) => {
+    setTracks((prev) =>
+      prev.map((track) =>
+        track.id === trackId ? { ...track, muted: !track.muted } : track
+      )
+    );
+  };
+
+  const handleTrackSolo = (trackId: string) => {
+    setTracks((prev) =>
+      prev.map((track) =>
+        track.id === trackId ? { ...track, solo: !track.solo } : track
+      )
+    );
+  };
+
+  const handleTrackVolumeChange = (trackId: string, volume: number) => {
+    setTracks((prev) =>
+      prev.map((track) => (track.id === trackId ? { ...track, volume } : track))
+    );
   };
 
   const handleClearTrack = (trackId: string) => {
-    setTracks(prev => prev.map(track => 
-      track.id === trackId
-        ? {
-            ...track,
-            steps: new Array(16).fill(false),
-            velocities: new Array(16).fill(0.8)
-          }
-        : track
-    ));
+    setTracks((prev) =>
+      prev.map((track) =>
+        track.id === trackId
+          ? {
+              ...track,
+              steps: new Array(16).fill(false),
+              velocities: new Array(16).fill(0.8),
+            }
+          : track
+      )
+    );
   };
 
   const handleClearAll = () => {
-    setTracks(prev => prev.map(track => ({
-      ...track,
-      steps: new Array(16).fill(false),
-      velocities: new Array(16).fill(0.8)
-    })));
+    setTracks((prev) =>
+      prev.map((track) => ({
+        ...track,
+        steps: new Array(16).fill(false),
+        velocities: new Array(16).fill(0.8),
+      }))
+    );
   };
 
   const handleAddTrack = (track: DrumTrack) => {
-    setTracks(prev => [...prev, track]);
+    setTracks((prev) => [...prev, track]);
   };
 
   const handleRemoveTrack = (trackId: string) => {
-    setTracks(prev => prev.filter(track => track.id !== trackId));
+    setTracks((prev) => prev.filter((track) => track.id !== trackId));
   };
 
   const handleLoadDefaultPattern = () => {
@@ -168,197 +210,277 @@ export const JamSession: React.FC<JamSessionProps> = ({
   };
 
   return (
-    <ResponsiveContainer className="min-h-screen bg-gray-900">
-      <Header
-        sessionCode={sessionCode}
-        userCount={users.length}
-        isConnected={isConnected}
-        onSettingsClick={() => setShowSettings(!showSettings)}
-      />
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      {/* Global Music Header */}
+      <GlobalMusicHeader />
 
-      <div className="p-4 md:p-6 pb-20 md:pb-6">
-        {/* Mobile Layout - tab-based views, all mounted */}
-        <div className={isMobile ? 'space-y-4' : 'hidden'}>
-          {/* Drum Tab - Drum Machine + Visualizer */}
-          <div className={activeView === 'drum' ? 'space-y-4' : 'hidden'}>
-            <CompactDrumMachine
-              tracks={tracks}
-              currentStep={currentStep}
-              isPlaying={isPlaying}
-              tempo={tempo}
-              colorMode={visualizerSettings.colorMode}
-              onStepToggle={handleStepToggle}
-              onPlay={handlePlay}
-              onStop={handleStop}
-              onTempoChange={handleTempoChange}
-              onAddTrack={handleAddTrack}
-              onLoadDefaultPattern={handleLoadDefaultPattern}
-            />
-            <LiveAudioVisualizer embedded />
-          </div>
-
-          {/* Users Tab - Users + Session Info */}
-          <div className={activeView === 'users' ? 'space-y-4' : 'hidden'}>
-            <UserList
-              users={users}
-              currentUserId="1"
-              onUserKick={(userId) => {
-                setUsers(prev => prev.filter(user => user.id !== userId));
-              }}
-            />
-
-            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-              <h3 className="text-lg font-semibold mb-3">Session Info</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Room Code:</span>
-                  <span className="font-mono text-primary-400">{sessionCode}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Tempo:</span>
-                  <span>{tempo} BPM</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Time Signature:</span>
-                  <span>4/4</span>
-                </div>
-              </div>
-              <button
-                onClick={onLeaveSession}
-                className="w-full mt-4 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition-colors"
-              >
-                Leave Session
-              </button>
+      {/* Session Header */}
+      <div className="bg-gray-800/50 border-b border-gray-700 px-4 py-3">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowLeaveConfirm(true)}
+              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+              aria-label="Leave Session"
+              title="Leave Session"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-400 hover:text-white" />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-white">Jam Session</h1>
+              <p className="text-sm text-gray-400">
+                Code: {sessionCode} • {participants.length} {participants.length === 1 ? 'participant' : 'participants'}
+              </p>
             </div>
           </div>
 
-          {/* Settings Tab */}
-          <div className={activeView === 'settings' ? '' : 'hidden'}>
-            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-              <h3 className="text-lg font-semibold mb-4">Settings</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Visualizer Settings</label>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1">Color Mode</label>
-                      <select
-                        value={visualizerSettings.colorMode}
-                        onChange={(e) => setVisualizerSettings({
-                          ...visualizerSettings,
-                          colorMode: e.target.value as any
-                        })}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:border-primary-500 focus:outline-none"
-                      >
-                        <option value="spectrum">Spectrum</option>
-                        <option value="chromatic">Chromatic</option>
-                        <option value="harmonic">Harmonic</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1">
-                        Brightness: {Math.round(visualizerSettings.brightness * 100)}%
-                      </label>
-                      <input
-                        type="range"
-                        min="0.1"
-                        max="1"
-                        step="0.1"
-                        value={visualizerSettings.brightness}
-                        onChange={(e) => setVisualizerSettings({
-                          ...visualizerSettings,
-                          brightness: parseFloat(e.target.value)
-                        })}
-                        className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Desktop Layout - always rendered, visibility controlled */}
-        <div className={!isMobile ? 'grid lg:grid-cols-4 gap-6' : 'hidden'}>
-          {/* Desktop: Left column - Drum Machine + Visualizer */}
-          <div className="lg:col-span-3 space-y-6">
-            <DrumMachine
-              tracks={tracks}
-              currentStep={currentStep}
-              isPlaying={isPlaying}
-              tempo={tempo}
-              colorMode={visualizerSettings.colorMode}
-              onStepToggle={handleStepToggle}
-              onVelocityChange={handleVelocityChange}
-              onTrackMute={handleTrackMute}
-              onTrackSolo={handleTrackSolo}
-              onTrackVolumeChange={handleTrackVolumeChange}
-              onPlay={handlePlay}
-              onStop={handleStop}
-              onTempoChange={handleTempoChange}
-              onClearTrack={handleClearTrack}
-              onClearAll={handleClearAll}
-              onAddTrack={handleAddTrack}
-              onRemoveTrack={handleRemoveTrack}
-              onLoadDefaultPattern={handleLoadDefaultPattern}
-            />
-
-            {/* Visualizer - same width as drum machine */}
-            <LiveAudioVisualizer embedded />
-          </div>
-
-          {/* Desktop: Right Sidebar - Users and Session Info */}
-          <div className="space-y-6">
-            <UserList
-              users={users}
-              currentUserId="1"
-              onUserKick={(userId) => {
-                setUsers(prev => prev.filter(user => user.id !== userId));
-              }}
-            />
-
-            {/* Session Info */}
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold mb-4">Session Info</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Room Code:</span>
-                  <span className="font-mono text-primary-400">{sessionCode}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Tempo:</span>
-                  <span>{tempo} BPM</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Time Signature:</span>
-                  <span>4/4</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Pattern Length:</span>
-                  <span>16 steps</span>
-                </div>
-              </div>
-
-              <button
-                onClick={onLeaveSession}
-                className="w-full mt-4 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition-colors"
-              >
-                Leave Session
-              </button>
-            </div>
+          {/* Connection Status & Actions */}
+          <div className="flex items-center gap-3">
+            <ConnectionStatus status={connectionStatus} compact />
+            <button
+              onClick={() => setShowLeaveConfirm(true)}
+              className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-red-900/20 border border-red-700/50 text-red-200 hover:bg-red-900/30 rounded-lg transition-colors text-sm"
+              title="Leave Session"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Leave</span>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile Navigation */}
-      {isMobile && (
-        <MobileNavigation
-          activeView={activeView}
-          onViewChange={setActiveView}
-          userCount={users.length}
-        />
+      {/* Leave Confirmation Modal */}
+      {showLeaveConfirm && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40"
+            onClick={() => setShowLeaveConfirm(false)}
+          />
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-800 rounded-lg border border-gray-700 shadow-2xl max-w-md w-full p-6">
+              <h2 className="text-xl font-semibold text-white mb-4">Leave Session?</h2>
+              <p className="text-gray-400 mb-6">
+                Are you sure you want to leave this jam session? Other participants will be notified.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowLeaveConfirm(false)}
+                  className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                >
+                  Stay
+                </button>
+                <button
+                  onClick={onLeaveSession}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"
+                >
+                  Leave
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
-    </ResponsiveContainer>
+
+      {/* Tab Navigation */}
+      <div className="bg-gray-800/30 border-b border-gray-700 px-4">
+        <div className="max-w-7xl mx-auto flex items-center gap-2 py-2">
+
+          {/* Tab Navigation */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('drum')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                activeTab === 'drum'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              <Music className="w-4 h-4" />
+              <span className="hidden sm:inline">Drums</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('piano')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                activeTab === 'piano'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              <Music className="w-4 h-4" />
+              <span className="hidden sm:inline">Piano</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                activeTab === 'users'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span className="hidden sm:inline">Users</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Content Area */}
+      <div className="p-6">
+        <div className="max-w-7xl mx-auto">
+          {activeTab === 'drum' && (
+            <div className="space-y-4">
+              {/* Drum Machine Toggle */}
+              <div className="bg-gray-800 rounded-lg border border-gray-700">
+                <button
+                  onClick={() => setShowDrumMachine(!showDrumMachine)}
+                  className="w-full flex items-center justify-between p-4 hover:bg-gray-700/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <Music className="w-6 h-6 text-primary-400" />
+                    <div className="text-left">
+                      <h3 className="text-lg font-semibold text-white">Drum Machine</h3>
+                      <p className="text-sm text-gray-400">
+                        16-step sequencer • Synced to global tempo ({music.tempo} BPM)
+                      </p>
+                    </div>
+                  </div>
+                  {showDrumMachine ? (
+                    <ChevronUp className="w-5 h-5 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                  )}
+                </button>
+
+                {showDrumMachine && (
+                  <div className="p-4 border-t border-gray-700">
+                    <DrumMachine
+                      tracks={tracks}
+                      currentStep={currentStep}
+                      isPlaying={isPlaying}
+                      tempo={music.tempo}
+                      colorMode={music.colorMode}
+                      onStepToggle={handleStepToggle}
+                      onVelocityChange={handleVelocityChange}
+                      onTrackMute={handleTrackMute}
+                      onTrackSolo={handleTrackSolo}
+                      onTrackVolumeChange={handleTrackVolumeChange}
+                      onPlay={handlePlay}
+                      onStop={handleStop}
+                      onTempoChange={music.updateTempo}
+                      onClearTrack={handleClearTrack}
+                      onClearAll={handleClearAll}
+                      onAddTrack={handleAddTrack}
+                      onRemoveTrack={handleRemoveTrack}
+                      onLoadDefaultPattern={handleLoadDefaultPattern}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Integration Status */}
+              <div className="bg-green-900/20 border border-green-700/50 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5 animate-pulse" />
+                  <div>
+                    <h4 className="text-sm font-semibold text-green-200 mb-1">
+                      ✅ Drum Machine Integrated
+                    </h4>
+                    <ul className="text-xs text-green-300/70 space-y-0.5">
+                      <li>• Tempo synced with global header ({music.tempo} BPM)</li>
+                      <li>• Color mode: {music.colorMode}</li>
+                      <li>• Master volume: {Math.round(music.masterVolume * 100)}%</li>
+                      <li>• Audio engine: Persistent across navigation</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'piano' && (
+            <div className="bg-gray-800 rounded-lg border border-gray-700 p-8">
+              <div className="text-center">
+                <Music className="w-16 h-16 text-blue-400 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-white mb-2">Piano Roll</h2>
+                <p className="text-gray-400 mb-6">
+                  Piano roll integration coming soon. Will use global tempo, key, and scale.
+                </p>
+                <div className="bg-gray-700/50 rounded-lg p-4 max-w-md mx-auto text-left">
+                  <h3 className="text-sm font-semibold text-gray-300 mb-2">
+                    Global Controls Active:
+                  </h3>
+                  <ul className="text-sm text-gray-400 space-y-1">
+                    <li>✓ Tempo sync from header</li>
+                    <li>✓ Key/Scale highlighting</li>
+                    <li>✓ Master volume control</li>
+                    <li>✓ Color mode (chromatic/harmonic)</li>
+                    <li>✓ MIDI input from header settings</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'users' && (
+            <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+              <div className="mb-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <Users className="w-6 h-6 text-green-400" />
+                  <h2 className="text-xl font-bold text-white">Participants</h2>
+                </div>
+                <p className="text-sm text-gray-400">
+                  Real-time participant list. Others will see when you join or leave.
+                </p>
+              </div>
+
+              <UserList
+                participants={participants}
+                myPeerId={supabaseSessionService.myPeerId}
+              />
+
+              {/* Epic 7 Status */}
+              <div className="mt-6 bg-green-900/20 border border-green-700/50 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5 animate-pulse" />
+                  <div>
+                    <h4 className="text-sm font-semibold text-green-200 mb-1">
+                      ✅ Epic 7: Jam Session Backend Active
+                    </h4>
+                    <ul className="text-xs text-green-300/70 space-y-0.5">
+                      <li>• Real-time presence tracking via Supabase</li>
+                      <li>• Tempo sync across all participants</li>
+                      <li>• Connection status: {connectionStatus}</li>
+                      <li>• Session code: {sessionCode}</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Development Info */}
+      <div className="fixed bottom-4 right-4 bg-blue-900/90 border border-blue-700 rounded-lg p-4 max-w-sm shadow-xl">
+        <h3 className="text-sm font-semibold text-blue-200 mb-2">✅ Epic 4 Integration Active</h3>
+        <p className="text-xs text-blue-100 mb-2">
+          DrumMachine now connected to Global Music Controls.
+        </p>
+        <div className="text-xs text-blue-200/70 space-y-1">
+          <div>• Try adjusting tempo in header</div>
+          <div>• Change key/scale and color mode</div>
+          <div>• Open Hardware Settings modal</div>
+          <div className="pt-2 border-t border-blue-700/50">
+            Legacy version:{' '}
+            <button
+              onClick={() => (window.location.href = '/jam-legacy')}
+              className="underline hover:text-blue-100"
+            >
+              /jam-legacy
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };

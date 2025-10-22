@@ -9,6 +9,7 @@ import { SpectrumVisualization, SpectrumConfig, DEFAULT_SPECTRUM_CONFIG } from '
 import { WaveformVisualization, WaveformConfig, DEFAULT_WAVEFORM_CONFIG } from './visualizations/WaveformVisualization';
 import { RippleVisualization, RippleConfig, DEFAULT_RIPPLE_CONFIG, RippleDirection } from './visualizations/RippleVisualization';
 import { AudioInputManager } from './AudioInputManager';
+import type { FrequencyDataAdapter } from './FrequencyDataAdapter';
 
 export type VisualizationMode = 'spectrum' | 'waveform' | 'ripple';
 
@@ -46,16 +47,22 @@ export class VisualizationEngine {
    */
   render(
     ctx: CanvasRenderingContext2D,
-    audioManager: AudioInputManager,
+    audioManager: AudioInputManager | FrequencyDataAdapter,
     width: number,
     height: number
   ): void {
     const { mode, stereo } = this.config;
 
+    // Extract sourceManager if adapter is available (for MIDI color support)
+    const sourceManager = 'getSourceManager' in audioManager ? audioManager.getSourceManager() : undefined;
+
+    // Debug logging (remove after testing)
+    // console.log('[VizEngine] Has sourceManager:', !!sourceManager, 'Mode:', mode);
+
     switch (mode) {
       case 'spectrum': {
         const frequencyData = audioManager.getFrequencyData();
-        this.spectrumViz.render(ctx, frequencyData, width, height);
+        this.spectrumViz.render(ctx, frequencyData, width, height, sourceManager);
         break;
       }
 
@@ -63,17 +70,17 @@ export class VisualizationEngine {
         const peakFreq = audioManager.getPeakFrequency();
         if (stereo) {
           const { left, right } = audioManager.getStereoWaveformData();
-          this.waveformViz.renderStereo(ctx, left, right, width, height, peakFreq.frequency);
+          this.waveformViz.renderStereo(ctx, left, right, width, height, peakFreq.frequency, sourceManager);
         } else {
           const timeData = audioManager.getWaveformData();
-          this.waveformViz.render(ctx, timeData, width, height, peakFreq.frequency);
+          this.waveformViz.render(ctx, timeData, width, height, peakFreq.frequency, sourceManager);
         }
         break;
       }
 
       case 'ripple': {
         const frequencyData = audioManager.getFrequencyData();
-        this.rippleViz.render(ctx, frequencyData, width, height);
+        this.rippleViz.render(ctx, frequencyData, width, height, sourceManager);
         break;
       }
     }
