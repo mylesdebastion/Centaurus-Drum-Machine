@@ -116,6 +116,13 @@ export class VisualizationEngine {
   }
 
   /**
+   * Set color mode for spectrum visualization
+   */
+  setColorMode(colorMode: 'spectrum' | 'chromatic' | 'harmonic'): void {
+    this.updateSpectrumConfig({ colorMode });
+  }
+
+  /**
    * Update waveform configuration
    */
   updateWaveformConfig(config: Partial<WaveformConfig>): void {

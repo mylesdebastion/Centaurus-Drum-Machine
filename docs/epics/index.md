@@ -2,7 +2,7 @@
 
 This directory contains all project epics organized by epic number. Each epic represents a major feature area or system architecture component.
 
-**Total Epics:** 11 (5 Complete, 3 In Progress, 3 Planning)
+**Total Epics:** 18 (6 Complete, 6 In Progress, 6 Planning)
 
 ---
 
@@ -16,11 +16,18 @@ This directory contains all project epics organized by epic number. Each epic re
 | [Epic 4](./epic-4-global-music-controls.md) | Global Music Controls & State Management | ✅ COMPLETE | High | 6 stories | 100% (6/6 complete) |
 | [Epic 5](./epic-5-universal-responsive-architecture.md) | Universal Responsive Architecture | ✅ COMPLETE | High | 1 story | 100% (Story 5.1 complete) |
 | [Epic 6](./epic-6-multi-client-sessions-wled.md) | Multi-Client Sessions & WLED Integration | 🚧 IN PROGRESS | High | 5 stories | 20% (Phase 0 complete, blocked) |
+| [Epic 7](./epic-7-jam-session-backend.md) | Jam Session Backend Infrastructure | ✅ COMPLETE | High | 10 stories | 100% (Supabase Realtime complete) |
+| [Epic 8](./epic-8-launchpad-pro-integration.md) | Launchpad Pro Hardware Integration | 🚧 IN PROGRESS | High | 4 stories | 50% (Stories 8.0-8.1 complete, 8.2-8.3 validated) |
 | [Epic 9](./epic-9-multi-instrument-midi-visualization.md) | Multi-Instrument MIDI Visualization | 🚧 IN PROGRESS | High | 4 stories | 50% (9.1-9.2 complete, 9.3-9.4 pending) |
+| [Epic 10](./epic-10-wled-preset-management.md) | WLED Preset Management | 📝 PLANNING | High | 1 story | Not started |
 | [Epic 11](./epic-11-roli-lumi-integration.md) | ROLI LUMI Integration | 🚧 IN PROGRESS | High | 1 story | 40% (Phase 2.1 complete) |
 | [Epic 12](./epic-12-sound-engine-expansion.md) | Sound Engine Expansion | ✅ COMPLETE | Medium | 1 story | 100% (All engines implemented) |
 | [Epic 13](./epic-13-documentation-infrastructure.md) | Documentation Infrastructure & Reconciliation | ✅ COMPLETE | High | 2 stories | 100% (both stories complete) |
 | [Epic 14](./epic-14-module-adapter-system.md) | Module Adapter System & Global State Integration | 🚧 IN PROGRESS | High | 6 stories | 10% (14.1 in progress) |
+| [Epic 15](./epic-15-chord-melody-arranger.md) | Chord Progression & Melody Arranger Module | 📝 PLANNING | High | 9 stories | Not started |
+| [Epic 16](./epic-16-unified-module-ui-template.md) | Unified Studio Module UI Template | 📝 PLANNING | Medium | 3 stories | Not started |
+| [Epic 17](./epic-17-remote-wled-state-sync.md) | Remote WLED Control via Jam Sessions | 📝 PLANNING | High | 3 stories | Not started |
+| [Epic 19](./epic-19-education-dj-visualizer-integration.md) | Education Mode DJ Visualizer Integration | 🚧 IN PROGRESS | Medium | 6 stories | 33% (19.1-19.2 in progress) |
 
 ---
 
@@ -143,6 +150,35 @@ This directory contains all project epics organized by epic number. Each epic re
 
 ---
 
+### Epic 10: WLED Preset Management
+**Status:** 📝 PLANNING
+**Goal:** Enable users to save, manage, and quickly load WLED device configurations as named presets, reducing setup time from 3-5 minutes to <15 seconds.
+
+**Key Features:**
+- Local preset save/load with inline UI (no modals)
+- Preset dropdown with quick selection
+- Unsaved changes detection with visual indicator
+- Non-blocking undo pattern for preset loading
+- Toast notifications for user feedback
+- localStorage persistence (foundation for cloud sync)
+
+**Stories:**
+- 📝 [Story 10.1](../stories/10.1.story.md): Local Preset Save/Load (Inline UI - No Modals)
+
+**User Value:**
+- **~4 minute time savings per hardware setup** (critical for live performance prep)
+- Rapid switching between configurations (guitar rig, drum kit, full band)
+- Inline expandable forms following UX_STANDARDS.md anti-modal philosophy
+
+**Integration Points:**
+- WLEDDeviceManager component (Story 6.1 Phase 0)
+- `/jam` Settings tab
+- localStorage services
+
+**Created:** 2025-10-21 (Sarah - Product Owner, via Epic 8 conflict resolution)
+
+---
+
 ### Epic 11: ROLI LUMI Integration
 **Status:** 🚧 IN PROGRESS (Phase 2.1 Complete)
 **Goal:** Seamless integration with ROLI Piano M (LUMI Keys) for visual feedback showing scales, intervals, and chord tones through per-key LED control.
@@ -227,6 +263,188 @@ This directory contains all project epics organized by epic number. Each epic re
 
 ---
 
+### Epic 7: Jam Session Backend Infrastructure
+**Status:** ✅ COMPLETE
+**Goal:** Build real-time collaborative backend infrastructure using Supabase Realtime for session management and state synchronization.
+
+**Key Features:**
+- Supabase Realtime Channels with Broadcast + Presence
+- Session management (room codes, participants)
+- Real-time state sync (tempo, playback, key/scale)
+- Broadcast/subscribe patterns via `supabaseSessionService`
+- Cost-effective MVP (free tier: 200 connections, 2M messages/month)
+
+**Stories:**
+- ✅ [Story 7.1](../stories/7.1-supabase-setup.md): Supabase Project Setup
+- ✅ [Story 7.2](../stories/7.2-supabase-realtime-service.md): Supabase Realtime Service Layer
+- ✅ [Story 7.3](../stories/7.3-jam-session-ui-integration.md): Jam Session UI Integration
+- ✅ Stories 7.4-7.10: Additional features (shareable URLs, state sync, error handling)
+
+**Technical Foundation for:**
+- Epic 17: Remote WLED Control (state sync extension)
+- Epic 6: Multi-Client Sessions (future WebRTC integration)
+
+---
+
+### Epic 8: Launchpad Pro Hardware Integration
+**Status:** 🚧 IN PROGRESS (Stories 8.0-8.1 Complete)
+**Goal:** Enable Novation Launchpad Pro (Mk3 and 2015 models) as hardware controllers for drum sequencing and isometric visualization with 8×8 RGB grid, velocity sensitivity, and enhanced control capabilities.
+
+**Key Features:**
+- Novation Launchpad Pro Mk3 (USB-C, 2020+) support
+- Launchpad Pro 2015 (original model) backward compatibility
+- 8×8 RGB grid (64 pads vs. APC40's 40 pads = 60% larger)
+- Full RGB color control (262,144 colors vs. APC40's ~8)
+- Velocity-sensitive pads (0-127 dynamic input)
+- Polyphonic aftertouch (pressure-sensitive performance)
+- Horizontal/vertical layout orientation toggle
+- Extended `HardwareController` interface (non-breaking)
+
+**Stories:**
+- ✅ [Story 8.0](../stories/8.0-hardware-controller-selection-infrastructure.md): Hardware Controller Selection Infrastructure (COMPLETE - 2025-10-21)
+  - Refactored hardcoded APC40 to dynamic controller selection
+  - Created ControllerRegistry with factory pattern
+  - Built HardwareControllerSelector UI component
+  - Enabled zero-modification integration for future controllers
+- ✅ [Story 8.1](../stories/8.1-launchpad-pro-controller-implementation.md): LaunchpadProController Implementation (COMPLETE - 2025-10-21)
+  - Web MIDI protocol with SysEx initialization
+  - RGB LED control with batched updates (16 LEDs per 5ms)
+  - Button input handling with velocity sensitivity and aftertouch
+  - Mk3 and 2015 models enabled in ControllerRegistry
+- 📝 [Story 8.2](../stories/8.2-drum-sequencer-integration-layout.md): Drum Sequencer Integration & Layout Orientation (VALIDATED - Ready for implementation)
+  - 8×8 grid mapping with Session/Note mode toggle
+  - Visual feedback for pad states and step indicators
+  - Bidirectional sync between hardware and UI
+- 📝 [Story 8.3](../stories/8.3-performance-optimization-testing.md): Performance Optimization & Multi-Device Testing (VALIDATED - Blocked by 8.2)
+  - Delta LED updates and frame budget optimization
+  - 60fps LED rendering, Mk3/2015/APC40 testing
+  - Memory leak detection and multi-device switching
+
+**Technical Foundation:**
+- Research findings: `/research/launchpad-pro-integration-findings.md` (complete MIDI protocol, code scaffolding)
+- Extends Epic 1 (APC40) patterns: `HardwareController` abstraction, queue-based LED updates
+- Web MIDI API (Chrome/Edge/Opera)
+
+**Critical Prerequisite:**
+- 🔥 Story 8.0 MUST be completed before Stories 8.1-8.3
+- Without Story 8.0, Launchpad Pro requires hardcoding into IsometricSequencer
+
+**Dependencies:**
+- Epic 4 (GlobalMusicContext for tempo/key/scale)
+- Epic 1 (HardwareController interface)
+
+**Hardware Availability:**
+- ✅ Launchpad Pro Mk3 (USB-C)
+- ✅ Launchpad Pro 2015 (developer has both devices)
+
+**Created:** 2025-10-21 (Sarah - Product Owner, via BMad Analyst research)
+
+---
+
+### Epic 15: Chord Progression & Melody Arranger Module
+**Status:** 📝 PLANNING
+**Goal:** Transform guitar fretboard chord progression feature into standalone Studio module with melody arranger capabilities and intelligent module routing.
+
+**Key Features:**
+- ChordMelodyArranger module for Studio
+- Chord progression builder with genre-based presets
+- Melody arranger step sequencer
+- Module routing system (send to Piano, Guitar, Drum, etc.)
+- GlobalMusicContext integration (key/scale/tempo sync)
+- Roman numeral progressions (adaptable to any key)
+
+**Stories:**
+- 📝 Story 15.1-15.9: Chord service extraction, UI, melody arranger, routing, integration
+
+**Dependencies:**
+- Epic 4 (GlobalMusicContext)
+- Epic 14 (Module adapter patterns)
+
+---
+
+### Epic 16: Unified Studio Module UI Template
+**Status:** 📝 PLANNING
+**Goal:** Establish consistent UI template for all Studio modules by extracting ChordMelodyArranger header/settings pattern.
+
+**Key Features:**
+- ModuleHeader component (icon, title, subtitle, settings gear)
+- ModuleTransportControls component (play/pause/stop)
+- ModuleSettingsPanel component (collapsible slide-up panel)
+- Responsive design patterns
+- Apply to all 6 modules (DrumMachine, PianoRoll, GuitarFretboard, etc.)
+
+**Stories:**
+- 📝 [Story 16.1-16.6](../stories/): Extract template, migrate ChordMelody, apply to all modules
+
+**Dependencies:**
+- Epic 4 (GlobalMusicContext transport state)
+- Epic 5 (Responsive patterns)
+- Epic 15 (ChordMelodyArranger reference implementation)
+
+---
+
+### Epic 17: Remote WLED Control via Jam Sessions
+**Status:** 📝 PLANNING
+**Goal:** Enable remote devices to control local WLED hardware via jam sessions by syncing musical state through Supabase Realtime.
+
+**Key Features:**
+- Musical state synchronization (drum patterns, notes, chords)
+- Delta-based updates (99% bandwidth savings)
+- Client-side color derivation (50% bandwidth savings)
+- Local LED frame generation (<1ms latency)
+- Natural "bridge" behavior (no special mode needed)
+- 79x bandwidth reduction vs naive approach (330 KB vs 26 MB per jam)
+
+**Stories:**
+- 📝 [Story 17.1](../stories/17.1-delta-drum-state-sync.md): Delta-Based Drum State Sync
+- 📝 [Story 17.2](../stories/17.2-client-side-color-derivation.md): Client-Side Color Derivation
+- 📝 [Story 17.3](../stories/17.3-full-pattern-sync-led-integration.md): Full Pattern Sync & LED Integration
+
+**Dependencies:**
+- Epic 7 (Supabase Realtime infrastructure) ✅
+- Epic 14 (LED Compositor integration) ✅
+
+**Architecture:** [remote-wled-state-sync.md](../architecture/remote-wled-state-sync.md)
+
+**Future Enhancements (Epic 18+):**
+- Multi-module state sync (Piano Roll, IsometricSequencer)
+- Binary message format (Uint8Array optimization)
+- DJ visualizer audio input integration
+
+---
+
+### Epic 19: Education Mode DJ Visualizer Integration
+**Status:** 🚧 IN PROGRESS (Story 19.2 Active)
+**Goal:** Integrate LiveAudioVisualizer into Education Mode lessons 2 & 4 for enhanced audio/pitch learning with real-time frequency visualization, while preserving step sequencer UI for rhythm lessons.
+
+**Key Features:**
+- LiveAudioVisualizer embedded mode for education context
+- Lesson 2 (Color & Pitch) - DJ visualizer spectrum mode
+- Lesson 4 (Melody & Harmony) - Piano keyboard with frequency visualization
+- WLED 1D LED strip spectrum visualization (Story 19.5* - may already work via 90×1 config)
+- WLED 2D LED matrix bar chart rendering (Story 19.6)
+- Pedagogical approach: step sequencer for rhythm (L1 & L3), visualizer for pitch/audio (L2 & L4)
+
+**Stories:**
+- 📝 [Story 19.1](../stories/19.1.story.md): LiveAudioVisualizer Embedded Mode
+- 🚧 [Story 19.2](../stories/19.2.story.md): Lesson 2 (Color & Pitch) Visualizer Integration (In Progress)
+- 📝 [Story 19.3](../stories/19.3.story.md): Performance Optimization & Polish (Lessons 2 & 4)
+- 📝 [Story 19.4](../stories/19.4.story.md): Lesson 4 (Melody & Harmony) Visualizer Integration
+- ⚠️ [Story 19.5](../stories/19.5-spectrum-wled-enhancement.md): Spectrum Mode WLED (1D LED Strips) - **POTENTIALLY SKIP/RESOLVED**
+- 📝 [Story 19.6](../stories/19.6-spectrum-wled-2d-matrix.md): Spectrum Mode WLED (2D LED Matrices)
+
+**Discovery (2025-10-19):** Story 19.5 may be unnecessary - 1D LED strip spectrum already works by configuring LED matrix as 90×1 (width=90, height=1) instead of 1×90. Verification needed before officially skipping.
+
+**Technical Foundation:**
+- Existing LiveAudioVisualizer at `/dj-visualizer` route
+- FrequencySourceManager for audio data mixing
+- WLED LED output via WebSocket bridge
+- 60fps canvas rendering, 30+ fps WLED output
+
+**Created:** 2025-10-19 (Sarah - Product Owner)
+
+---
+
 ## Epic Status Legend
 
 - ✅ **COMPLETE**: All stories implemented and verified
@@ -273,5 +491,5 @@ This directory contains all project epics organized by epic number. Each epic re
 
 ---
 
-**Last Updated:** 2025-01-13
+**Last Updated:** 2025-10-21 (Epic 8: Stories 8.0-8.1 complete, 8.2-8.3 validated)
 **Maintained By:** BMad Framework (Product Owner, PM, Dev Agents)

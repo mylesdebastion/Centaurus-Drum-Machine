@@ -28,8 +28,8 @@ interface LEDMatrixManagerProps {
 }
 
 const DEFAULT_CONFIG: LEDMatrixConfig = {
-  width: 1,
-  height: 90,
+  width: 90,
+  height: 1,
   ipAddress: '192.168.8.158',
   orientation: 'horizontal',
   serpentine: true,

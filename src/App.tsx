@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { GlobalMusicProvider } from './contexts/GlobalMusicContext';
+import { HardwareManager } from './hardware';
 import { audioEngine, TransportState } from './utils/audioEngine';
 import { WelcomeScreen } from './components/Welcome/WelcomeScreen';
 import { JamSession } from './components/JamSession/JamSession';
@@ -9,6 +10,7 @@ import { EducationMode } from './components/Education/EducationMode';
 import { IsometricSequencer } from './components/IsometricSequencer/IsometricSequencer';
 import { LiveAudioVisualizer } from './components/LiveAudioVisualizer/LiveAudioVisualizer';
 import { WLEDDirectTest } from './components/WLEDExperiment/WLEDDirectTest';
+import { WLEDManager } from './components/WLEDManager';
 import { MIDITest } from './components/MIDI/MIDITest';
 import { PianoRoll } from './components/PianoRoll/PianoRoll';
 import { GuitarFretboard } from './components/GuitarFretboard/GuitarFretboard';
@@ -19,6 +21,9 @@ import { SupabaseConnectionTest } from './components/SupabaseConnectionTest';
 import { ChordMelodyArranger } from './components/Studio/modules/ChordMelodyArranger';
 import { UsernameModal, getStoredUsername } from './components/JamSession/UsernameModal';
 import { supabaseSessionService } from './services/supabaseSession';
+import { AuthTest } from './components/AuthTest';
+import { LaunchpadProExperiment } from './components/LaunchpadProExperiment';
+import { AnnouncementBanner } from './components/AnnouncementBanner';
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
@@ -193,6 +198,14 @@ function App() {
     navigate('/');
   };
 
+  const handleWLEDManager = () => {
+    navigate('/wled-manager');
+  };
+
+  const handleExitWLEDManager = () => {
+    navigate('/');
+  };
+
   const handleMIDITest = () => {
     navigate('/midi-test');
   };
@@ -249,25 +262,34 @@ function App() {
     navigate('/');
   };
 
-  // Reserved for future WelcomeScreen button
-  // const handleChordMelodyTest = () => {
-  //   navigate('/chord-melody-test');
-  // };
+  const handleChordMelodyTest = () => {
+    navigate('/chord-melody-test');
+  };
 
   const handleExitChordMelodyTest = () => {
     navigate('/');
   };
 
-  return (
-    <GlobalMusicProvider>
-      {/* Username Modal */}
-      <UsernameModal
-        isOpen={showUsernameModal}
-        onSave={handleUsernameSubmit}
-        onCancel={handleUsernameCancel}
-      />
+  const handleLaunchpadTest = () => {
+    navigate('/launchpad-test');
+  };
 
-      <Routes>
+  const handleExitLaunchpadTest = () => {
+    navigate('/');
+  };
+
+  return (
+    <>
+    <GlobalMusicProvider>
+      <HardwareManager>
+        {/* Username Modal */}
+        <UsernameModal
+          isOpen={showUsernameModal}
+          onSave={handleUsernameSubmit}
+          onCancel={handleUsernameCancel}
+        />
+
+        <Routes>
         <Route
           path="/"
           element={
@@ -279,6 +301,7 @@ function App() {
               onIsometricMode={handleIsometricMode}
               onDJVisualizer={handleDJVisualizer}
               onWLEDExperiment={handleWLEDExperiment}
+              onWLEDManager={handleWLEDManager}
               onMIDITest={handleMIDITest}
               onPianoRoll={handlePianoRoll}
               onGuitarFretboard={handleGuitarFretboard}
@@ -286,6 +309,8 @@ function App() {
               onHeaderTest={handleHeaderTest}
               onStudio={handleStudio}
               onSupabaseTest={handleSupabaseTest}
+              onChordMelodyTest={handleChordMelodyTest}
+              onLaunchpadTest={handleLaunchpadTest}
             />
           }
         />
@@ -336,6 +361,14 @@ function App() {
           element={
             <WLEDDirectTest
               onBack={handleExitWLEDExperiment}
+            />
+          }
+        />
+        <Route
+          path="/wled-manager"
+          element={
+            <WLEDManager
+              onBack={handleExitWLEDManager}
             />
           }
         />
@@ -412,8 +445,33 @@ function App() {
             </div>
           }
         />
+        <Route
+          path="/launchpad-test"
+          element={
+            <LaunchpadProExperiment
+              onBack={handleExitLaunchpadTest}
+            />
+          }
+        />
+        <Route
+          path="/auth-test"
+          element={<AuthTest />}
+        />
       </Routes>
+      </HardwareManager>
     </GlobalMusicProvider>
+
+    {/* Announcement Banner */}
+    <AnnouncementBanner
+      announcement={{
+        id: 'discord-launch-2025-10',
+        message: 'Join our new Discord community to provide feedback and discuss ideas for the future of Audiolux!',
+        link: 'https://discord.gg/ZsXcujcnFe',
+        linkText: 'Join Discord',
+        icon: 'discord'
+      }}
+    />
+  </>
   );
 }
 

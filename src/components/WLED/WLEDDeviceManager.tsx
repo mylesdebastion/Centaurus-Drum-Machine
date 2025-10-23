@@ -1,6 +1,10 @@
 /**
- * WLED Device Manager Component
+ * WLED Device Manager Component (LEGACY)
  * Story 6.1: Multi-Client Shared Sessions - Phase 0
+ *
+ * ⚠️ DEPRECATED: This component is legacy code used only in GuitarFretboard.
+ * For new WLED features, use src/components/WLEDManager/ instead.
+ * See Epic 18 for the new WLED architecture.
  *
  * Main component managing WLED devices with WebSocket/UDP WARLS protocol,
  * localStorage persistence, and inline row layout (similar to WLED app UI)
@@ -673,6 +677,7 @@ const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
               <WLEDVirtualPreview
                 device={device}
                 ledColors={ledData}
+                showLivePreview={true}
               />
             )}
           </div>
