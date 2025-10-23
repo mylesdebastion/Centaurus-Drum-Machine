@@ -23,6 +23,7 @@ import { UsernameModal, getStoredUsername } from './components/JamSession/Userna
 import { supabaseSessionService } from './services/supabaseSession';
 import { AuthTest } from './components/AuthTest';
 import { LaunchpadProExperiment } from './components/LaunchpadProExperiment';
+import { AnnouncementBanner } from './components/AnnouncementBanner';
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
@@ -278,6 +279,7 @@ function App() {
   };
 
   return (
+    <>
     <GlobalMusicProvider>
       <HardwareManager>
         {/* Username Modal */}
@@ -458,6 +460,18 @@ function App() {
       </Routes>
       </HardwareManager>
     </GlobalMusicProvider>
+
+    {/* Announcement Banner */}
+    <AnnouncementBanner
+      announcement={{
+        id: 'discord-launch-2025-10',
+        message: 'Join our new Discord community to provide feedback and discuss ideas for the future of Audiolux!',
+        link: 'https://discord.gg/ZsXcujcnFe',
+        linkText: 'Join Discord',
+        icon: 'discord'
+      }}
+    />
+  </>
   );
 }
 
