@@ -74,8 +74,75 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
         {/* Action Buttons Section */}
         <div className="mb-12 sm:mb-16">
-          <div className="grid sm:grid-cols-3 gap-4">
-            {/* 3D Sequencer - Primary */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Music Studio */}
+            {onStudio && (
+              <button
+                onClick={onStudio}
+                className="group bg-gradient-to-br from-indigo-900/50 to-blue-900/50 hover:from-indigo-800/60 hover:to-blue-800/60 p-6 rounded-xl border-2 border-indigo-500/30 hover:border-indigo-400 transition-all transform hover:scale-105 shadow-lg hover:shadow-indigo-500/20"
+              >
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <Grid3x3 className="w-12 h-12 text-indigo-400 group-hover:text-indigo-300 transition-colors" />
+                  <h3 className="text-lg font-bold text-white">Music Studio</h3>
+                  <p className="text-sm text-gray-300">
+                    Dynamic workspace with multiple music modules
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-xs text-indigo-300">
+                    <Play className="w-4 h-4" />
+                    <span>Launch Studio</span>
+                  </div>
+                </div>
+              </button>
+            )}
+
+            {/* Multiplayer Jam */}
+            <div className="bg-gradient-to-br from-purple-900/50 to-violet-900/50 p-6 rounded-xl border-2 border-purple-500/30 shadow-lg">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <Users className="w-12 h-12 text-purple-400" />
+                <h3 className="text-lg font-bold text-white">Multiplayer Jam</h3>
+                <p className="text-sm text-gray-300 mb-2">
+                  Sync with friends using room codes and global controls
+                </p>
+                <div className="w-full space-y-2">
+                  <button
+                    onClick={onStartJam}
+                    className="w-full bg-purple-600 hover:bg-purple-500 text-white font-semibold px-4 py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Play className="w-4 h-4" />
+                    Create a Room
+                  </button>
+                  {!showJoinInput ? (
+                    <button
+                      onClick={() => setShowJoinInput(true)}
+                      className="w-full bg-purple-700/50 hover:bg-purple-700 text-purple-200 font-semibold px-4 py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Users className="w-4 h-4" />
+                      Join a Room
+                    </button>
+                  ) : (
+                    <form onSubmit={handleJoinSubmit} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={joinCode}
+                        onChange={(e) => setJoinCode(e.target.value)}
+                        placeholder="Room code"
+                        className="flex-1 px-3 py-3 bg-purple-950/50 border border-purple-500/30 rounded-lg text-white text-sm placeholder-purple-300/50 focus:border-purple-400 focus:outline-none"
+                        autoFocus
+                      />
+                      <button
+                        type="submit"
+                        className="bg-purple-600 hover:bg-purple-500 text-white font-semibold px-4 py-3 rounded-lg transition-colors"
+                        disabled={!joinCode.trim()}
+                      >
+                        Join
+                      </button>
+                    </form>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 3D Sequencer */}
             <button
               onClick={onIsometricMode}
               className="group bg-gradient-to-br from-cyan-900/50 to-purple-900/50 hover:from-cyan-800/60 hover:to-purple-800/60 p-6 rounded-xl border-2 border-cyan-500/30 hover:border-cyan-400 transition-all transform hover:scale-105 shadow-lg hover:shadow-cyan-500/20"
@@ -93,20 +160,56 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               </div>
             </button>
 
-            {/* Drum Machine */}
+            {/* DJ Visualizer */}
             <button
-              onClick={onStartJam}
-              className="group bg-gradient-to-br from-primary-900/50 to-accent-900/50 hover:from-primary-800/60 hover:to-accent-800/60 p-6 rounded-xl border-2 border-primary-500/30 hover:border-primary-400 transition-all transform hover:scale-105 shadow-lg hover:shadow-primary-500/20"
+              onClick={onDJVisualizer}
+              className="group bg-gradient-to-br from-orange-900/50 to-red-900/50 hover:from-orange-800/60 hover:to-red-800/60 p-6 rounded-xl border-2 border-orange-500/30 hover:border-orange-400 transition-all transform hover:scale-105 shadow-lg hover:shadow-orange-500/20"
             >
               <div className="flex flex-col items-center gap-3 text-center">
-                <Grid3x3 className="w-12 h-12 text-primary-400 group-hover:text-primary-300 transition-colors" />
-                <h3 className="text-lg font-bold text-white">Drum Machine</h3>
+                <Activity className="w-12 h-12 text-orange-400 group-hover:text-orange-300 transition-colors" />
+                <h3 className="text-lg font-bold text-white">DJ Visualizer</h3>
                 <p className="text-sm text-gray-300">
-                  Classic grid-based drum sequencer with sample pads
+                  Live audio visualization with spectrum analyzer and LED output
                 </p>
-                <div className="mt-2 flex items-center gap-2 text-xs text-primary-300">
-                  <Music className="w-4 h-4" />
-                  <span>Beat Maker</span>
+                <div className="mt-2 flex items-center gap-2 text-xs text-orange-300">
+                  <Play className="w-4 h-4" />
+                  <span>Launch Visualizer</span>
+                </div>
+              </div>
+            </button>
+
+            {/* Piano Roll */}
+            <button
+              onClick={onPianoRoll}
+              className="group bg-gradient-to-br from-lime-900/50 to-green-900/50 hover:from-lime-800/60 hover:to-green-800/60 p-6 rounded-xl border-2 border-lime-500/30 hover:border-lime-400 transition-all transform hover:scale-105 shadow-lg hover:shadow-lime-500/20"
+            >
+              <div className="flex flex-col items-center gap-3 text-center">
+                <Piano className="w-12 h-12 text-lime-400 group-hover:text-lime-300 transition-colors" />
+                <h3 className="text-lg font-bold text-white">Piano Roll</h3>
+                <p className="text-sm text-gray-300">
+                  88-key interactive piano with MIDI input and LED output
+                </p>
+                <div className="mt-2 flex items-center gap-2 text-xs text-lime-300">
+                  <Play className="w-4 h-4" />
+                  <span>Launch Piano</span>
+                </div>
+              </div>
+            </button>
+
+            {/* Guitar Fretboard */}
+            <button
+              onClick={onGuitarFretboard}
+              className="group bg-gradient-to-br from-amber-900/50 to-yellow-900/50 hover:from-amber-800/60 hover:to-yellow-800/60 p-6 rounded-xl border-2 border-amber-500/30 hover:border-amber-400 transition-all transform hover:scale-105 shadow-lg hover:shadow-amber-500/20"
+            >
+              <div className="flex flex-col items-center gap-3 text-center">
+                <Guitar className="w-12 h-12 text-amber-400 group-hover:text-amber-300 transition-colors" />
+                <h3 className="text-lg font-bold text-white">Guitar Fretboard</h3>
+                <p className="text-sm text-gray-300">
+                  6×25 fretboard with chord progressions and LED output
+                </p>
+                <div className="mt-2 flex items-center gap-2 text-xs text-amber-300">
+                  <Play className="w-4 h-4" />
+                  <span>Launch Guitar</span>
                 </div>
               </div>
             </button>
@@ -177,43 +280,26 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </p>
 
           <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
-            {/* Piano Roll Visualizer */}
-            <button
-              onClick={onPianoRoll}
-              className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-green-500/50 transition-colors text-left"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <Piano className="w-6 h-6 text-green-400" />
-                <h3 className="font-semibold text-white">Piano Roll</h3>
-                <span className="text-xs bg-green-600/30 text-green-300 px-2 py-1 rounded">New</span>
-              </div>
-              <p className="text-sm text-gray-400 mb-4">
-                88-key interactive piano with MIDI input and WLED LED strip output
-              </p>
-              <div className="flex items-center gap-2 text-sm text-green-400 group-hover:text-green-300">
-                <span>Launch Piano</span>
-                <Play className="w-4 h-4" />
-              </div>
-            </button>
-
-            {/* Guitar Fretboard Visualizer */}
-            <button
-              onClick={onGuitarFretboard}
-              className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-amber-500/50 transition-colors text-left"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <Guitar className="w-6 h-6 text-amber-400" />
-                <h3 className="font-semibold text-white">Guitar Fretboard</h3>
-                <span className="text-xs bg-amber-600/30 text-amber-300 px-2 py-1 rounded">Beta</span>
-              </div>
-              <p className="text-sm text-gray-400 mb-4">
-                6×25 fretboard with chord progressions and LED matrix output
-              </p>
-              <div className="flex items-center gap-2 text-sm text-amber-400 group-hover:text-amber-300">
-                <span>Launch Guitar</span>
-                <Play className="w-4 h-4" />
-              </div>
-            </button>
+            {/* Drum Machine (Legacy) */}
+            {onStartJamLegacy && (
+              <button
+                onClick={onStartJamLegacy}
+                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-primary-500/50 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <Grid3x3 className="w-6 h-6 text-primary-400" />
+                  <h3 className="font-semibold text-white">Drum Machine</h3>
+                  <span className="text-xs bg-gray-600/30 text-gray-300 px-2 py-1 rounded">Legacy</span>
+                </div>
+                <p className="text-sm text-gray-400 mb-4">
+                  Classic grid-based drum sequencer with sample pads (original version)
+                </p>
+                <div className="flex items-center gap-2 text-sm text-primary-400 group-hover:text-primary-300">
+                  <span>Launch Legacy</span>
+                  <Play className="w-4 h-4" />
+                </div>
+              </button>
+            )}
 
             {/* MIDI Input Test */}
             <button
@@ -335,27 +421,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               </button>
             )}
 
-            {/* Music Studio */}
-            {onStudio && (
-              <button
-                onClick={onStudio}
-                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-indigo-500/50 transition-colors text-left"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <Grid3x3 className="w-6 h-6 text-indigo-400" />
-                  <h3 className="font-semibold text-white">Music Studio</h3>
-                  <span className="text-xs bg-indigo-600/30 text-indigo-300 px-2 py-1 rounded">NEW</span>
-                </div>
-                <p className="text-sm text-gray-400 mb-4">
-                  Dynamic workspace with multiple music modules (Story 4.7)
-                </p>
-                <div className="flex items-center gap-2 text-sm text-indigo-400 group-hover:text-indigo-300">
-                  <span>Launch Studio</span>
-                  <Play className="w-4 h-4" />
-                </div>
-              </button>
-            )}
-
             {/* Chord Melody Arranger */}
             {onChordMelodyTest && (
               <button
@@ -397,81 +462,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 </div>
               </button>
             )}
-
-            {/* DJ Visualizer */}
-            <button
-              onClick={onDJVisualizer}
-              className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-orange-500/50 transition-colors text-left"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <Activity className="w-6 h-6 text-orange-400" />
-                <h3 className="font-semibold text-white">DJ Visualizer</h3>
-                <span className="text-xs bg-orange-600/30 text-orange-300 px-2 py-1 rounded">Beta</span>
-              </div>
-              <p className="text-sm text-gray-400 mb-4">
-                Live audio visualization with spectrum analyzer, ripple effects, and LED matrix output
-              </p>
-              <div className="flex items-center gap-2 text-sm text-orange-400 group-hover:text-orange-300">
-                <span>Launch Visualizer</span>
-                <Play className="w-4 h-4" />
-              </div>
-            </button>
-
-            {/* Multiplayer Jam */}
-            <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
-              <div className="flex items-center gap-3 mb-3">
-                <Users className="w-6 h-6 text-purple-400" />
-                <h3 className="font-semibold text-white">Multiplayer Jam</h3>
-                <span className="text-xs bg-purple-600/30 text-purple-300 px-2 py-1 rounded">New</span>
-              </div>
-              <p className="text-sm text-gray-400 mb-4">
-                Sync with friends using room codes (New version with global music controls)
-              </p>
-              <div className="space-y-2">
-                <button
-                  onClick={onStartJam}
-                  className="btn-primary w-full text-sm px-4 py-2 flex items-center justify-center gap-2"
-                >
-                  <Play className="w-4 h-4" />
-                  Create a Jam Room (New)
-                </button>
-                {!showJoinInput ? (
-                  <button
-                    onClick={() => setShowJoinInput(true)}
-                    className="btn-secondary w-full text-sm px-4 py-2 flex items-center justify-center gap-2"
-                  >
-                    <Users className="w-4 h-4" />
-                    Join a Room
-                  </button>
-                ) : (
-                  <form onSubmit={handleJoinSubmit} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={joinCode}
-                      onChange={(e) => setJoinCode(e.target.value)}
-                      placeholder="Room code"
-                      className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm placeholder-gray-400 focus:border-purple-500 focus:outline-none"
-                      autoFocus
-                    />
-                    <button
-                      type="submit"
-                      className="btn-primary px-4 py-2 text-sm"
-                      disabled={!joinCode.trim()}
-                    >
-                      Join
-                    </button>
-                  </form>
-                )}
-                {onStartJamLegacy && (
-                  <button
-                    onClick={onStartJamLegacy}
-                    className="w-full text-xs px-3 py-1.5 bg-gray-700/50 hover:bg-gray-700 text-gray-400 hover:text-gray-300 rounded transition-colors flex items-center justify-center gap-2"
-                  >
-                    <span>or use Legacy Version</span>
-                  </button>
-                )}
-              </div>
-            </div>
 
             {/* APC40 Demo */}
             <a
