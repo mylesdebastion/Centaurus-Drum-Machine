@@ -49,6 +49,27 @@ function App() {
     };
   }, [location]);
 
+  /**
+   * Hide Crisp chat widget in Education Mode to avoid student distractions
+   */
+  useEffect(() => {
+    // Wait for Crisp to load
+    const checkCrisp = setInterval(() => {
+      if (window.$crisp) {
+        clearInterval(checkCrisp);
+
+        // Hide on Education Mode, show on all other routes
+        if (location.pathname === '/education') {
+          window.$crisp.push(['do', 'chat:hide']);
+        } else {
+          window.$crisp.push(['do', 'chat:show']);
+        }
+      }
+    }, 100);
+
+    return () => clearInterval(checkCrisp);
+  }, [location.pathname]);
+
   const handleStartJam = () => {
     // Check if username exists, if not show modal
     const storedUsername = getStoredUsername();
