@@ -3,4 +3,4 @@ User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: https://centaurus-drum-machine.vercel.app/sitemap.xml
+Sitemap: https://jam.audiolux.app/sitemap.xml
