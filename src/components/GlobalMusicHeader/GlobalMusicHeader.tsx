@@ -15,7 +15,6 @@ import {
 import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import { ScaleSelector } from '../Music/ScaleSelector';
-import { HardwareStatusIndicator } from '../../hardware/ui/HardwareStatusIndicator';
 import { HardwareSettingsModal } from './HardwareSettingsModal';
 import { audioEngine } from '../../utils/audioEngine';
 import { ColorMode } from '../../utils/colorMapping';
