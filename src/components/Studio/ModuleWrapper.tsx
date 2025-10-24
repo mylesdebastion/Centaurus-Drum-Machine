@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { ComponentType } from 'react';
 import { X, Settings } from 'lucide-react';
 
 /**
@@ -10,6 +10,7 @@ interface ModuleWrapperProps {
   moduleId: string;
   label: string;
   color: string; // Tailwind color class (e.g., 'green-400')
+  icon: ComponentType<{ className?: string }>; // Module icon component
   onClose: () => void;
   onSettings?: () => void; // Optional settings toggle callback
   showSettings?: boolean; // Whether settings panel is open (for active state)
@@ -19,6 +20,7 @@ interface ModuleWrapperProps {
 export const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
   label,
   color,
+  icon: Icon,
   onClose,
   onSettings,
   showSettings = false,
@@ -29,7 +31,7 @@ export const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
       {/* Module Header */}
       <div className="flex items-center justify-between px-4 py-2 bg-gray-800/90 border-b border-gray-700">
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full bg-${color}`} />
+          <Icon className={`w-4 h-4 text-${color}`} />
           <h3 className="font-semibold text-white text-sm">{label}</h3>
         </div>
         <div className="flex items-center gap-1">

@@ -107,6 +107,7 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
               moduleId={module.moduleId}
               label={module.label}
               color={definition.color}
+              icon={definition.icon}
               onClose={() => onRemoveModule(module.instanceId)}
               onSettings={() => toggleSettings(module.instanceId)}
               showSettings={openSettings.has(module.instanceId)}
