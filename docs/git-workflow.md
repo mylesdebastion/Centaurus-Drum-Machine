@@ -116,7 +116,19 @@ git push origin --delete feature/my-feature
 
 ## Pre-Push Hook Protection
 
-The `.git/hooks/pre-push` hook automatically checks:
+### Setup (Required Once Per Machine)
+
+After cloning the repository, configure git to use the tracked hooks:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This tells git to use hooks from the `.githooks/` directory (which is version controlled) instead of the default `.git/hooks/` directory.
+
+### Hook Behavior
+
+The `pre-push` hook automatically checks:
 
 ### 1. Build Artifact Prevention
 - **Check**: Scans for `dist/` files in commits
