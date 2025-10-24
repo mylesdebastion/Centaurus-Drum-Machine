@@ -36,12 +36,17 @@ interface GuitarFretboardProps {
    * Module instance ID for routing (when embedded in Studio)
    */
   instanceId?: string;
+  /**
+   * Controlled settings visibility (for Studio module wrapper)
+   */
+  showSettings?: boolean;
 }
 
 export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({
   onBack,
   embedded = false,
-  instanceId = 'guitar-fretboard-standalone'
+  instanceId = 'guitar-fretboard-standalone',
+  showSettings: controlledShowSettings
 }) => {
   // Module Adapter Pattern - Context Detection (Epic 14, Story 14.4)
   const context = useModuleContext();
@@ -54,7 +59,11 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({
   const [chordProgressionEnabled, setChordProgressionEnabled] = useState(false); // Start with no chord selected
   const [localColorMode, setLocalColorMode] = useState<ColorMode>('chromatic');
   const [guitarSynth, setGuitarSynth] = useState<Tone.PolySynth | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
+  const [internalShowSettings, setInternalShowSettings] = useState(false);
+
+  // Use controlled prop if provided, otherwise use internal state
+  const showSettings = controlledShowSettings !== undefined ? controlledShowSettings : internalShowSettings;
+
   const [localIsPlaying, setLocalIsPlaying] = useState(false); // Local playback state
   const [showProgressionMenu, setShowProgressionMenu] = useState(false);
   const [selectedTuning, setSelectedTuning] = useState<GuitarTuning>(GUITAR_TUNINGS[0]); // Standard tuning
@@ -1017,7 +1026,7 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({
               </div>
             )}
             <button
-              onClick={() => setShowSettings(!showSettings)}
+              onClick={() => setInternalShowSettings(!showSettings)}
               className="p-2 hover:bg-gray-700 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
               aria-label="Toggle settings"
             >

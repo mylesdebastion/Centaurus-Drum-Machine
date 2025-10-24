@@ -31,6 +31,7 @@ interface LiveAudioVisualizerProps {
   showModeButtons?: boolean; // When true, shows mode toggle buttons even if hideControls is true
   frequencySource?: FrequencyMixMode; // Override frequency source (for Education Mode)
   onInitialized?: (initialized: boolean) => void; // Callback when audio is initialized/stopped
+  showSettings?: boolean; // Controlled settings visibility (for Studio module wrapper)
 }
 
 export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
@@ -44,7 +45,8 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
   hideControls = false,
   showModeButtons = false,
   frequencySource: controlledFrequencySource,
-  onInitialized
+  onInitialized,
+  showSettings: controlledShowSettings
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioManagerRef = useRef<AudioInputManager | null>(null);
@@ -64,7 +66,11 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
 
   const [gain, setGain] = useState(0.5); // 50%
   const [frequencyScale, setFrequencyScale] = useState<'log' | 'linear' | 'quadratic'>('log');
-  const [showSettings, setShowSettings] = useState(false);
+  const [internalShowSettings, setInternalShowSettings] = useState(false);
+
+  // Use controlled prop if provided, otherwise use internal state
+  const showSettings = controlledShowSettings !== undefined ? controlledShowSettings : internalShowSettings;
+
   const [fps, setFps] = useState(0);
   const [currentRippleDirection, setCurrentRippleDirection] = useState<RippleDirection>('radial');
   const [frequencySource, setFrequencySource] = useState<FrequencyMixMode>('mic-only');
@@ -709,7 +715,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
           )}
 
           <button
-            onClick={() => setShowSettings(!showSettings)}
+            onClick={() => setInternalShowSettings(!showSettings)}
             className={`p-2 rounded-lg transition-colors ${
               showSettings ? 'bg-primary-600 text-white' : 'hover:bg-gray-700 text-gray-400'
             }`}

@@ -26,6 +26,7 @@ interface PianoRollProps {
   settings?: Record<string, any>; // Module settings (for module adapter pattern)
   onSettingsChange?: (settings: Record<string, any>) => void; // Settings callback
   embedded?: boolean; // Whether embedded in Studio
+  showSettings?: boolean; // Controlled settings visibility (for Studio module wrapper)
 }
 
 /**
@@ -47,7 +48,8 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   layout: _layout, // Reserved for module adapter pattern
   settings: _settings, // Reserved for module adapter pattern
   onSettingsChange: _onSettingsChange, // Reserved for module adapter pattern
-  embedded: _embedded = false // Reserved for module adapter pattern
+  embedded: _embedded = false, // Reserved for module adapter pattern
+  showSettings: controlledShowSettings
 }) => {
   // Module Adapter Pattern - Context Detection (Epic 14, Story 14.3)
   const context = useModuleContext();
@@ -85,7 +87,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   const [selectedOutputId, setSelectedOutputId] = useState<string | null>(null);
   const [showKeyMenu, setShowKeyMenu] = useState(false);
   const [showScaleMenu, setShowScaleMenu] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [internalShowSettings, setInternalShowSettings] = useState(false);
+
+  // Use controlled prop if provided, otherwise use internal state
+  const showSettings = controlledShowSettings !== undefined ? controlledShowSettings : internalShowSettings;
+
   const [isAudioReady, setIsAudioReady] = useState(false);
 
   // Chord progression state
@@ -990,7 +996,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
 
               {/* Settings Toggle Button */}
               <button
-                onClick={() => setShowSettings(!showSettings)}
+                onClick={() => setInternalShowSettings(!showSettings)}
                 className={`p-2 hover:bg-gray-700 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center ${
                   showSettings ? 'bg-gray-700' : ''
                 }`}
