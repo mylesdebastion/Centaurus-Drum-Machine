@@ -725,12 +725,12 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
 
       {/* Main Content */}
       <div className={isStandalone ? "flex-1 p-4 overflow-auto" : ""}>
-        <div className="max-w-7xl mx-auto space-y-4">
+        <div className={`max-w-7xl mx-auto ${isStandalone ? 'space-y-4' : 'space-y-2'}`}>
           {/* Piano Visualizer Container */}
-          <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+          <div className={`bg-gray-800 rounded-lg border border-gray-700 ${isStandalone ? 'p-4' : 'p-2'}`}>
             {/* Canvas Header with Controls */}
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-              <h2 className="text-lg font-semibold text-white">Piano Visualizer</h2>
+            <div className={`flex items-center justify-between ${isStandalone ? 'mb-4' : 'mb-2'} flex-wrap gap-3`}>
+              {isStandalone && <h2 className="text-lg font-semibold text-white">Piano Visualizer</h2>}
 
               {/* Main Controls */}
               <div className="flex items-center gap-2 flex-wrap">
@@ -1000,7 +1000,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
               </button>
             </div>
 
-            <div className="h-64 sm:h-80 md:h-96">
+            <div className={isStandalone ? "h-64 sm:h-80 md:h-96" : "h-48 sm:h-56"}>
               <PianoCanvas
                 activeNotes={activeNotes}
                 colorMode={colorMode}

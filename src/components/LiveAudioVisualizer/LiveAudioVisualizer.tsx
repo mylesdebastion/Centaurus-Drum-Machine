@@ -399,31 +399,20 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
   if (embedded) {
     return (
       <div className={`bg-gray-800 rounded-xl p-6 border border-gray-700 ${className}`}>
-        <div className="flex items-center justify-between mb-4 gap-2">
-          <h2 className="text-2xl font-bold flex-shrink-0">Live Audio Visualizer</h2>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            {isInitialized && (
-              <div className="flex gap-2 text-sm font-mono">
-                <div className="text-gray-400 whitespace-nowrap">
-                  <span className="inline-block w-6 text-right">{fps}</span> FPS
-                </div>
-                <div className="text-gray-400 whitespace-nowrap">
-                  <span className="inline-block w-8 text-right">{(rms * 100).toFixed(0)}</span>%
-                </div>
-                <div className="text-gray-400 whitespace-nowrap">
-                  <span className="inline-block w-10 text-right">{peakFreq.frequency.toFixed(0)}</span> Hz
-                </div>
-              </div>
-            )}
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              className="p-3 hover:bg-gray-700 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-              aria-label="Toggle settings"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
+        {/* FPS/Load counters - only show when settings open */}
+        {isInitialized && showSettings && (
+          <div className="flex gap-2 text-sm font-mono mb-4 justify-end">
+            <div className="text-gray-400 whitespace-nowrap">
+              <span className="inline-block w-6 text-right">{fps}</span> FPS
+            </div>
+            <div className="text-gray-400 whitespace-nowrap">
+              <span className="inline-block w-8 text-right">{(rms * 100).toFixed(0)}</span>%
+            </div>
+            <div className="text-gray-400 whitespace-nowrap">
+              <span className="inline-block w-10 text-right">{peakFreq.frequency.toFixed(0)}</span> Hz
+            </div>
           </div>
-        </div>
+        )}
 
         {!isInitialized && !error && (
           <div className="flex items-center justify-center py-12">

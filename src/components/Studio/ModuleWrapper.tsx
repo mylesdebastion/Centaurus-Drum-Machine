@@ -1,5 +1,5 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, Settings } from 'lucide-react';
 
 /**
  * ModuleWrapper - Provides consistent chrome for all modules (Story 4.7)
@@ -11,6 +11,7 @@ interface ModuleWrapperProps {
   label: string;
   color: string; // Tailwind color class (e.g., 'green-400')
   onClose: () => void;
+  onSettings?: () => void; // Optional settings toggle callback
   children: React.ReactNode;
 }
 
@@ -18,6 +19,7 @@ export const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
   label,
   color,
   onClose,
+  onSettings,
   children,
 }) => {
   return (
@@ -28,13 +30,24 @@ export const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
           <div className={`w-2 h-2 rounded-full bg-${color}`} />
           <h3 className="font-semibold text-white text-sm">{label}</h3>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1 hover:bg-gray-700 rounded transition-colors"
-          aria-label={`Close ${label}`}
-        >
-          <X className="w-4 h-4 text-gray-400 hover:text-white" />
-        </button>
+        <div className="flex items-center gap-1">
+          {onSettings && (
+            <button
+              onClick={onSettings}
+              className="p-1 hover:bg-gray-700 rounded transition-colors"
+              aria-label={`${label} settings`}
+            >
+              <Settings className="w-4 h-4 text-gray-400 hover:text-white" />
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-gray-700 rounded transition-colors"
+            aria-label={`Close ${label}`}
+          >
+            <X className="w-4 h-4 text-gray-400 hover:text-white" />
+          </button>
+        </div>
       </div>
 
       {/* Module Content */}

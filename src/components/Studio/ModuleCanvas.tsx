@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { LoadedModule, getModuleDefinition } from './moduleRegistry';
 import { ModuleWrapper } from './ModuleWrapper';
@@ -25,6 +25,20 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
   onRemoveModule,
   onUpdateSettings,
 }) => {
+  // Track which modules have settings open
+  const [openSettings, setOpenSettings] = useState<Set<string>>(new Set());
+
+  const toggleSettings = (instanceId: string) => {
+    setOpenSettings(prev => {
+      const next = new Set(prev);
+      if (next.has(instanceId)) {
+        next.delete(instanceId);
+      } else {
+        next.add(instanceId);
+      }
+      return next;
+    });
+  };
   // Empty state - no modules loaded
   if (modules.length === 0) {
     return (
@@ -94,6 +108,7 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
               label={module.label}
               color={definition.color}
               onClose={() => onRemoveModule(module.instanceId)}
+              onSettings={() => toggleSettings(module.instanceId)}
             >
               <ModuleComponent
                 layout={effectiveLayout}
@@ -103,6 +118,7 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
                 }
                 embedded={true} // For components that support embedded mode (like LiveAudioVisualizer)
                 instanceId={module.instanceId} // Story 15.6: Pass instanceId for module routing
+                showSettings={openSettings.has(module.instanceId)} // Controlled settings state
               />
             </ModuleWrapper>
           </div>

@@ -744,24 +744,12 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({
   if (embedded) {
     return (
       <div className="space-y-4">
-        {/* Compact Header */}
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <Guitar className="w-5 h-5 text-primary-500" />
-            <div>
-              <h2 className="text-lg font-bold text-white">Guitar Fretboard</h2>
-              <p className="text-xs text-gray-400">
-                {progression.name} - {chord.name}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-            aria-label="Toggle settings"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
+        {/* Progression/Chord Info */}
+        <div className="flex items-center gap-2 px-4">
+          <Guitar className="w-5 h-5 text-primary-500" />
+          <p className="text-sm text-gray-300">
+            {progression.name} - {chord.name}
+          </p>
         </div>
 
         {/* Fretboard Canvas */}
