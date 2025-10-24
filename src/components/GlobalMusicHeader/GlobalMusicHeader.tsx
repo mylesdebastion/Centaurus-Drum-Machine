@@ -402,16 +402,6 @@ export const GlobalMusicHeader: React.FC = () => {
                     <div className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full" />
                   )}
                 </button>
-
-                {!isTablet && (
-                  <div className="relative">
-                    <HardwareStatusIndicator
-                      showDeviceInfo={true}
-                      showCompatibilityInfo={true}
-                      className=""
-                    />
-                  </div>
-                )}
               </div>
             </div>
           )}
