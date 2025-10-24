@@ -61,13 +61,16 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
   }
 
   // Render loaded modules with always-mount pattern
-  // Dynamic column count based on number of modules:
-  // 1 module = full width (1 col), 2 modules = 50/50 (2 cols), 3+ modules = 33/33/33 (3 cols)
-  // Breakpoints adjusted for better module readability at narrow widths
+  // Dynamic column count based on number of modules with optimized breakpoints:
+  // - Mobile/tablet: Always 1 column (stacked)
+  // - Desktop (1024px+): 2 columns for better width utilization
+  // - Large desktop (1280px+): 3 columns for 3-4 modules
+  // - Ultra-wide (1536px+): 4 columns for 5+ modules
   const getGridColumns = () => {
-    if (modules.length === 1) return 'grid-cols-1';
-    if (modules.length === 2) return 'grid-cols-1 xl:grid-cols-2'; // 2 cols at 1280px+
-    return 'grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3'; // 3 cols at 1536px+ (wider screens only)
+    if (modules.length === 1) return 'grid-cols-1'; // Single module: always full width
+    if (modules.length === 2) return 'grid-cols-1 lg:grid-cols-2'; // 2 modules: 2 cols at 1024px+
+    if (modules.length <= 4) return 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3'; // 3-4 modules: 2 cols at 1024px, 3 cols at 1280px
+    return 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'; // 5+ modules: 2 cols at 1024px, 3 cols at 1280px, 4 cols at 1536px
   };
 
   return (
