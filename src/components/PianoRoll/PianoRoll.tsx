@@ -994,16 +994,18 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 </div>
               </div>
 
-              {/* Settings Toggle Button */}
-              <button
-                onClick={() => setInternalShowSettings(!showSettings)}
-                className={`p-2 hover:bg-gray-700 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center ${
-                  showSettings ? 'bg-gray-700' : ''
-                }`}
-                aria-label="Toggle settings"
-              >
-                <Settings className="w-5 h-5" />
-              </button>
+              {/* Settings Toggle Button - Only show in standalone mode */}
+              {isStandalone && (
+                <button
+                  onClick={() => setInternalShowSettings(!showSettings)}
+                  className={`p-2 hover:bg-gray-700 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center ${
+                    showSettings ? 'bg-gray-700' : ''
+                  }`}
+                  aria-label="Toggle settings"
+                >
+                  <Settings className="w-5 h-5" />
+                </button>
+              )}
             </div>
 
             <div className={isStandalone ? "h-64 sm:h-80 md:h-96" : "h-48 sm:h-56"}>

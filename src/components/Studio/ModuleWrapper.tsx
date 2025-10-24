@@ -12,6 +12,7 @@ interface ModuleWrapperProps {
   color: string; // Tailwind color class (e.g., 'green-400')
   onClose: () => void;
   onSettings?: () => void; // Optional settings toggle callback
+  showSettings?: boolean; // Whether settings panel is open (for active state)
   children: React.ReactNode;
 }
 
@@ -20,6 +21,7 @@ export const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
   color,
   onClose,
   onSettings,
+  showSettings = false,
   children,
 }) => {
   return (
@@ -34,10 +36,14 @@ export const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
           {onSettings && (
             <button
               onClick={onSettings}
-              className="p-1 hover:bg-gray-700 rounded transition-colors"
+              className={`p-1 rounded transition-colors ${
+                showSettings
+                  ? 'bg-primary-600 text-white'
+                  : 'hover:bg-gray-700 text-gray-400 hover:text-white'
+              }`}
               aria-label={`${label} settings`}
             >
-              <Settings className="w-4 h-4 text-gray-400 hover:text-white" />
+              <Settings className="w-4 h-4" />
             </button>
           )}
           <button

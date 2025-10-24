@@ -109,6 +109,7 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
               color={definition.color}
               onClose={() => onRemoveModule(module.instanceId)}
               onSettings={() => toggleSettings(module.instanceId)}
+              showSettings={openSettings.has(module.instanceId)}
             >
               <ModuleComponent
                 layout={effectiveLayout}
