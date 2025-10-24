@@ -128,10 +128,12 @@ The `.git/hooks/pre-push` hook automatically checks:
 - **Action**: Blocks push if build fails
 - **Reason**: Prevents broken deployments to Vercel
 
-### 3. Main Branch Warning
-- **Check**: Confirms direct pushes to main
-- **Action**: Prompts for confirmation
-- **Reason**: Encourages dev → main workflow
+### 3. Main Branch Protection (Smart Detection)
+- **Check**: Detects merge commits vs direct commits to main
+- **Action**:
+  - ✅ **Merge from dev**: Allowed automatically (standard workflow)
+  - ⚠️ **Direct commit**: Prompts for confirmation
+- **Reason**: Enforces staging validation while allowing smooth merges
 
 ---
 
