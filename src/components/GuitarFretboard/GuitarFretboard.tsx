@@ -753,14 +753,6 @@ export const GuitarFretboard: React.FC<GuitarFretboardProps> = ({
   if (embedded) {
     return (
       <div className="space-y-4">
-        {/* Progression/Chord Info */}
-        <div className="flex items-center gap-2 px-4">
-          <Guitar className="w-5 h-5 text-primary-500" />
-          <p className="text-sm text-gray-300">
-            {progression.name} - {chord.name}
-          </p>
-        </div>
-
         {/* Fretboard Canvas */}
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
           <FretboardCanvas
