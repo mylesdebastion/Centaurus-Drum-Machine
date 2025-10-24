@@ -217,25 +217,6 @@ export const Studio: React.FC<StudioProps> = ({ onBack }) => {
         />
       )}
 
-      {/* Development Info */}
-      {import.meta.env.DEV && (
-        <div className="fixed bottom-4 right-4 bg-blue-900/90 border border-blue-700 rounded-lg p-4 max-w-sm shadow-xl">
-          <h3 className="text-sm font-semibold text-blue-200 mb-2">
-            🚀 Story 4.7: Module Loading System
-          </h3>
-          <p className="text-xs text-blue-100 mb-2">
-            Dynamic workspace with always-mounted modules (JamSession pattern).
-          </p>
-          <div className="text-xs text-blue-200/70 space-y-1">
-            <div>• Desktop: CSS Grid (2-3 columns)</div>
-            <div>• Mobile: Single module + tabs</div>
-            <div>• Audio/viz persist across module changes</div>
-            <div className="pt-2 border-t border-blue-700/50">
-              Loaded: {loadedModules.length} module{loadedModules.length !== 1 ? 's' : ''}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
