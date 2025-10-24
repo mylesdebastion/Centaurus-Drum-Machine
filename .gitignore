@@ -1,7 +1,22 @@
+# Dependencies
 node_modules/
+
+# Build artifacts (Vercel builds from source)
 dist/
-.env
 .vercel/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
 
 # SSL certificates (local only)
 *.pem
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.vscode/
+.idea/
