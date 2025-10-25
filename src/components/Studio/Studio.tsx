@@ -27,6 +27,7 @@ export const Studio: React.FC<StudioProps> = ({ onBack }) => {
     addModule,
     removeModule,
     updateModuleSettings,
+    reorderModules,
   } = useModuleManager();
 
   const [showModuleSelector, setShowModuleSelector] = useState(false);
@@ -189,6 +190,7 @@ export const Studio: React.FC<StudioProps> = ({ onBack }) => {
             onAddModule={() => setShowModuleSelector(true)}
             onRemoveModule={removeModule}
             onUpdateSettings={updateModuleSettings}
+            onReorderModules={reorderModules}
           />
         </div>
       </div>

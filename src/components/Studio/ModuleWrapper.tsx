@@ -14,6 +14,8 @@ interface ModuleWrapperProps {
   onClose: () => void;
   onSettings?: () => void; // Optional settings toggle callback
   showSettings?: boolean; // Whether settings panel is open (for active state)
+  onDragStart?: () => void; // Drag-and-drop start
+  onDragEnd?: () => void; // Drag-and-drop end
   children: React.ReactNode;
 }
 
@@ -24,12 +26,25 @@ export const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
   onClose,
   onSettings,
   showSettings = false,
+  onDragStart,
+  onDragEnd,
   children,
 }) => {
   return (
     <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden h-full flex flex-col">
       {/* Module Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-800/90 border-b border-gray-700">
+      <div
+        className="flex items-center justify-between px-4 py-2 bg-gray-800/90 border-b border-gray-700 cursor-move"
+        draggable={true}
+        onDragStart={(e) => {
+          e.stopPropagation();
+          onDragStart?.();
+        }}
+        onDragEnd={(e) => {
+          e.stopPropagation();
+          onDragEnd?.();
+        }}
+      >
         <div className="flex items-center gap-2">
           <Icon className={`w-4 h-4 text-${color}`} />
           <h3 className="font-semibold text-white text-sm">{label}</h3>

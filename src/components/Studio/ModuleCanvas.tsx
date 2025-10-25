@@ -15,6 +15,7 @@ interface ModuleCanvasProps {
   onAddModule: () => void;
   onRemoveModule: (instanceId: string) => void;
   onUpdateSettings: (instanceId: string, settings: Record<string, any>) => void;
+  onReorderModules: (newOrder: LoadedModule[]) => void;
 }
 
 export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
@@ -24,9 +25,14 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
   onAddModule,
   onRemoveModule,
   onUpdateSettings,
+  onReorderModules,
 }) => {
   // Track which modules have settings open
   const [openSettings, setOpenSettings] = useState<Set<string>>(new Set());
+
+  // Drag-and-drop state
+  const [draggedModuleId, setDraggedModuleId] = useState<string | null>(null);
+  const [dragOverModuleId, setDragOverModuleId] = useState<string | null>(null);
 
   const toggleSettings = (instanceId: string) => {
     setOpenSettings(prev => {
@@ -39,6 +45,55 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
       return next;
     });
   };
+
+  // Drag-and-drop handlers
+  const handleDragStart = (instanceId: string) => {
+    setDraggedModuleId(instanceId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, instanceId: string) => {
+    e.preventDefault(); // Allow drop
+    setDragOverModuleId(instanceId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverModuleId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetInstanceId: string) => {
+    e.preventDefault();
+
+    if (!draggedModuleId || draggedModuleId === targetInstanceId) {
+      setDraggedModuleId(null);
+      setDragOverModuleId(null);
+      return;
+    }
+
+    // Find indices
+    const draggedIndex = modules.findIndex(m => m.instanceId === draggedModuleId);
+    const targetIndex = modules.findIndex(m => m.instanceId === targetInstanceId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedModuleId(null);
+      setDragOverModuleId(null);
+      return;
+    }
+
+    // Reorder array
+    const newModules = [...modules];
+    const [removed] = newModules.splice(draggedIndex, 1);
+    newModules.splice(targetIndex, 0, removed);
+
+    onReorderModules(newModules);
+    setDraggedModuleId(null);
+    setDragOverModuleId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedModuleId(null);
+    setDragOverModuleId(null);
+  };
+
   // Empty state - no modules loaded
   if (modules.length === 0) {
     return (
@@ -101,13 +156,22 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
         // - Desktop with 1 module = 'desktop' layout (full width, use full DrumMachine)
         const effectiveLayout = isMobile || modules.length >= 2 ? 'mobile' : 'desktop';
 
+        const isDragging = draggedModuleId === module.instanceId;
+        const isDraggedOver = dragOverModuleId === module.instanceId;
+
         return (
           <div
             key={module.instanceId}
             className={`
               ${!isActive ? 'hidden' : ''}
               ${isMobile ? 'w-full' : 'h-[650px]'}
+              ${isDragging ? 'opacity-50' : ''}
+              ${isDraggedOver ? 'ring-2 ring-primary-500' : ''}
+              transition-opacity
             `}
+            onDragOver={(e) => handleDragOver(e, module.instanceId)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, module.instanceId)}
           >
             <ModuleWrapper
               moduleId={module.moduleId}
@@ -117,6 +181,8 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
               onClose={() => onRemoveModule(module.instanceId)}
               onSettings={() => toggleSettings(module.instanceId)}
               showSettings={openSettings.has(module.instanceId)}
+              onDragStart={() => handleDragStart(module.instanceId)}
+              onDragEnd={handleDragEnd}
             >
               <ModuleComponent
                 layout={effectiveLayout}
