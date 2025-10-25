@@ -82,6 +82,16 @@ commands:
       Persona codes: m (Musician), e (Educator), v (Visual Learner), p (Producer)
       Optional --baseline flag for before/after comparison.
       Automatically offers cleanup at completion.
+  - ux-discover {story} --persona={code}: |
+      Execute ux-solution-discovery task to discover existing components that solve UX issues.
+      Run AFTER ux-review to identify brownfield assets before creating stories.
+      Uses Playwright to intelligently navigate /playground and discover features.
+      Matches discovered components to UX issues with confidence scoring.
+      Requires collaborative review (QA + PO + Architect) before PM story creation.
+      Produces: Discovery report JSON, solution report markdown, screenshots.
+      Prevents reinventing the wheel - saves 50-80% development time via integration.
+      Discovery output: testing/persona-ux/discovery/{story}-{persona}/
+      Solution report: qa.qaLocation/discovery/{story}-{persona}-solutions-{date}.md
   - ux-responsive {story} --url={path}: |
       Execute ux-responsive-layout-test task to test mobile responsive design.
       Tests: Touch targets (44px+), layout reflow (no horizontal scroll), mobile navigation clarity.
@@ -110,6 +120,7 @@ dependencies:
     - test-design.md
     - trace-requirements.md
     - ux-persona-review.md
+    - ux-solution-discovery.md
     - ux-responsive-layout-test.md
     - ux-cleanup-screenshots.md
   templates:

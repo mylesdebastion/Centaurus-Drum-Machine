@@ -367,6 +367,185 @@ done
 
 Final gate = worst individual persona result
 
+---
+
+## Solution Discovery Workflow
+
+**Purpose**: Prevent reinventing the wheel by discovering existing components that can solve UX issues BEFORE creating new feature stories.
+
+### When to Use
+
+Run `*ux-discover` **after** UX assessment identifies issues and **before** PM creates improvement stories.
+
+**The Problem**: Teams often rush to create stories for new features without checking if solutions already exist in the codebase.
+
+**The Solution**: Intelligent discovery workflow that:
+1. Analyzes UX assessment to extract issue keywords
+2. Uses Playwright to explore `/playground` and key routes
+3. Discovers existing components/features via DOM inspection
+4. AI matches discovered features to persona issues
+5. Categorizes solutions: **Integrate Existing** vs **Build New**
+
+**The Value**:
+- Save 50-80% development time (integration << new development)
+- Discover brownfield assets (features built but not surfaced in tutorials)
+- Inform PO/Architect decisions (technical feasibility, effort estimates)
+- Prevent duplicate functionality
+
+---
+
+### Quick Start: Solution Discovery
+
+**1. Complete UX Assessment First**
+```bash
+# Capture screenshots
+node capture-flow.js --persona=e
+
+# Run UX review
+@qa *ux-review 22.1 --persona=e
+# Outputs: gate file + assessment report
+```
+
+**2. Run Solution Discovery**
+```bash
+@qa *ux-discover 22.1 --persona=e
+```
+
+This executes:
+- Runs `testing/persona-ux/discover-solutions.js` Playwright script
+- Auto-extracts issue keywords from assessment report
+- Navigates `/playground` to discover existing features
+- Matches features to issues with confidence scoring
+- Outputs discovery report JSON + screenshots
+
+**3. Collaborative Review (QA + PO + Architect)**
+
+**CRITICAL**: This is a decision point - DO NOT proceed to stories without review.
+
+For each high-confidence match:
+- **QA (Quinn)**: Presents discovery findings, UX requirements
+- **PO**: Evaluates business value, integration strategy
+- **Architect**: Assesses technical feasibility, effort estimates
+- **Decision**: ✅ INTEGRATE or 🆕 BUILD NEW
+
+**4. PM Creates Stories**
+
+PM uses solution report to create stories informed by discovery:
+- **Integration stories**: "Integrate Chord Arranger into Educator tutorial" (6 hours)
+- **New feature stories**: "Create pricing section component" (1 hour)
+
+---
+
+### Solution Categorization
+
+**✅ High Confidence (≥75%)**: Existing feature clearly matches issue
+- Action: Recommend integration
+- Effort: Low (component reuse)
+- Example: "No visual learning demo" → Chord Arranger found at `/playground` (75% match)
+
+**⚠️ Medium Confidence (50-74%)**: Feature partially matches
+- Action: Requires PO/Architect review
+- Effort: Medium (may need adaptation)
+
+**❌ Low Confidence (<50%)** or **No Match**: No existing solution
+- Action: New feature development needed
+- Effort: High (build from scratch)
+- Example: "No pricing information" → No pricing component found → Build new
+
+---
+
+### Discovery Output
+
+**Discovery Report JSON**: `testing/persona-ux/discovery/{story}-{persona}/discovery-report.json`
+
+```json
+{
+  "solutions": {
+    "existing": [
+      {
+        "issue": "visual learning",
+        "existingFeature": "Chord Arranger",
+        "location": "/playground",
+        "confidence": "75%",
+        "recommendation": "Consider integrating Chord Arranger into Educator tutorial"
+      }
+    ],
+    "newFeaturesNeeded": [
+      {
+        "issue": "pricing",
+        "status": "No existing solution found",
+        "recommendation": "New feature development required"
+      }
+    ]
+  }
+}
+```
+
+**Solution Report Markdown**: `docs/qa/discovery/{story}-{persona}-solutions-{date}.md`
+
+Human-readable report with:
+- Executive summary (issues analyzed, solutions found, effort estimates)
+- Solution mapping (for each issue, show existing solution or new feature required)
+- Integration plan (approach, changes needed, effort, risk)
+- PO decisions (✅ INTEGRATE or 🆕 BUILD NEW)
+- Summary by category (integration vs new development)
+- ROI calculation (time saved by integration)
+
+**Screenshots**: `testing/persona-ux/discovery/{story}-{persona}/screenshots/`
+- Route overviews (`route-playground-{date}.png`)
+- Feature captures as needed
+
+---
+
+### Complete Workflow Example
+
+```bash
+# 1. Complete UX assessment
+@qa *ux-review 22.1 --persona=e
+# Output: docs/qa/assessments/22.1-ux-educator-20251025.md
+# Score: 68/100 (CONCERNS)
+# Issues: No visual learning demo, missing accessibility, no pricing
+
+# 2. Run solution discovery
+@qa *ux-discover 22.1 --persona=e
+# Playwright navigates /playground
+# Discovers: Chord Arranger, Frequency Visualizer
+# Matches: "visual learning" → Chord Arranger (75% confidence)
+# No match: "pricing" → Build new
+
+# 3. Collaborative review (in meeting or async)
+# QA: "Found Chord Arranger at /playground - 75% match for visual learning issue"
+# Architect: "Component has embeddedMode prop, can integrate in 6 hours"
+# PO: "✅ Approve integration - faster than building new"
+
+# 4. PM creates stories
+@pm *create-brownfield-story
+# Story 22.8 Task 1: Integrate Chord Arranger (6h) ✅
+# Story 22.8 Task 3: Create pricing section (1h) 🆕
+# Total effort: 7h (vs 15h if building both new)
+```
+
+---
+
+### Troubleshooting Discovery
+
+**"No features discovered at /playground"**
+- Verify `/playground` route exists: `curl http://localhost:5173/playground`
+- Check if dev server is running
+- Try alternative routes: `/, /studio`
+
+**"Low confidence matches only"**
+- Review screenshots manually (visual inspection)
+- Add manual keywords: `--issues="visual,interactive,color-coded"`
+- Expand discovery routes: `--routes="/playground,/studio,/modules"`
+
+**"Feature exists but not discovered"**
+- Feature may be hidden, modal, or require interaction
+- Manual review of `/playground` in browser
+- Update discover-solutions.js to add navigation steps
+
+---
+
 ## Integration with BMAD
 
 ### Creating Improvement Stories
@@ -521,21 +700,25 @@ See `testing/persona-ux/README.md` for detailed troubleshooting.
 ## Files
 
 **BMAD Extensions:**
-- `.bmad-core/tasks/ux-persona-review.md` - Task definition
+- `.bmad-core/tasks/ux-persona-review.md` - UX review task definition
+- `.bmad-core/tasks/ux-solution-discovery.md` - Solution discovery task definition
 - `.bmad-core/data/persona-contexts.md` - Persona backgrounds
 - `.bmad-core/data/ux-analysis-framework.md` - Evaluation criteria
-- `.bmad-core/agents/qa.md` - Updated with *ux-review command
+- `.bmad-core/agents/qa.md` - Updated with *ux-review and *ux-discover commands
 
 **Testing Infrastructure:**
-- `testing/persona-ux/capture-flow.js` - Playwright capture script
+- `testing/persona-ux/capture-flow.js` - Playwright screenshot capture script
+- `testing/persona-ux/discover-solutions.js` - Playwright feature discovery script
 - `testing/persona-ux/package.json` - Dependencies
 - `testing/persona-ux/README.md` - Detailed usage guide
 
 **Output Locations:**
 - `docs/qa/gates/{epic}.{story}-ux-{persona}.yml` - Gate files
-- `docs/qa/assessments/{epic}.{story}-ux-{persona}-{date}.md` - Reports
+- `docs/qa/assessments/{epic}.{story}-ux-{persona}-{date}.md` - Assessment reports
+- `docs/qa/discovery/{story}-{persona}-solutions-{date}.md` - Solution reports
 - `testing/persona-ux/screenshots/{persona}/` - Raw screenshots
 - `testing/persona-ux/feedback/{persona}/` - Annotated screenshots
+- `testing/persona-ux/discovery/{story}-{persona}/` - Discovery reports + screenshots
 
 ---
 
