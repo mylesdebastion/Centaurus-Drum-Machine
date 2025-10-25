@@ -1,0 +1,5 @@
+# Epic 22 Tools - Python Dependencies
+#
+# Install with: pip install -r tools/requirements.txt
+
+anthropic>=0.39.0
