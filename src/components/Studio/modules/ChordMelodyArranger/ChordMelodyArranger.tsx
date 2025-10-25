@@ -311,6 +311,7 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
           outputTargets={outputTargets}
           currentChord={currentChords[currentChordIndex] || null}
           romanNumeral={selectedProgression?.romanNumerals[currentChordIndex] || ''}
+          embedded={embedded}
         />
       </div>
 

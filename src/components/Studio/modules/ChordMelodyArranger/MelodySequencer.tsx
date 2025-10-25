@@ -45,6 +45,7 @@ export interface MelodySequencerProps {
   outputTargets?: string[]; // Connected output modules
   currentChord?: Chord | null; // Active chord from ChordTimeline (Story 15.7)
   romanNumeral?: string; // Current Roman numeral (for educational display)
+  embedded?: boolean; // Whether in Studio embedded mode (for responsive layout)
 }
 
 /**
@@ -110,6 +111,7 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
   outputTargets: _outputTargets = [],
   currentChord = null,
   romanNumeral = '',
+  embedded = false,
 }) => {
   const { key, scale, colorMode } = useGlobalMusic();
   const melodyService = IntelligentMelodyService.getInstance();
@@ -125,6 +127,7 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
   // Sound engine selection
   const [selectedSoundEngine, setSelectedSoundEngine] = useState<SoundEngineType>('keys');
   const [showSoundMenu, setShowSoundMenu] = useState(false);
+  const [showStepMenu, setShowStepMenu] = useState(false);
   const [showGenerateMenu, setShowGenerateMenu] = useState(false);
 
   // Story 15.9: Multi-page sequencer state
@@ -971,32 +974,33 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
   }, []);
 
   return (
-    <div className="relative bg-gray-800 rounded-lg border border-gray-700 p-4">
+    <div className={`relative bg-gray-800 rounded-lg border border-gray-700 ${embedded ? 'p-2' : 'p-4'}`}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-semibold text-white">Melody Sequencer (64 steps)</h3>
-          {currentChord && romanNumeral && (
-            <p className="text-xs text-gray-400 mt-0.5">
-              Current chord: {romanNumeral} ({currentChord.name})
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">
+      <div className={`flex flex-col gap-2 ${embedded ? 'mb-2' : 'mb-4'}`}>
+        <div className="flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <h3 className={`${embedded ? 'text-sm' : 'text-lg'} font-semibold text-white truncate`}>{embedded ? 'Melody (64 steps)' : 'Melody Sequencer (64 steps)'}</h3>
+            {currentChord && romanNumeral && (
+              <p className="text-xs text-gray-400 mt-0.5 truncate">
+                {romanNumeral} ({currentChord.name})
+              </p>
+            )}
+          </div>
+          <span className={`${embedded ? 'text-xs' : 'text-xs'} text-gray-400 flex-shrink-0 ml-2`}>
             {notes.length} {notes.length === 1 ? 'note' : 'notes'}
           </span>
-
+        </div>
+        <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
           {/* Sound Engine Selector */}
           <div className="relative">
             <button
               onClick={() => setShowSoundMenu(!showSoundMenu)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs font-medium rounded-lg transition-colors min-h-[44px]"
+              className={`flex items-center gap-1 ${embedded ? 'px-2 py-1.5' : 'px-3 py-2'} bg-gray-700 hover:bg-gray-600 text-white text-xs font-medium rounded-lg transition-colors ${embedded ? 'min-h-[36px]' : 'min-h-[44px]'}`}
               aria-label="Select sound engine"
             >
               <Volume2 className="w-4 h-4" />
-              {soundEngineNames[selectedSoundEngine]}
-              <span className="text-xs">▼</span>
+              <span className={embedded ? 'hidden sm:inline' : ''}>{soundEngineNames[selectedSoundEngine]}</span>
+              <ChevronDown className="w-3 h-3" />
             </button>
 
             {showSoundMenu && (
@@ -1021,37 +1025,85 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
             )}
           </div>
 
-          {/* Step Duration Controls */}
+          {/* Step Duration Controls - Dropdown when embedded, buttons when not */}
           {setStepDuration && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-400">Step:</span>
-              {[
-                { value: 0.125, label: '32nd' },
-                { value: 0.25, label: '16th' },
-                { value: 0.5, label: '8th' },
-                { value: 1, label: 'Quarter' },
-                { value: 2, label: 'Half' },
-                { value: 4, label: 'Whole' }
-              ].map(({ value, label }) => (
+            embedded ? (
+              <div className="relative">
                 <button
-                  key={value}
-                  onClick={() => setStepDuration(value)}
-                  className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-colors min-h-[36px] ${
-                    stepDuration === value
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                  aria-label={`${label} note step duration`}
+                  onClick={() => setShowStepMenu(!showStepMenu)}
+                  className="flex items-center gap-1 px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs font-medium rounded-lg transition-colors min-h-[36px]"
+                  aria-label="Select step duration"
                 >
-                  {label}
+                  <span className="text-xs text-gray-400">Step:</span>
+                  <span>
+                    {stepDuration === 0.125 ? '32nd' :
+                     stepDuration === 0.25 ? '16th' :
+                     stepDuration === 0.5 ? '8th' :
+                     stepDuration === 1 ? 'Quarter' :
+                     stepDuration === 2 ? 'Half' : 'Whole'}
+                  </span>
+                  <ChevronDown className="w-3 h-3" />
                 </button>
-              ))}
-            </div>
+
+                {showStepMenu && (
+                  <div className="absolute top-full mt-2 left-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50">
+                    {[
+                      { value: 0.125, label: '32nd' },
+                      { value: 0.25, label: '16th' },
+                      { value: 0.5, label: '8th' },
+                      { value: 1, label: 'Quarter' },
+                      { value: 2, label: 'Half' },
+                      { value: 4, label: 'Whole' }
+                    ].map(({ value, label }) => (
+                      <button
+                        key={value}
+                        onClick={() => {
+                          setStepDuration(value);
+                          setShowStepMenu(false);
+                        }}
+                        className={`w-full px-4 py-2 text-left text-xs transition-colors ${
+                          stepDuration === value
+                            ? 'bg-primary-600 text-white'
+                            : 'text-gray-300 hover:bg-gray-700'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-400">Step:</span>
+                {[
+                  { value: 0.125, label: '32nd' },
+                  { value: 0.25, label: '16th' },
+                  { value: 0.5, label: '8th' },
+                  { value: 1, label: 'Quarter' },
+                  { value: 2, label: 'Half' },
+                  { value: 4, label: 'Whole' }
+                ].map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => setStepDuration(value)}
+                    className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-colors min-h-[36px] ${
+                      stepDuration === value
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                    aria-label={`${label} note step duration`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )
           )}
 
           <button
             onClick={() => setShowHarmonicGuidance(!showHarmonicGuidance)}
-            className={`p-2 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${
+            className={`${embedded ? 'p-1.5' : 'p-2'} rounded-lg transition-colors ${embedded ? 'min-h-[36px] min-w-[36px]' : 'min-h-[44px] min-w-[44px]'} flex items-center justify-center ${
               showHarmonicGuidance
                 ? 'bg-primary-600 hover:bg-primary-700 text-white'
                 : 'hover:bg-gray-700 text-gray-400'
@@ -1063,7 +1115,7 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
           </button>
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className="p-2 hover:bg-gray-700 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className={`${embedded ? 'p-1.5' : 'p-2'} hover:bg-gray-700 rounded-lg transition-colors ${embedded ? 'min-h-[36px] min-w-[36px]' : 'min-h-[44px] min-w-[44px]'} flex items-center justify-center`}
             aria-label="Toggle settings"
           >
             <Settings className="w-4 h-4" />
@@ -1072,7 +1124,7 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
           {/* Auto-Melody Generation Button (Moth drawn to the light) */}
           <button
             onClick={isAutoGenerating ? stopAutoMelodyGeneration : startAutoMelodyGeneration}
-            className={`p-2 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${
+            className={`${embedded ? 'p-1.5' : 'p-2'} rounded-lg transition-colors ${embedded ? 'min-h-[36px] min-w-[36px]' : 'min-h-[44px] min-w-[44px]'} flex items-center justify-center ${
               isAutoGenerating
                 ? 'bg-red-600 hover:bg-red-700 text-white'
                 : 'bg-green-600 hover:bg-green-700 text-white'
@@ -1094,17 +1146,18 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
                 generateMelody();
                 setShowGenerateMenu(false);
               }}
-              className="flex items-center gap-1.5 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-medium rounded-lg transition-colors min-h-[44px]"
+              className={`flex items-center gap-1 ${embedded ? 'px-2 py-1.5' : 'px-3 py-2'} bg-primary-600 hover:bg-primary-700 text-white text-xs font-medium rounded-lg transition-colors ${embedded ? 'min-h-[36px]' : 'min-h-[44px]'}`}
               aria-label={`Generate melody on ${generateScope === 'current' ? 'current page' : 'all active pages'}`}
             >
               <Wand2 className="w-4 h-4" />
-              Generate ({generateScope === 'current' ? 'Current' : 'All Active'})
+              <span className={embedded ? 'hidden sm:inline' : ''}>Generate</span>
+              <span className={embedded ? 'text-[10px]' : 'text-xs'}>({generateScope === 'current' ? 'Current' : 'All'})</span>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowGenerateMenu(!showGenerateMenu);
                 }}
-                className="ml-1 hover:bg-primary-800 rounded p-0.5 transition-colors"
+                className="ml-0.5 hover:bg-primary-800 rounded p-0.5 transition-colors"
                 aria-label="Toggle generation scope"
               >
                 <ChevronDown className="w-3 h-3" />
@@ -1145,7 +1198,7 @@ export const MelodySequencer: React.FC<MelodySequencerProps> = ({
           <button
             onClick={clearAllNotes}
             disabled={notes.length === 0}
-            className="p-2 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className={`${embedded ? 'p-1.5' : 'p-2'} hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors ${embedded ? 'min-h-[36px] min-w-[36px]' : 'min-h-[44px] min-w-[44px]'} flex items-center justify-center`}
             aria-label="Clear all notes"
           >
             <Trash2 className="w-4 h-4" />
