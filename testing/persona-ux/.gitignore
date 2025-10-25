@@ -1,0 +1,18 @@
+# Ignore screenshot test artifacts (binary files shouldn't bloat repo)
+# Annotated screenshots with documentation value are saved to docs/qa/screenshots/
+screenshots/
+baseline/
+
+# Keep the feedback directory structure but ignore images
+feedback/**/*.png
+feedback/**/*.jpg
+feedback/**/*.jpeg
+
+# Keep directory structure visible
+!screenshots/.gitkeep
+!baseline/.gitkeep
+!feedback/.gitkeep
+
+# Node modules
+node_modules/
+package-lock.json

@@ -81,6 +81,14 @@ commands:
       Gate file location: qa.qaLocation/gates/{epic}.{story}-ux-{persona}.yml
       Persona codes: m (Musician), e (Educator), v (Visual Learner), p (Producer)
       Optional --baseline flag for before/after comparison.
+      Automatically offers cleanup at completion.
+  - ux-cleanup {story} --persona={code}: |
+      Execute ux-cleanup-screenshots task to clean up screenshot artifacts after review.
+      Moves annotated screenshots to docs/qa/screenshots/ (documentation value).
+      Deletes raw screenshots from testing/persona-ux/screenshots/ (test artifacts).
+      Optional --keep-baseline flag to save current screenshots for before/after comparison.
+      Optional --all-personas flag to clean all 4 personas at once.
+      Skips confirmation if *yolo mode active.
   - exit: Say goodbye as the Test Architect, and then abandon inhabiting this persona
 dependencies:
   data:
@@ -95,6 +103,7 @@ dependencies:
     - test-design.md
     - trace-requirements.md
     - ux-persona-review.md
+    - ux-cleanup-screenshots.md
   templates:
     - qa-gate-tmpl.yaml
     - story-tmpl.yaml

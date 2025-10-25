@@ -4,15 +4,19 @@
  * Captures screenshots of persona tutorial flows for visual analysis.
  *
  * Usage:
- *   node capture-flow.js --persona=m --url="/?v=m"
- *   node capture-flow.js --persona=e --url="/?v=e"
+ *   node capture-flow.js --story=22.1 --persona=m
+ *   node capture-flow.js --story=22.1 --persona=e --url="/?v=e"
  *
  * Options:
+ *   --story=epic.story Story ID for organization (default: adhoc)
  *   --persona=m|e|v|p  Persona code (required)
  *   --url=path         URL path to test (default: /?v={persona})
  *   --base=url         Base URL (default: http://localhost:5173)
  *   --mobile-only      Only capture mobile viewport
  *   --desktop-only     Only capture desktop viewport
+ *
+ * Screenshots saved to: testing/persona-ux/screenshots/{story}-{persona}/
+ * Filename format: {story}-{persona}-{step}-{viewport}-{date}.png
  */
 
 const { chromium } = require('playwright');
@@ -27,6 +31,7 @@ const args = process.argv.slice(2).reduce((acc, arg) => {
 }, {});
 
 const PERSONA_CODE = args.persona;
+const STORY_ID = args.story || 'adhoc'; // e.g., "22.1"
 const BASE_URL = args.base || 'http://localhost:5173';
 const URL_PATH = args.url || `/?v=${PERSONA_CODE}`;
 const MOBILE_ONLY = args['mobile-only'];
@@ -55,7 +60,8 @@ if (!PERSONA_CODE || !PERSONAS[PERSONA_CODE]) {
 
 const persona = PERSONAS[PERSONA_CODE];
 const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '');
-const screenshotDir = path.join(__dirname, 'screenshots', PERSONA_CODE);
+// Organize by story/persona: screenshots/22.1-m/
+const screenshotDir = path.join(__dirname, 'screenshots', `${STORY_ID}-${PERSONA_CODE}`);
 
 // Ensure screenshot directory exists
 if (!fs.existsSync(screenshotDir)) {
@@ -73,7 +79,9 @@ console.log(`Timestamp: ${timestamp}\n`);
  * Capture screenshot with retry logic
  */
 async function captureScreenshot(page, stepName, viewport) {
-  const filename = `${timestamp}-${stepName}-${viewport}.png`;
+  // Filename format: {story}-{persona}-{step}-{viewport}-{date}.png
+  // Example: 22.1-m-step2-desktop-20250125.png
+  const filename = `${STORY_ID}-${PERSONA_CODE}-${stepName}-${viewport}-${timestamp}.png`;
   const filepath = path.join(screenshotDir, filename);
 
   try {

@@ -451,3 +451,65 @@ After review:
 3. Save annotated screenshots to feedback directory
 4. Recommend status: "UX approved" or "UX needs revision"
 5. Tag issues with suggested owner: `dev` (code), `design` (visual), `pm` (scope/messaging)
+6. **Offer screenshot cleanup** (unless *yolo mode - then auto-cleanup)
+
+### Screenshot Cleanup Prompt
+
+After generating all outputs, prompt user:
+
+```
+✅ UX Review Complete
+
+Gate: {PASS|CONCERNS|FAIL} ({score}/100)
+Report: docs/qa/assessments/{epic}.{story}-ux-{persona}-{date}.md
+Annotated screenshots: testing/persona-ux/feedback/{story}-{persona}/
+Raw screenshots: testing/persona-ux/screenshots/{story}-{persona}/
+
+Screenshot cleanup options:
+  1. Move annotated to docs/qa/screenshots/ and delete raw (recommended)
+  2. Keep baseline for before/after comparison
+  3. Skip cleanup (keep all files)
+
+Clean up screenshots? (Y/n)
+Create baseline for next review? (y/N)
+```
+
+**If user says yes to cleanup:**
+- Execute ux-cleanup-screenshots task
+- Move annotated screenshots to `docs/qa/screenshots/{story}-{persona}/`
+- Delete raw screenshots from `testing/persona-ux/screenshots/{story}-{persona}/`
+- Update gate file screenshot paths to new location
+
+**If user says yes to baseline:**
+- Copy current screenshots to `testing/persona-ux/baseline/{story}-{persona}/`
+- Create baseline.json metadata file
+- These will be used for before/after comparison in next review
+
+**If *yolo mode active:**
+- Automatically move annotated screenshots
+- Automatically delete raw screenshots
+- Skip baseline (unless explicitly requested with --keep-baseline flag)
+- Log actions without confirmation prompts
+
+### Final Summary
+
+```
+🎉 UX Review and Cleanup Complete
+
+Preserved:
+  ✓ Gate file: docs/qa/gates/{epic}.{story}-ux-{persona}.yml
+  ✓ Report: docs/qa/assessments/{epic}.{story}-ux-{persona}-{date}.md
+  ✓ Annotated screenshots: docs/qa/screenshots/{story}-{persona}/ ({X} files)
+  {if baseline}
+  ✓ Baseline saved: testing/persona-ux/baseline/{story}-{persona}/ ({Y} files)
+  {endif}
+
+Cleaned:
+  ✓ Deleted raw screenshots (freed {Z} MB)
+
+Next steps:
+  1. Review findings: docs/qa/assessments/{epic}.{story}-ux-{persona}-{date}.md
+  2. Address critical issues (see "Immediate Actions" section)
+  3. Re-capture and review after fixes
+  4. Compare against baseline to verify improvements
+```
