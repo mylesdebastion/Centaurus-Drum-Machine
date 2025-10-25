@@ -229,17 +229,17 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
     <>
       <div className="flex flex-col h-full bg-gray-900 text-white">
         {/* Module Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-700">
-        <div className="flex items-center gap-3">
-          <Music className="w-6 h-6 text-purple-400" />
-          <div>
-            <h2 className="text-xl font-bold">Chord & Melody Arranger</h2>
-            <p className="text-xs text-gray-400">
-              {progressionDisplayName} • Key: {keyScaleDisplay}
+        <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${embedded ? 'p-2' : 'p-4'} border-b border-gray-700`}>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Music className={`${embedded ? 'w-5 h-5' : 'w-6 h-6'} text-purple-400 flex-shrink-0`} />
+          <div className="min-w-0 flex-1">
+            <h2 className={`${embedded ? 'text-base' : 'text-xl'} font-bold truncate`}>{embedded ? 'Chord/Melody' : 'Chord & Melody Arranger'}</h2>
+            <p className="text-xs text-gray-400 truncate">
+              {progressionDisplayName} • {keyScaleDisplay}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           <OutputSelector
             sourceInstanceId={instanceId}
             selectedTargets={outputTargets}
@@ -251,18 +251,20 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
           />
           <button
             onClick={isPlaying ? handlePause : handlePlay}
-            className="p-3 bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className={`${embedded ? 'p-2' : 'p-3'} bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center`}
             aria-label={isPlaying ? 'Pause progression' : 'Play progression'}
           >
-            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+            {isPlaying ? <Pause className={`${embedded ? 'w-4 h-4' : 'w-5 h-5'}`} /> : <Play className={`${embedded ? 'w-4 h-4' : 'w-5 h-5'}`} />}
           </button>
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="p-2 hover:bg-gray-700 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-            aria-label="Toggle settings"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
+          {!embedded && (
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="p-2 hover:bg-gray-700 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+              aria-label="Toggle settings"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          )}
           {!embedded && onBack && (
             <button
               onClick={onBack}
@@ -275,12 +277,13 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-auto p-4 space-y-4">
+      <div className={`flex-1 overflow-auto ${embedded ? 'p-2 space-y-2' : 'p-4 space-y-4'}`}>
         {/* Chord Builder Section */}
         <ChordBuilder
           selectedProgression={selectedProgression}
           onProgressionSelect={setSelectedProgression}
           onClearProgression={handleClearProgression}
+          embedded={embedded}
         />
 
         {/* Chord Timeline */}

@@ -17,12 +17,14 @@ export interface ChordBuilderProps {
   selectedProgression: RomanNumeralProgression | null;
   onProgressionSelect: (progression: RomanNumeralProgression) => void;
   onClearProgression?: () => void;
+  embedded?: boolean;
 }
 
 export const ChordBuilder: React.FC<ChordBuilderProps> = ({
   selectedProgression,
   onProgressionSelect,
   onClearProgression,
+  embedded = false,
 }) => {
   const service = ChordProgressionService.getInstance();
   const { key } = useGlobalMusic();
@@ -85,10 +87,10 @@ export const ChordBuilder: React.FC<ChordBuilderProps> = ({
     : 'Select Chord Progression...';
 
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+    <div className={`bg-gray-800 rounded-lg border border-gray-700 ${embedded ? 'p-2' : 'p-4'}`}>
       {/* Header with Clear Button */}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white">Chord Progressions</h3>
+      <div className={`flex items-center justify-between ${embedded ? 'mb-2' : 'mb-4'}`}>
+        <h3 className={`${embedded ? 'text-sm' : 'text-lg'} font-semibold text-white`}>{embedded ? 'Chords' : 'Chord Progressions'}</h3>
         {selectedProgression && onClearProgression && (
           <button
             onClick={onClearProgression}
@@ -105,10 +107,10 @@ export const ChordBuilder: React.FC<ChordBuilderProps> = ({
       <div ref={dropdownRef} className="relative">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors flex items-center justify-between min-h-[44px]"
+          className={`w-full ${embedded ? 'px-2 py-2' : 'px-4 py-3'} bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors flex items-center justify-between min-h-[44px]`}
           aria-label="Toggle chord progression selector"
         >
-          <span className="text-sm">{selectedDisplay}</span>
+          <span className={`${embedded ? 'text-xs truncate' : 'text-sm'}`}>{selectedDisplay}</span>
           <ChevronDown
             className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
           />
