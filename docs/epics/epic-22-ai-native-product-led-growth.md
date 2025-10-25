@@ -525,7 +525,7 @@ Different personas have different behaviors and value. Track metrics separately 
 | 2025-10-25 | Story 22.1 deployed | Multi-path onboarding live (PersonaSelector + 4 tutorials + routing) |
 | 2025-10-25 | Story 22.2 deployed | AI outreach generator ready (Python CLI + Claude API integration) |
 | 2025-10-25 | Story 22.3 deployed | Analytics tracking live (referral attribution + dashboard + CSV export) |
-| TBD | Story 22.4 deployed | Viral loops active |
+| 2025-10-25 | Story 22.4 component ready | Share modal created, integration pending (Week 1-2) |
 | TBD | Week 4 checkpoint | 160+ users milestone |
 | TBD | Week 12 checkpoint | 6,700+ users milestone |
 
