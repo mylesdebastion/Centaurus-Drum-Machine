@@ -97,6 +97,8 @@ For each screenshot, analyze using `ux-analysis-framework.md`:
 
 **Persona Voice:** "As a {persona}, the first thing I see is... The second thing is... I'm looking for {goal} but I see..."
 
+**What Would Help Me:** "{Persona suggests what they need in their own words}"
+
 #### B. Layout & Responsiveness
 
 **Scoring:**
@@ -111,6 +113,8 @@ For each screenshot, analyze using `ux-analysis-framework.md`:
 - [ ] Touch targets are ≥44px (mobile accessibility)
 
 **Persona Voice:** "On my phone, I can't... The spacing feels... Elements are..."
+
+**What Would Help Me:** "{Persona suggests layout improvements in their words}"
 
 #### C. Cognitive Load
 
@@ -127,6 +131,8 @@ For each screenshot, analyze using `ux-analysis-framework.md`:
 
 **Persona Voice:** "I don't understand what... There's too much... I just want to... Why are they asking me about...?"
 
+**What Would Help Me:** "{Persona suggests how to reduce cognitive load}"
+
 #### D. Emotional Response
 
 **Scoring:**
@@ -142,6 +148,8 @@ For each screenshot, analyze using `ux-analysis-framework.md`:
 
 **Persona Voice:** "This feels... I'm excited about... This makes me nervous because... I'd bail if..."
 
+**What Would Help Me:** "{Persona suggests what would make them feel confident/excited/engaged}"
+
 #### E. Persona-Specific Friction
 
 **Check against persona context:**
@@ -153,6 +161,8 @@ For each screenshot, analyze using `ux-analysis-framework.md`:
 
 **Persona Voice:** "Why are they showing me... I don't care about... What I actually need is... This assumes I know..."
 
+**What Would Help Me:** "{Persona suggests features/changes that align with their specific goals}"
+
 ### Step 4: Screenshot Annotation
 
 For each identified issue:
@@ -160,6 +170,25 @@ For each identified issue:
 2. Label with issue type: [HIERARCHY] [LAYOUT] [COGNITIVE] [EMOTIONAL] [FRICTION]
 3. Note severity: CRITICAL / MAJOR / MINOR
 4. Provide persona voice quote
+5. Add "What Would Help Me" persona suggestion
+
+**Annotation Format:**
+```
+[RED/ORANGE/YELLOW BOX around element]
+❌ CRITICAL/MAJOR/MINOR: [Category] - [Issue Description]
+Persona Voice: "[Reaction/frustration in their words]"
+What Would Help Me: "[Persona suggests solution in their words]"
+Fix: [Specific technical action to implement]
+```
+
+**Example:**
+```
+[RED BOX around "Configure MIDI Input" heading]
+❌ CRITICAL: Cognitive Load + Persona Friction
+Persona Voice (Musician): "MIDI? Audio buffer? I just want to jam! This is way too technical for me."
+What Would Help Me (Musician): "Just show me a picture of a keyboard or tell me I can use my computer keys. I need to know I can start right now without buying anything."
+Fix: Replace with "Connect Your Keyboard (Optional)" + visual preview + "Computer keyboard works too!" callout
+```
 
 **Save annotated images:** `testing/persona-ux/feedback/{persona_code}/{YYYYMMDD}-{step}-annotated.png`
 
@@ -220,6 +249,7 @@ ux_review:
       description: 'Tutorial feels intimidating to non-technical musicians'
       screenshot: 'testing/persona-ux/feedback/m/20250125-step2-annotated.png'
       persona_voice: '"This assumes I know what a MIDI device is - I just want to jam!"'
+      what_would_help_me: '"Just show me I can start with what I have. A picture of a keyboard or mouse would help. Tell me I don''t need special equipment."'
       suggested_fix: 'Replace technical jargon with simple music terms'
   recommendations:
     immediate: # Fix before launch
@@ -309,6 +339,7 @@ Flow Tested: {flow_url}
 1. **[EMOTIONAL] Tutorial intimidates non-technical users**
    - Location: Step 2 - Equipment Setup
    - Persona Voice: "MIDI controller? Audio buffer? I have no idea what this means!"
+   - What Would Help Me: "Just tell me I can use my computer keyboard or show me a simple picture. I need to know I don't need to buy anything special to get started."
    - Impact: Users will abandon tutorial
    - Suggested Fix: Replace with: "Connect your gear (optional - keyboard works too!)"
    - Screenshot: `step2-annotated.png`
