@@ -54,6 +54,102 @@
 
 ---
 
+## Routing Strategy: /playground for Developer Access
+
+**DECISION (2025-10-25)**: Move current WelcomeScreen (experiment browser) from `/` to `/playground` to make room for Epic 22 onboarding.
+
+### Current State
+- `jam.audiolux.app` → WelcomeScreen with 16+ experiment buttons (Piano, Guitar, MIDI Test, WLED Manager, etc.)
+- **Problem**: Overwhelming for new users (70-90% estimated bounce rate)
+- **Problem**: No guided onboarding, users don't know where to start
+
+### New Route Structure
+
+| Route | Shows | User Type |
+|-------|-------|-----------|
+| `/` | OnboardingRouter → PersonaSelector or Tutorial | New users (95% of traffic) |
+| `/playground` | WelcomeScreen (experiment browser) | Developers, power users |
+| `/studio` | Music Studio (direct access) | Everyone |
+| `/jam` | Jam Session (direct access) | Everyone |
+| All other routes | Unchanged (direct access) | Everyone |
+
+### User Flows
+
+**New User** (`jam.audiolux.app`):
+```
+Landing → PersonaSelector (4 cards) → Tutorial (30-60s) → Studio/Jam
+```
+
+**New User with Persona URL** (`jam.audiolux.app?v=e`):
+```
+Landing → Tutorial starts immediately → Studio/Jam
+```
+
+**Returning User** (`jam.audiolux.app`):
+```
+Landing → Check localStorage → hasCompletedOnboarding? → Redirect to /studio
+```
+
+**Developer** (`jam.audiolux.app/playground`):
+```
+Landing → WelcomeScreen (same as current) → All experiments
+```
+
+### Implementation
+
+**Step 1**: Move WelcomeScreen route (App.tsx):
+```typescript
+// BEFORE:
+<Route path="/" element={<WelcomeScreen ... />} />
+
+// AFTER:
+<Route path="/" element={<OnboardingRouter />} />
+<Route path="/playground" element={<WelcomeScreen ... />} />
+```
+
+**Step 2**: Add footer link for discoverability:
+```typescript
+<Footer>
+  <Link to="/playground">🧪 Developer Playground</Link>
+</Footer>
+```
+
+**Step 3**: Announce in Discord:
+- "Experiment browser moved to /playground"
+- "Bookmark jam.audiolux.app/playground for quick access"
+- "All existing routes still work (/studio, /piano, /midi-test, etc.)"
+
+### Benefits
+
+**For New Users**:
+- ✅ Guided onboarding (40%+ conversion vs. 10-30% with experiment grid)
+- ✅ Persona-specific experience (Educator sees teaching tools, Musician sees instruments)
+- ✅ Clear path to value (<60 seconds to first "aha moment")
+
+**For Developers**:
+- ✅ Zero disruption (just bookmark /playground)
+- ✅ All experiments still accessible
+- ✅ All direct routes still work (/studio, /piano, etc.)
+
+**For Power Users**:
+- ✅ Discoverable via footer link
+- ✅ Can still explore all features
+- ✅ No account/onboarding required (skip to /playground)
+
+### Risks & Mitigation
+
+**Risk**: Developers/power users can't find experiments
+- **Mitigation**: Footer link "🧪 Developer Playground"
+- **Mitigation**: Discord announcement
+- **Mitigation**: All direct routes still work
+
+**Risk**: Existing bookmarks break
+- **Impact**: Low (anyone who bookmarked specific routes like /studio will still work)
+- **Impact**: Medium (anyone who bookmarked / will see onboarding instead of WelcomeScreen)
+- **Mitigation**: Temporary redirect banner: "Looking for experiments? Visit /playground"
+
+---
+
 ## Success Criteria
 
 **UPDATED**: Targets adjusted for phased rollout
