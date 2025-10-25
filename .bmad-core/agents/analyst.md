@@ -59,6 +59,7 @@ commands:
   - help: Show numbered list of the following commands to allow selection
   - brainstorm {topic}: Facilitate structured brainstorming session (run task facilitate-brainstorming-session.md with template brainstorming-output-tmpl.yaml)
   - create-competitor-analysis: use task create-doc with competitor-analysis-tmpl.yaml
+  - create-persona: Create user persona document (run task create-persona.md with template persona-tmpl.yaml)
   - create-project-brief: use task create-doc with project-brief-tmpl.yaml
   - doc-out: Output full document in progress to current destination file
   - elicit: run the task advanced-elicitation
@@ -74,11 +75,13 @@ dependencies:
     - advanced-elicitation.md
     - create-deep-research-prompt.md
     - create-doc.md
+    - create-persona.md
     - document-project.md
     - facilitate-brainstorming-session.md
   templates:
     - brainstorming-output-tmpl.yaml
     - competitor-analysis-tmpl.yaml
     - market-research-tmpl.yaml
+    - persona-tmpl.yaml
     - project-brief-tmpl.yaml
 ```

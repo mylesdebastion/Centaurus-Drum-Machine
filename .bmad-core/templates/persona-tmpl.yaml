@@ -1,0 +1,151 @@
+persona_code: '{code}' # Single letter code (m/d/e/v/p/i or new)
+persona_name: '{name}' # User-facing name (e.g., "Musician", "Educator")
+persona_slug: '{slug}' # Filename slug (auto-generated from name)
+primary_need: '{need}' # What they want in one sentence
+budget: '{budget}' # Free, $10/mo, $199/yr, etc.
+url_parameter: '?v={code}'
+example_url: 'jam.audiolux.app?v={code}&r=hash'
+
+demographics:
+  age_range: '{age_range}' # e.g., 16-45
+  experience_level: '{level}' # beginner/intermediate/advanced
+  budget_detail: '{budget_detail}' # Free tier or $10/mo Pro
+  platforms: # Where they hang out
+    - '{platform_1}' # e.g., Reddit (r/musicproduction)
+    - '{platform_2}' # e.g., Discord (music communities)
+    - '{platform_3}' # e.g., YouTube
+
+who_they_are: # 3-5 sentence description
+  - '{description_1}'
+  - '{description_2}'
+  - '{description_3}'
+
+pain_points: # 3-5 frustrations in their own words
+  - '{pain_1}' # e.g., "I just want to make a beat, not learn a PhD program"
+  - '{pain_2}'
+  - '{pain_3}'
+
+goals: # What they want to accomplish
+  - '{goal_1}' # Primary goal
+  - '{goal_2}' # Secondary goal
+  - '{goal_3}' # Long-term aspiration
+
+user_journey:
+  hook:
+    duration: '3 sec'
+    content: '{hook}' # e.g., "Make a beat in 30 seconds. No download needed."
+
+  tutorial:
+    duration: '{tutorial_duration}' # e.g., 25 sec
+    steps:
+      - '{step_1}' # e.g., Load drum sequencer
+      - '{step_2}' # e.g., Tap 4 kick drum beats
+      - '{step_3}' # e.g., Press play
+
+  celebration:
+    duration: '5 sec'
+    content: '{celebration}' # e.g., "You just made music in your browser 🎹"
+    share_prompt: '{share_prompt}' # e.g., "Jam with a friend"
+
+messaging:
+  headline: '{headline}' # e.g., "Browser-based music creation"
+  subhead: '{subhead}' # e.g., "Make beats, collaborate live, no download needed"
+  cta: '{cta}' # e.g., "Start creating (free)"
+
+success_metrics:
+  engagement: '{engagement_metric}' # e.g., 60%+ tutorial completion
+  conversion: '{conversion_metric}' # e.g., 15%+ convert to Pro after 3 sessions
+  retention: '{retention_metric}' # e.g., 30%+ create jam session after tutorial
+
+outreach_targets:
+  communities: # Reddit, Discord, Facebook, etc.
+    - '{community_1}'
+    - '{community_2}'
+    - '{community_3}'
+
+  influencers: # Optional - high priority advocates
+    - name: '{influencer_1}'
+      platform: '{platform}'
+      reach: '{reach}' # e.g., 4.4M TikTok followers
+      why: '{why}' # e.g., ASL music content creator
+
+  conferences: # Optional - events/conferences
+    - '{conference_1}'
+
+tutorial_modules_used: # From reusable module library
+  - module: '{module_1}' # e.g., Quick Beat Creation
+    duration: '{duration}' # e.g., 20-25s
+  - module: '{module_2}' # e.g., Collaboration Demo
+    duration: '{duration}' # e.g., 10-15s
+
+language_preferences:
+  yes_terms: # Terms/phrases that resonate (use these)
+    - '{yes_1}' # e.g., "Jam, beat, loop, tempo, create"
+    - '{yes_2}'
+
+  no_terms: # Terms/phrases that alienate (avoid these)
+    - '{no_1}' # e.g., "MIDI configuration, buffer settings"
+    - '{no_2}'
+
+bailout_triggers: # What makes them quit
+  - '{bailout_1}' # e.g., Tutorial >5 steps or >60 seconds
+  - '{bailout_2}' # e.g., See "configuration" before making sound
+  - '{bailout_3}' # e.g., Need to read paragraphs of text
+
+trust_factors: # What makes them trust us
+  - '{trust_1}' # e.g., Immediate sound output (within 10 seconds)
+  - '{trust_2}' # e.g., Visual workflow (see the pattern grid)
+  - '{trust_3}' # e.g., Free tier removes risk
+
+conversion_factors: # What makes them convert (or advocate)
+  - '{conversion_1}' # e.g., Hit project limit (3 projects in Free tier)
+  - '{conversion_2}' # e.g., Want to collaborate on >2 sessions
+  - '{conversion_3}' # e.g., Discover advanced modules
+
+# Optional fields (context-dependent):
+
+specific_needs_addressed: # For accessibility/specialized personas
+  - '{need_1}' # e.g., "✅ Visual music theory (no reliance on hearing)"
+  - '{need_2}'
+
+community_influence_potential: # For advocacy personas
+  high_advocacy_rate: '{boolean}' # true/false
+  key_influencers:
+    - name: '{name}'
+      reach: '{reach}'
+  description: '{description}' # e.g., "Deaf community is tight-knit and shares accessible tools widely"
+
+pricing_tiers: # For paid/enterprise personas
+  - tier: '{tier_1}' # e.g., Free
+    price: '{price}' # e.g., $0
+    features:
+      - '{feature_1}'
+      - '{feature_2}'
+
+  - tier: '{tier_2}' # e.g., Pro
+    price: '{price}' # e.g., $10/mo
+    features:
+      - '{feature_1}'
+      - '{feature_2}'
+
+decision_making_process: # For enterprise personas
+  steps:
+    - week: '{week_1}' # e.g., Week 1
+      action: '{action}' # e.g., Discovery via LinkedIn
+    - week: '{week_2}'
+      action: '{action}'
+  timeline: '{timeline}' # e.g., 8-12 weeks from discovery to paid license
+
+roi_calculation: # For enterprise personas
+  traditional_solution:
+    name: '{solution_name}' # e.g., Ableton
+    cost: '{cost}' # e.g., $6,000 (30 seats × $200)
+    it_setup: '{setup_time}' # e.g., 6 weeks
+    accessibility: '{accessibility}' # e.g., Limited
+
+  audiolux_solution:
+    cost: '{cost}' # e.g., $199/year
+    it_setup: '{setup_time}' # e.g., 0 weeks
+    accessibility: '{accessibility}' # e.g., Full
+
+  savings: '{savings}' # e.g., $5,801/year (97% reduction)

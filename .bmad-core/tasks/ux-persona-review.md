@@ -43,8 +43,9 @@ npx playwright install chromium
 
 ```yaml
 data:
-  - persona-contexts.md # Detailed persona backgrounds, goals, frustrations
   - ux-analysis-framework.md # Visual hierarchy checklist, layout evaluation criteria
+external:
+  - docs/personas/{persona_code}-*.md # Canonical persona documents (m/d/e/v/p/i)
 ```
 
 ## Process
@@ -68,15 +69,25 @@ node testing/persona-ux/capture-flow.js --persona={persona_code} --url={flow_url
 
 ### Step 2: Load Persona Context
 
-Read `persona-contexts.md` to embody the persona:
+Read canonical persona document from `docs/personas/{persona_code}-*.md`:
 
 **For each persona, internalize:**
-- Background: Who are they? What's their experience level?
-- Goals: What do they want to accomplish? Why are they here?
-- Frustrations: What annoys them? What makes them bail?
-- Decision Criteria: "I'd quit if...", "I'd trust this if..."
-- Attention Span: How patient are they with tutorials?
-- Technical Comfort: What jargon is okay? What's intimidating?
+- Who They Are: Background, experience level, context
+- Demographics: Age range, budget, platforms
+- Pain Points: What frustrates them? (in their own words)
+- Goals: What do they want to accomplish?
+- Bailout Triggers: "I'd quit if..." scenarios
+- Language Preferences: YES terms (use) vs NO terms (avoid)
+- Trust Factors: What makes them trust us?
+- Conversion Factors: What makes them convert or advocate?
+
+**Map persona codes to files:**
+- `m` → docs/personas/m-musician.md
+- `d` → docs/personas/d-deaf-hoh.md
+- `e` → docs/personas/e-educator.md
+- `v` → docs/personas/v-visual-learner.md
+- `p` → docs/personas/p-producer.md
+- `i` → docs/personas/i-enterprise.md
 
 ### Step 3: Visual Analysis Framework
 
