@@ -80,7 +80,7 @@ export const Studio: React.FC<StudioProps> = ({ onBack }) => {
 
       {/* Studio Header */}
       <div className="bg-gray-800/50 border-b border-gray-700 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="max-w-7xl 3xl:max-w-[95%] mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={onBack}
@@ -122,7 +122,7 @@ export const Studio: React.FC<StudioProps> = ({ onBack }) => {
       {/* LED Compositor Panel */}
       {showCompositorPanel && (
         <div className="bg-gray-800/90 border-b border-gray-700 px-4 py-4">
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-7xl 3xl:max-w-[95%] mx-auto">
             <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
               <Layers className="w-4 h-4 text-accent-400" />
               LED Compositor (Epic 14, Story 14.7)
@@ -181,7 +181,7 @@ export const Studio: React.FC<StudioProps> = ({ onBack }) => {
 
       {/* Content Area */}
       <div className="p-6 pb-24 md:pb-6">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl 3xl:max-w-[95%] mx-auto">
           <ModuleCanvas
             modules={loadedModules}
             activeModuleId={activeModuleId}

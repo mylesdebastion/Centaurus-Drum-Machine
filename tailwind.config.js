@@ -6,6 +6,10 @@ export default {
   ],
   theme: {
     extend: {
+      screens: {
+        '3xl': '2560px', // Ultra-wide displays
+        '4xl': '3440px', // Super ultra-wide displays
+      },
       colors: {
         primary: {
           50: '#f0f9ff',

@@ -64,13 +64,16 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
   // Dynamic column count based on number of modules with optimized breakpoints:
   // - Mobile/tablet: Always 1 column (stacked)
   // - Desktop (1024px+): 2 columns for better width utilization
-  // - Large desktop (1280px+): 3 columns for 3-4 modules
-  // - Ultra-wide (1536px+): 4 columns for 5+ modules
+  // - Large desktop (1280px+): 3 columns
+  // - Ultra-wide (2560px+): 5 columns
+  // - Super ultra-wide (3440px+): 6 columns
   const getGridColumns = () => {
     if (modules.length === 1) return 'grid-cols-1'; // Single module: always full width
-    if (modules.length === 2) return 'grid-cols-1 lg:grid-cols-2'; // 2 modules: 2 cols at 1024px+
-    if (modules.length <= 4) return 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3'; // 3-4 modules: 2 cols at 1024px, 3 cols at 1280px
-    return 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'; // 5+ modules: 2 cols at 1024px, 3 cols at 1280px, 4 cols at 1536px
+    if (modules.length === 2) return 'grid-cols-1 lg:grid-cols-2 3xl:grid-cols-2'; // 2 modules: 2 cols (even on ultra-wide)
+    if (modules.length === 3) return 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-3'; // 3 modules: max 3 cols
+    if (modules.length === 4) return 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4'; // 4 modules: 4 cols at 2560px+
+    if (modules.length === 5) return 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5'; // 5 modules: 5 cols at 2560px+
+    return 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 4xl:grid-cols-6'; // 6+ modules: 6 cols at 3440px+
   };
 
   return (
