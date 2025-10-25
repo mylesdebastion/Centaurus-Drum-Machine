@@ -1,0 +1,128 @@
+schema: 1
+story: '22.1'
+gate: CONCERNS
+status_reason: 'Educator tutorial missing critical accessibility features and visual learning demo - breaks promise to "teach music visually"'
+reviewer: 'Quinn (Test Architect) - Educator Persona'
+updated: '2025-10-25T14:18:00Z'
+
+ux_review:
+  persona: e
+  persona_name: Educator
+  score: 68
+  screenshots_analyzed: 5
+  issues:
+    critical: 3
+    major: 2
+    minor: 2
+
+  categories:
+    visual_hierarchy: PASS
+    layout_responsive: PASS
+    cognitive_load: CONCERNS
+    emotional_response: FAIL
+    persona_friction: FAIL
+
+  top_issues:
+    - severity: critical
+      category: emotional_response
+      description: "No hands-on visual learning demo during tutorial"
+      screenshot: "testing/persona-ux/screenshots/22.1-e/22.1-e-step2-desktop-20251025-1418.png"
+      persona_voice: "You promised I could 'teach music visually' but I never SAW students learning visually! The Chord Arranger sounds great, but SHOW me the color-coded notes, SHOW me students seeing theory as they create. I need to see this working before I bring it to my classroom."
+      what_would_help_me: "Embed a live preview of the Chord Arranger with color-coded notes. Let me click a chord and SEE the visual feedback. Show me what my students will experience, not just tell me about it."
+      suggested_fix: "Add interactive Chord Arranger preview in Step 2 - let educator click C major chord and see color visualization"
+      refs: ['src/components/Onboarding/tutorials/EducatorTutorial.tsx']
+
+    - severity: critical
+      category: persona_friction
+      description: "Missing accessibility features mention (Deaf/HOH support)"
+      screenshot: "testing/persona-ux/screenshots/22.1-e/22.1-e-completion-desktop-20251025-1418.png"
+      persona_voice: "I teach Deaf and hard-of-hearing students. You said this is 'inclusive for everyone' in the landing page, but WHERE are the accessibility features? I need to know students can SEE music, not just hear it. This is a dealbreaker for my classroom."
+      what_would_help_me: "Add a step showing visual feedback features: color-coded notes, visual waveforms, frequency visualizer. Say explicitly: 'Students can SEE music - perfect for Deaf/HOH learners.'"
+      suggested_fix: "Add Step 4: Accessibility Tour showing visual music features and stating 'Accessible for Deaf, HOH, and visual learners'"
+      refs: ['src/components/Onboarding/tutorials/EducatorTutorial.tsx', 'docs/personas/e-educator.md:87-91']
+
+    - severity: critical
+      category: persona_friction
+      description: "No pricing information for budget approval"
+      screenshot: "testing/persona-ux/screenshots/22.1-e/22.1-e-completion-desktop-20251025-1418.png"
+      persona_voice: "I need to request budget approval from my principal. HOW MUCH does the classroom license cost? I can't move forward without knowing if it's $50 or $500. I need this number NOW to start the approval process."
+      what_would_help_me: "Show pricing clearly: '$199/year classroom license (30 students)'. Let me know I can afford this and it's under my discretionary budget threshold ($200)."
+      suggested_fix: "Add pricing to completion screen: 'Classroom License: $199/yr (30 students) - Start free 30-day trial'"
+      refs: ['src/components/Onboarding/tutorials/EducatorTutorial.tsx', 'docs/personas/e-educator.md:131-135']
+
+    - severity: major
+      category: cognitive_load
+      description: "Technical jargon: '6-character code' intimidates non-tech teachers"
+      screenshot: "testing/persona-ux/screenshots/22.1-e/22.1-e-step3-desktop-20251025-1418.png"
+      persona_voice: "'6-character code' sounds technical. I'm a music teacher, not a computer teacher! Just say 'easy code students can type' or show me an example like 'ABC123' so I know it's simple."
+      what_would_help_me: "Say: 'Share a simple code (like ABC123) - students type it in and they're connected!' Remove technical terms."
+      suggested_fix: "Replace '6-character code' with 'easy join code (like ABC123)' and show example code"
+      refs: ['src/components/Onboarding/tutorials/EducatorTutorial.tsx']
+
+    - severity: major
+      category: persona_friction
+      description: "No explicit Chromebook compatibility confirmation"
+      screenshot: "testing/persona-ux/screenshots/22.1-e/22.1-e-step1-desktop-20251025-1418.png"
+      persona_voice: "My school uses Chromebooks. The 'no software installation' message is good, but I need to hear you say 'Works on Chromebooks' explicitly. That's our IT standard and I need confirmation before I invest time learning this."
+      what_would_help_me: "Add: 'Works perfectly on Chromebooks, iPads, and PCs - no installation needed'"
+      suggested_fix: "Update Step 1 subtitle to include explicit Chromebook mention"
+      refs: ['src/components/Onboarding/tutorials/EducatorTutorial.tsx']
+
+  bailout_assessment:
+    bailout_triggers_hit:
+      - "Missing accessibility features (critical for inclusive classroom mandate)"
+      - "No pricing information (can't request budget approval without it)"
+      - "Visual learning not demonstrated (tutorial told, didn't show)"
+    bailout_probability: 50%
+    bailout_point: "Completion screen (realizes accessibility features weren't shown, pricing unknown)"
+    reasoning: "Educator is excited by collaboration features but can't commit without: (1) seeing visual learning in action, (2) knowing accessibility works for diverse students, (3) having a price to present to administration"
+
+  recommendations:
+    immediate:
+      - action: "Add interactive visual learning demo in Step 2"
+        impact: "Shows color-coded notes, proves 'teach visually' claim"
+        effort: "4 hours"
+        refs: ['src/components/Onboarding/tutorials/EducatorTutorial.tsx']
+
+      - action: "Add Accessibility Tour step (Step 4)"
+        impact: "Shows visual feedback for Deaf/HOH, addresses inclusive mandate"
+        effort: "3 hours"
+        refs: ['src/components/Onboarding/tutorials/EducatorTutorial.tsx']
+
+      - action: "Add pricing to completion screen"
+        impact: "Enables budget approval process, removes friction"
+        effort: "30 minutes"
+        refs: ['src/components/Onboarding/tutorials/EducatorTutorial.tsx']
+
+    future:
+      - action: "Replace technical jargon with teacher-friendly language"
+        impact: "Reduces cognitive load for non-tech educators"
+        effort: "1 hour"
+
+      - action: "Add explicit Chromebook compatibility badge"
+        impact: "Confirms IT infrastructure compatibility"
+        effort: "30 minutes"
+
+  positive_findings:
+    - "Step 1 clearly states 'no software installation' (addresses IT approval pain point)"
+    - "Collaboration focus (Jam Session) aligns perfectly with classroom teaching goals"
+    - "Tutorial duration (45s) is appropriate for educator evaluation"
+    - "'Ready to Teach!' completion messaging uses persona-appropriate language"
+    - "Two CTAs give flexibility (explore solo or start class session immediately)"
+
+  overall_assessment: |
+    The Educator tutorial has strong collaboration messaging and addresses
+    the "no installation" pain point, but fails to deliver on its core
+    promise: visual music education for inclusive classrooms.
+
+    Three critical gaps:
+    1. No visual learning demonstration (told about Chord Arranger, never shown)
+    2. Accessibility features completely absent (dealbreaker for inclusive education)
+    3. No pricing information (blocks budget approval process)
+
+    The tutorial feels like it's describing a great product but not showing it.
+    Educators need to SEE visual learning in action and CONFIRM accessibility
+    features work before committing to a classroom tool.
+
+    With fixes, score would jump to 85+ (PASS). Without fixes, 50% bailout risk
+    at completion when educator realizes they don't have enough info to proceed.
