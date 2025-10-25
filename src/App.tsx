@@ -7,6 +7,7 @@ import { WelcomeScreen } from './components/Welcome/WelcomeScreen';
 import { OnboardingRouter } from './components/Onboarding/OnboardingRouter';
 import { AnalyticsDashboard } from './components/Analytics/AnalyticsDashboard';
 import { JamSession } from './components/JamSession/JamSession';
+import '@/utils/devShortcuts'; // Load dev shortcuts globally
 import { JamSessionLegacy } from './components/JamSessionLegacy/JamSessionLegacy';
 import { EducationMode } from './components/Education/EducationMode';
 import { IsometricSequencer } from './components/IsometricSequencer/IsometricSequencer';

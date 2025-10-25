@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { Music, BookOpen, Eye, Sliders } from 'lucide-react';
+import { Music, BookOpen, Eye, Sliders, RotateCcw } from 'lucide-react';
 import { PersonaCode, getPersonaConfig } from '@/utils/personaCodes';
+import { resetOnboarding } from '@/utils/devShortcuts';
 
 /**
  * PersonaSelector - Epic 22 Story 22.1
@@ -106,12 +107,26 @@ export function PersonaSelector() {
           <p className="text-gray-500 text-sm mb-4">
             Not sure? Just pick one - you can explore all features later!
           </p>
-          <button
-            onClick={() => navigate('/playground')}
-            className="text-primary-400 hover:text-primary-300 text-sm transition-colors"
-          >
-            🧪 Skip to Developer Playground
-          </button>
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={() => navigate('/playground')}
+              className="text-primary-400 hover:text-primary-300 text-sm transition-colors"
+            >
+              🧪 Skip to Developer Playground
+            </button>
+            <span className="text-gray-600">•</span>
+            <button
+              onClick={() => {
+                resetOnboarding();
+                window.location.reload();
+              }}
+              className="text-gray-500 hover:text-gray-400 text-sm transition-colors flex items-center gap-1"
+              title="Reset onboarding (Ctrl+Shift+R)"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Dev Reset
+            </button>
+          </div>
         </div>
       </div>
     </div>
