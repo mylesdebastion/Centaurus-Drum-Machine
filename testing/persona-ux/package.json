@@ -1,0 +1,13 @@
+{
+  "name": "audiolux-persona-ux-testing",
+  "version": "1.0.0",
+  "description": "Playwright-based UX testing for persona tutorials",
+  "main": "capture-flow.js",
+  "scripts": {
+    "capture": "node capture-flow.js",
+    "install-browsers": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}

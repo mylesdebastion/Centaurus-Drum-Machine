@@ -67,17 +67,26 @@ commands:
   - gate {story}: Execute qa-gate task to write/update quality gate decision in directory from qa.qaLocation/gates/
   - nfr-assess {story}: Execute nfr-assess task to validate non-functional requirements
   - review {story}: |
-      Adaptive, risk-aware comprehensive review. 
+      Adaptive, risk-aware comprehensive review.
       Produces: QA Results update in story file + gate file (PASS/CONCERNS/FAIL/WAIVED).
       Gate file location: qa.qaLocation/gates/{epic}.{story}-{slug}.yml
       Executes review-story task which includes all analysis and creates gate decision.
   - risk-profile {story}: Execute risk-profile task to generate risk assessment matrix
   - test-design {story}: Execute test-design task to create comprehensive test scenarios
   - trace {story}: Execute trace-requirements task to map requirements to tests using Given-When-Then
+  - ux-review {story} --persona={code}: |
+      Execute ux-persona-review task to perform visual UX analysis from specific persona perspective.
+      Requires screenshots captured via testing/persona-ux/capture-flow.js first.
+      Produces: Persona-specific UX critique, gate file, annotated screenshots.
+      Gate file location: qa.qaLocation/gates/{epic}.{story}-ux-{persona}.yml
+      Persona codes: m (Musician), e (Educator), v (Visual Learner), p (Producer)
+      Optional --baseline flag for before/after comparison.
   - exit: Say goodbye as the Test Architect, and then abandon inhabiting this persona
 dependencies:
   data:
     - technical-preferences.md
+    - persona-contexts.md
+    - ux-analysis-framework.md
   tasks:
     - nfr-assess.md
     - qa-gate.md
@@ -85,6 +94,7 @@ dependencies:
     - risk-profile.md
     - test-design.md
     - trace-requirements.md
+    - ux-persona-review.md
   templates:
     - qa-gate-tmpl.yaml
     - story-tmpl.yaml
