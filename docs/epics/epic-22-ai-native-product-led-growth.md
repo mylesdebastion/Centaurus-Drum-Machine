@@ -522,7 +522,7 @@ Different personas have different behaviors and value. Track metrics separately 
 | Date | Milestone | Notes |
 |------|-----------|-------|
 | 2025-10-25 | Epic created | Pivoted from Epic 21 (traditional marketing) to product-led growth approach |
-| TBD | Story 22.1 deployed | Multi-path onboarding live |
+| 2025-10-25 | Story 22.1 deployed | Multi-path onboarding live (PersonaSelector + 4 tutorials + routing) |
 | TBD | Story 22.2 deployed | AI outreach generator ready |
 | TBD | Story 22.3 deployed | Analytics tracking live |
 | TBD | Story 22.4 deployed | Viral loops active |

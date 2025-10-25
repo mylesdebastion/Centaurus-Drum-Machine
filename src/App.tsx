@@ -4,6 +4,7 @@ import { GlobalMusicProvider } from './contexts/GlobalMusicContext';
 import { HardwareManager } from './hardware';
 import { audioEngine, TransportState } from './utils/audioEngine';
 import { WelcomeScreen } from './components/Welcome/WelcomeScreen';
+import { OnboardingRouter } from './components/Onboarding/OnboardingRouter';
 import { JamSession } from './components/JamSession/JamSession';
 import { JamSessionLegacy } from './components/JamSessionLegacy/JamSessionLegacy';
 import { EducationMode } from './components/Education/EducationMode';
@@ -292,6 +293,10 @@ function App() {
         <Routes>
         <Route
           path="/"
+          element={<OnboardingRouter />}
+        />
+        <Route
+          path="/playground"
           element={
             <WelcomeScreen
               onStartJam={handleStartJam}
