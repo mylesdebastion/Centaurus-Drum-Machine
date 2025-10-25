@@ -1,5 +1,5 @@
 import React, { ComponentType } from 'react';
-import { X, Settings } from 'lucide-react';
+import { X, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 
 /**
  * ModuleWrapper - Provides consistent chrome for all modules (Story 4.7)
@@ -16,6 +16,8 @@ interface ModuleWrapperProps {
   showSettings?: boolean; // Whether settings panel is open (for active state)
   onDragStart?: () => void; // Drag-and-drop start
   onDragEnd?: () => void; // Drag-and-drop end
+  isMinimized?: boolean; // Whether module is minimized
+  onToggleMinimize?: () => void; // Toggle minimize state
   children: React.ReactNode;
 }
 
@@ -28,13 +30,15 @@ export const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
   showSettings = false,
   onDragStart,
   onDragEnd,
+  isMinimized = false,
+  onToggleMinimize,
   children,
 }) => {
   return (
     <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden h-full flex flex-col">
       {/* Module Header */}
       <div
-        className="flex items-center justify-between px-4 py-2 bg-gray-800/90 border-b border-gray-700 cursor-move"
+        className="flex items-center justify-between px-4 py-2 bg-gray-800/90 border-b border-gray-700 cursor-move select-none"
         draggable={true}
         onDragStart={(e) => {
           e.stopPropagation();
@@ -44,15 +48,31 @@ export const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
           e.stopPropagation();
           onDragEnd?.();
         }}
+        onClick={(e) => {
+          // Only toggle minimize if clicking on the header itself, not on buttons
+          if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.module-header-content')) {
+            onToggleMinimize?.();
+          }
+        }}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 module-header-content">
           <Icon className={`w-4 h-4 text-${color}`} />
           <h3 className="font-semibold text-white text-sm">{label}</h3>
+          {onToggleMinimize && (
+            isMinimized ? (
+              <ChevronDown className="w-4 h-4 text-gray-400" />
+            ) : (
+              <ChevronUp className="w-4 h-4 text-gray-400" />
+            )
+          )}
         </div>
         <div className="flex items-center gap-1">
           {onSettings && (
             <button
-              onClick={onSettings}
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent minimize toggle
+                onSettings();
+              }}
               className={`p-1 rounded transition-colors ${
                 showSettings
                   ? 'bg-primary-600 text-white'
@@ -64,7 +84,10 @@ export const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
             </button>
           )}
           <button
-            onClick={onClose}
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent minimize toggle
+              onClose();
+            }}
             className="p-1 hover:bg-gray-700 rounded transition-colors"
             aria-label={`Close ${label}`}
           >
@@ -73,10 +96,12 @@ export const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
         </div>
       </div>
 
-      {/* Module Content */}
-      <div className="flex-1 overflow-auto">
-        {children}
-      </div>
+      {/* Module Content - Only render when not minimized */}
+      {!isMinimized && (
+        <div className="flex-1 overflow-auto">
+          {children}
+        </div>
+      )}
     </div>
   );
 };

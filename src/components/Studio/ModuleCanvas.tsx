@@ -30,12 +30,27 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
   // Track which modules have settings open
   const [openSettings, setOpenSettings] = useState<Set<string>>(new Set());
 
+  // Track which modules are minimized
+  const [minimizedModules, setMinimizedModules] = useState<Set<string>>(new Set());
+
   // Drag-and-drop state
   const [draggedModuleId, setDraggedModuleId] = useState<string | null>(null);
   const [dragOverModuleId, setDragOverModuleId] = useState<string | null>(null);
 
   const toggleSettings = (instanceId: string) => {
     setOpenSettings(prev => {
+      const next = new Set(prev);
+      if (next.has(instanceId)) {
+        next.delete(instanceId);
+      } else {
+        next.add(instanceId);
+      }
+      return next;
+    });
+  };
+
+  const toggleMinimize = (instanceId: string) => {
+    setMinimizedModules(prev => {
       const next = new Set(prev);
       if (next.has(instanceId)) {
         next.delete(instanceId);
@@ -158,13 +173,14 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
 
         const isDragging = draggedModuleId === module.instanceId;
         const isDraggedOver = dragOverModuleId === module.instanceId;
+        const isMinimized = minimizedModules.has(module.instanceId);
 
         return (
           <div
             key={module.instanceId}
             className={`
               ${!isActive ? 'hidden' : ''}
-              ${isMobile ? 'w-full' : 'h-[650px]'}
+              ${isMobile ? 'w-full' : (isMinimized ? 'h-auto' : 'h-[650px]')}
               ${isDragging ? 'opacity-50' : ''}
               ${isDraggedOver ? 'ring-2 ring-primary-500' : ''}
               transition-opacity
@@ -183,6 +199,8 @@ export const ModuleCanvas: React.FC<ModuleCanvasProps> = ({
               showSettings={openSettings.has(module.instanceId)}
               onDragStart={() => handleDragStart(module.instanceId)}
               onDragEnd={handleDragEnd}
+              isMinimized={isMinimized}
+              onToggleMinimize={() => toggleMinimize(module.instanceId)}
             >
               <ModuleComponent
                 layout={effectiveLayout}
