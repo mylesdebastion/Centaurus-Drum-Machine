@@ -50,14 +50,16 @@ node capture-flow.js --persona=m
 
 ### 1. Playwright Captures Screenshots
 
-The capture script navigates through the tutorial flow and takes screenshots at each step for both mobile and desktop viewports.
+The capture script navigates through the tutorial flow and takes screenshots at each step.
 
 **What it captures:**
 - Initial landing/selector screen
 - Each tutorial step
 - Completion/CTA screen
-- Mobile viewport (375px - iPhone SE)
-- Desktop viewport (1920px)
+- **Desktop viewport (1920px)** - Default for regular personas (m, e, v, p)
+- **Mobile viewport (375px)** - Only for responsive persona testing
+
+**Note:** Regular persona testing defaults to desktop-only to speed up testing. Use `--mobile-only` flag if needed, or use `persona=responsive` for mobile-specific testing.
 
 ### 2. QA Agent Embodies Persona
 
@@ -197,28 +199,159 @@ ux_review:
    - Address CRITICAL issues first
    - Implement recommendations
 
-5. **Baseline** (optional)
+5. **Clean up** (after review)
    ```bash
-   cp -r testing/persona-ux/screenshots/m/ testing/persona-ux/baseline/m/
+   @qa *ux-cleanup 22.1 --persona=m --keep-baseline
    ```
 
-### Re-Review After Fixes
+   This:
+   - Moves annotated screenshots to `docs/qa/screenshots/`
+   - Saves baseline to `testing/persona-ux/baseline/22.1-m/`
+   - Creates `baseline.json` with score and issues
+   - Deletes raw screenshots from `testing/persona-ux/screenshots/`
 
-1. **Re-capture**
-   ```bash
-   node capture-flow.js --persona=m
-   ```
+---
 
-2. **Review with baseline**
-   ```bash
-   @qa *ux-review 22.1 --persona=m --baseline
-   ```
+## Re-Testing After Fixes
 
-3. **Compare**
-   - Before: 65/100 (CONCERNS)
-   - After: 85/100 (PASS)
-   - Improvement: +20 points
-   - Issues resolved: 2 CRITICAL, 3 MAJOR
+After implementing UX improvements, you have **two testing strategies**:
+
+### Strategy A: Fresh Review (Independent Assessment)
+
+**Use when:** You want an unbiased evaluation of the new UX.
+
+**Steps:**
+```bash
+# 1. Clean up old test artifacts (no baseline)
+@qa *ux-cleanup 22.1 --persona=m
+# Deletes screenshots, moves annotated to docs/
+
+# 2. Implement fixes
+# ... code changes ...
+
+# 3. Re-capture screenshots
+cd testing/persona-ux
+node capture-flow.js --persona=m
+# Creates: adhoc-m-step1-desktop-20251026-0915.png (new timestamp)
+
+# 4. Fresh review (no comparison)
+@qa *ux-review 22.1 --persona=m
+# Agent analyzes as if seeing UX for first time
+# Outputs new gate and report
+```
+
+**Result:** New independent score, no explicit comparison to previous review.
+
+**Best for:**
+- Major redesigns
+- Testing if agent naturally finds fewer issues
+- Avoiding bias from previous findings
+
+---
+
+### Strategy B: Before/After Comparison (Improvement Validation)
+
+**Use when:** You want to validate specific fixes and see score delta.
+
+**Steps:**
+```bash
+# 1. Save baseline after first review
+@qa *ux-cleanup 22.1 --persona=m --keep-baseline
+# Saves screenshots + baseline.json to testing/persona-ux/baseline/22.1-m/
+# baseline.json contains: score, gate, issues, categories
+
+# 2. Implement fixes
+# ... code changes ...
+
+# 3. Re-capture screenshots
+cd testing/persona-ux
+node capture-flow.js --persona=m
+# Creates new screenshots with new timestamp
+
+# 4. Comparison review
+@qa *ux-review 22.1 --persona=m --baseline
+# Agent loads baseline.json + baseline screenshots
+# Compares old vs new side-by-side
+# Outputs comparison report with:
+#   - Score delta (72 → 90 = +18)
+#   - Issues resolved ✅
+#   - Issues persisting ⚠️
+#   - New issues introduced ❌
+```
+
+**Result:** Explicit before/after comparison showing improvements and regressions.
+
+**Best for:**
+- Validating that critical issues were fixed
+- Quantifying improvement (for PRs/reports)
+- Catching regressions introduced by fixes
+
+---
+
+### Comparison Report Example
+
+When using `--baseline`, the report includes:
+
+```markdown
+## Before/After Comparison
+
+**Previous Review:** 2025-10-25 | 72/100 | CONCERNS
+**Current Review:** 2025-10-26 | 90/100 | PASS
+**Change:** +18 points (CONCERNS → PASS)
+
+### Issues Resolved ✅
+
+#### 1. Text Wall Before Action (Step 2) - FIXED
+- **Baseline:** 3-paragraph explanation before user takes action
+- **Current:** Step removed entirely, user goes straight to interaction
+- **Impact:** Saved 10s, eliminated cognitive load
+
+### New Issues Introduced ❌
+
+#### 1. Auto-Advance Too Fast - REGRESSION
+- **Severity:** MAJOR
+- **Description:** Interactive step auto-advances after 2 seconds
+- **Persona Voice:** "Wait, I didn't even get to click!"
+- **Fix:** Replace timer with "Continue" button
+```
+
+---
+
+### Screenshot Management (Re-Testing)
+
+**Timestamps prevent overwrites:**
+- First test: `adhoc-m-step1-desktop-20251025-1430.png`
+- Same-day re-test: `adhoc-m-step1-desktop-20251025-1615.png` (different time)
+- Next-day re-test: `adhoc-m-step1-desktop-20251026-0915.png` (different date)
+
+**Multiple captures accumulate:**
+```
+testing/persona-ux/screenshots/22.1-m/
+  adhoc-m-step1-desktop-20251025-1430.png  (first capture)
+  adhoc-m-step1-desktop-20251025-1615.png  (second capture, same day)
+  adhoc-m-step1-desktop-20251026-0915.png  (third capture, next day)
+```
+
+**Clean up between tests:**
+- Use `*ux-cleanup` to delete old screenshots before re-testing
+- Or keep baseline for comparison with `--keep-baseline`
+- Agent analyzes newest screenshots (latest timestamp) by default
+
+---
+
+### Decision Tree: Which Strategy?
+
+```
+After implementing fixes, ask:
+
+┌─ "Do I want explicit comparison to previous review?"
+│
+├─ YES → Strategy B (Baseline Comparison)
+│  └─ Use: *ux-cleanup --keep-baseline → *ux-review --baseline
+│
+└─ NO → Strategy A (Fresh Review)
+   └─ Use: *ux-cleanup → *ux-review
+```
 
 ### Testing All Personas
 

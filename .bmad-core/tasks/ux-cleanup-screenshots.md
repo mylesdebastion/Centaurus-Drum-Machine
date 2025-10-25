@@ -133,16 +133,46 @@ cp testing/persona-ux/screenshots/{story}-{persona}/*.png \
 ```
 
 **Create baseline metadata:**
+
+Extract from completed gate file (`docs/qa/gates/{epic}.{story}-ux-{persona}.yml`):
+
 ```json
 {
   "story": "{story}",
   "persona": "{persona}",
-  "date": "{ISO-8601}",
-  "ux_score": XX,
+  "date": "{ISO-8601 with time}",
+  "timestamp": "{YYYYMMDD-HHMM}",
+  "ux_score": 72,
   "gate": "PASS|CONCERNS|FAIL",
+  "issues": {
+    "critical": 3,
+    "major": 2,
+    "minor": 3
+  },
+  "categories": {
+    "visual_hierarchy": "PASS|CONCERNS|FAIL",
+    "layout_responsive": "PASS|CONCERNS|FAIL",
+    "cognitive_load": "PASS|CONCERNS|FAIL",
+    "emotional_response": "PASS|CONCERNS|FAIL",
+    "persona_friction": "PASS|CONCERNS|FAIL"
+  },
+  "top_issues": [
+    {
+      "severity": "critical|major|minor",
+      "category": "category_name",
+      "description": "Brief issue description"
+    }
+  ],
   "note": "Baseline for before/after comparison"
 }
 ```
+
+**Source data from:**
+- `ux_score`: From gate YAML `ux_review.score`
+- `gate`: From gate YAML `gate` field
+- `issues`: Count from gate YAML `ux_review.issues`
+- `categories`: From gate YAML `ux_review.categories`
+- `top_issues`: From gate YAML `ux_review.top_issues` (first 3-5 critical/major)
 
 Save to: `testing/persona-ux/baseline/{story}-{persona}/baseline.json`
 

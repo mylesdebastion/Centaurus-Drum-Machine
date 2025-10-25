@@ -89,6 +89,87 @@ Read canonical persona document from `docs/personas/{persona_code}-*.md`:
 - `p` → docs/personas/p-producer.md
 - `i` → docs/personas/i-enterprise.md
 
+### Step 2B: Load Baseline (If --baseline Flag Provided)
+
+**Execute this step ONLY if baseline comparison was requested.**
+
+#### Check Baseline Exists
+
+**Location:** `testing/persona-ux/baseline/{story}-{persona}/`
+
+**Required files:**
+- `baseline.json` - Metadata from previous review
+- Screenshot PNGs with previous timestamps
+
+**If baseline not found:**
+- Warn user: "Baseline not found. Run cleanup with --keep-baseline after first review."
+- Abort comparison, proceed with fresh review only
+
+#### Load Baseline Metadata
+
+Read `baseline.json`:
+
+```json
+{
+  "story": "22.1",
+  "persona": "m",
+  "date": "2025-10-25T14:30:00Z",
+  "timestamp": "20251025-1430",
+  "ux_score": 72,
+  "gate": "CONCERNS",
+  "issues": {
+    "critical": 3,
+    "major": 2,
+    "minor": 3
+  },
+  "categories": {
+    "visual_hierarchy": "PASS",
+    "layout_responsive": "PASS",
+    "cognitive_load": "FAIL",
+    "emotional_response": "FAIL",
+    "persona_friction": "CONCERNS"
+  },
+  "top_issues": [
+    {
+      "severity": "critical",
+      "category": "cognitive_load",
+      "description": "Step 2 text wall explains features before action"
+    },
+    {
+      "severity": "critical",
+      "category": "emotional_response",
+      "description": "No hands-on music creation during tutorial"
+    }
+  ]
+}
+```
+
+#### Map Baseline Screenshots to Current Screenshots
+
+**Compare screenshot sets:**
+
+**Baseline:**
+- `baseline/{story}-{persona}/adhoc-m-step1-desktop-20251025-1430.png`
+- `baseline/{story}-{persona}/adhoc-m-step2-desktop-20251025-1430.png`
+
+**Current:**
+- `screenshots/{story}-{persona}/adhoc-m-step1-desktop-20251026-0915.png`
+- `screenshots/{story}-{persona}/adhoc-m-step2-desktop-20251026-0915.png`
+
+**Match by step name (not timestamp):**
+- step1 baseline → step1 current
+- step2 baseline → step2 current
+
+**Note:** If step count changed (e.g., Step 2 removed), note structural changes in comparison.
+
+#### Prepare for Comparison Analysis
+
+During Step 3 analysis, you'll compare:
+- **Visual differences:** Layout changes, color changes, text changes
+- **Issue resolution:** Were baseline critical issues fixed?
+- **New issues:** Did fixes introduce regressions?
+- **Score delta:** How did each category score change?
+
 ### Step 3: Visual Analysis Framework
 
 For each screenshot, analyze using `ux-analysis-framework.md`:
@@ -361,17 +442,138 @@ Flow Tested: {flow_url}
 
 ## Before/After Comparison
 
-[If baseline_screenshots provided, show side-by-side comparison]
+**ONLY include this section if --baseline flag was provided and baseline loaded successfully.**
 
-**Previous UX Score:** XX/100
-**Current UX Score:** YY/100
-**Change:** +/- ZZ points
+### Baseline Review Summary
 
-**Improvements Made:**
-- {List of improvements}
+**Previous Review:**
+- **Date:** {baseline.date} (ISO format)
+- **UX Score:** {baseline.ux_score}/100
+- **Gate:** {baseline.gate}
+- **Issues Found:**
+  - Critical: {baseline.issues.critical}
+  - Major: {baseline.issues.major}
+  - Minor: {baseline.issues.minor}
 
-**New Issues Introduced:**
-- {List of regressions}
+**Current Review:**
+- **Date:** {current_date} (ISO format)
+- **UX Score:** {current_score}/100
+- **Gate:** {current_gate}
+- **Issues Found:**
+  - Critical: {current_issues.critical}
+  - Major: {current_issues.major}
+  - Minor: {current_issues.minor}
+
+**Overall Change:** {score_delta} points ({baseline.gate} → {current_gate})
+
+### Category Score Changes
+
+| Category | Baseline | Current | Change |
+|----------|----------|---------|--------|
+| Visual Hierarchy | {baseline.categories.visual_hierarchy} | {current.visual_hierarchy} | ↑/↓/→ |
+| Layout & Responsiveness | {baseline.categories.layout_responsive} | {current.layout_responsive} | ↑/↓/→ |
+| Cognitive Load | {baseline.categories.cognitive_load} | {current.cognitive_load} | ↑/↓/→ |
+| Emotional Response | {baseline.categories.emotional_response} | {current.emotional_response} | ↑/↓/→ |
+| Persona Friction | {baseline.categories.persona_friction} | {current.persona_friction} | ↑/↓/→ |
+
+### Issues Resolved ✅
+
+For each baseline issue that no longer appears in current review:
+
+#### 1. {Baseline Issue Title} - FIXED
+
+**Baseline State:**
+- **Severity:** {critical|major|minor}
+- **Category:** {category}
+- **Description:** {baseline description}
+- **Screenshot:** `baseline/{story}-{persona}/{filename}.png`
+- **Persona Voice:** "{baseline persona quote}"
+
+**Current State:**
+- **Status:** RESOLVED
+- **Evidence:** {Describe what changed in screenshots}
+- **Screenshot:** `screenshots/{story}-{persona}/{filename}.png`
+- **Impact:** {How this fix improved UX}
+
+**Example:**
+```markdown
+#### 1. Text Wall Before Action (Step 2) - FIXED
+
+**Baseline State:**
+- **Severity:** CRITICAL
+- **Category:** Cognitive Load
+- **Description:** 3-paragraph explanation before user takes action
+- **Screenshot:** `baseline/adhoc-m/adhoc-m-step2-desktop-20251025-1430.png`
+- **Persona Voice:** "I don't want to read, I want to PLAY!"
+
+**Current State:**
+- **Status:** RESOLVED
+- **Evidence:** Step 2 removed entirely, user goes straight to interactive drum machine
+- **Screenshot:** `screenshots/adhoc-m/adhoc-m-step2-desktop-20251026-0915.png`
+- **Impact:** Saved 10 seconds, eliminated cognitive load, user reaches action faster
+```
+
+### Issues Persisting ⚠️
+
+For each baseline issue that STILL appears in current review:
+
+#### 1. {Issue Title} - STILL PRESENT
+
+**Status:** Not addressed in this iteration
+**Screenshots:** Baseline vs Current show same problem
+**Recommendation:** Prioritize for next iteration
+
+### New Issues Introduced ❌
+
+For each current issue that was NOT present in baseline:
+
+#### 1. {New Issue Title} - REGRESSION
+
+**Severity:** {critical|major|minor}
+**Category:** {category}
+**Description:** {what's wrong}
+**Screenshot:** `screenshots/{story}-{persona}/{filename}.png`
+**Persona Voice:** "{quote}"
+**Root Cause:** {What change introduced this issue?}
+**Fix:** {How to address this regression}
+
+**Example:**
+```markdown
+#### 1. Interactive Step Too Fast - REGRESSION
+
+**Severity:** MAJOR
+**Category:** Emotional Response
+**Description:** New interactive beat creation step auto-advances after 2 seconds
+**Screenshot:** `screenshots/adhoc-m/adhoc-m-step3-desktop-20251026-0915.png`
+**Persona Voice:** "Wait, what just happened? I didn't even get to click!"
+**Root Cause:** Auto-advance timer added to speed up tutorial
+**Fix:** Replace timer with explicit "Continue" button, let user control pacing
+```
+
+### Visual Comparison Notes
+
+**Structural Changes:**
+- Steps added: {list}
+- Steps removed: {list}
+- Steps reordered: {list}
+
+**Visual Design Changes:**
+- Color scheme updates: {describe}
+- Typography changes: {describe}
+- Layout shifts: {describe}
+
+### Improvement Assessment
+
+**Wins:**
+- {List major improvements with impact}
+- {Quantify improvements: "Reduced cognitive load by X seconds"}
+
+**Concerns:**
+- {List any regressions or new issues}
+- {Assess if regressions outweigh improvements}
+
+**Overall:**
+{1-2 paragraph summary: Did the fixes work? Is the UX better? What's left to address?}
 
 ## Recommendations
 

@@ -4,19 +4,26 @@
  * Captures screenshots of persona tutorial flows for visual analysis.
  *
  * Usage:
- *   node capture-flow.js --story=22.1 --persona=m
- *   node capture-flow.js --story=22.1 --persona=e --url="/?v=e"
+ *   node capture-flow.js --story=22.1 --persona=m              # Desktop-only (default for regular personas)
+ *   node capture-flow.js --story=22.1 --persona=responsive     # Mobile-only (auto for responsive)
+ *   node capture-flow.js --story=22.1 --persona=m --mobile-only # Force mobile capture
  *
  * Options:
- *   --story=epic.story Story ID for organization (default: adhoc)
- *   --persona=m|e|v|p  Persona code (required)
- *   --url=path         URL path to test (default: /?v={persona})
- *   --base=url         Base URL (default: http://localhost:5173)
- *   --mobile-only      Only capture mobile viewport
- *   --desktop-only     Only capture desktop viewport
+ *   --story=epic.story    Story ID for organization (default: adhoc)
+ *   --persona=code        Persona code (required): m|e|v|p (desktop-only) or responsive (mobile-only)
+ *   --url=path            URL path to test (default: /?v={persona})
+ *   --base=url            Base URL (default: http://localhost:5173)
+ *   --mobile-only         Force mobile viewport only
+ *   --desktop-only        Force desktop viewport only
+ *
+ * Default Behavior:
+ *   - Regular personas (m, e, v, p): Desktop-only (speeds up testing)
+ *   - Responsive persona: Mobile-only (tests layout constraints)
+ *   - Override with --mobile-only or --desktop-only flags
  *
  * Screenshots saved to: testing/persona-ux/screenshots/{story}-{persona}/
- * Filename format: {story}-{persona}-{step}-{viewport}-{date}.png
+ * Filename format: {story}-{persona}-{step}-{viewport}-{YYYYMMDD-HHMM}.png
+ * Timestamp includes time to prevent same-day overwrites during re-testing
  */
 
 const { chromium } = require('playwright');
@@ -34,15 +41,26 @@ const PERSONA_CODE = args.persona;
 const STORY_ID = args.story || 'adhoc'; // e.g., "22.1"
 const BASE_URL = args.base || 'http://localhost:5173';
 const URL_PATH = args.url || `/?v=${PERSONA_CODE}`;
-const MOBILE_ONLY = args['mobile-only'];
-const DESKTOP_ONLY = args['desktop-only'];
+let MOBILE_ONLY = args['mobile-only'];
+let DESKTOP_ONLY = args['desktop-only'];
+
+// Auto-configure viewport strategy based on persona type
+if (PERSONA_CODE === 'responsive') {
+  // Responsive persona: mobile-only by default
+  MOBILE_ONLY = true;
+} else if (!MOBILE_ONLY && !DESKTOP_ONLY) {
+  // Regular personas (m, e, v, p): desktop-only by default (speeds up testing)
+  // Override with --mobile-only or --desktop-only if needed
+  DESKTOP_ONLY = true;
+}
 
 // Persona metadata
 const PERSONAS = {
   m: { name: 'Musician', steps: 4 },
   e: { name: 'Educator', steps: 4 },
   v: { name: 'Visual Learner', steps: 4 },
-  p: { name: 'Producer', steps: 4 }
+  p: { name: 'Producer', steps: 4 },
+  responsive: { name: 'Mobile/Responsive', steps: 4, mobileOnly: true }
 };
 
 // Viewport configurations
@@ -59,7 +77,11 @@ if (!PERSONA_CODE || !PERSONAS[PERSONA_CODE]) {
 }
 
 const persona = PERSONAS[PERSONA_CODE];
-const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '');
+// Enhanced timestamp: YYYYMMDD-HHMM (prevents same-day overwrites)
+const now = new Date();
+const datePart = now.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
+const timePart = now.toTimeString().slice(0, 5).replace(':', ''); // HHMM
+const timestamp = `${datePart}-${timePart}`;
 // Organize by story/persona: screenshots/22.1-m/
 const screenshotDir = path.join(__dirname, 'screenshots', `${STORY_ID}-${PERSONA_CODE}`);
 
@@ -79,8 +101,8 @@ console.log(`Timestamp: ${timestamp}\n`);
  * Capture screenshot with retry logic
  */
 async function captureScreenshot(page, stepName, viewport) {
-  // Filename format: {story}-{persona}-{step}-{viewport}-{date}.png
-  // Example: 22.1-m-step2-desktop-20250125.png
+  // Filename format: {story}-{persona}-{step}-{viewport}-{date}-{time}.png
+  // Example: 22.1-m-step2-desktop-20250125-1430.png (never overwrites)
   const filename = `${STORY_ID}-${PERSONA_CODE}-${stepName}-${viewport}-${timestamp}.png`;
   const filepath = path.join(screenshotDir, filename);
 

@@ -82,6 +82,13 @@ commands:
       Persona codes: m (Musician), e (Educator), v (Visual Learner), p (Producer)
       Optional --baseline flag for before/after comparison.
       Automatically offers cleanup at completion.
+  - ux-responsive {story} --url={path}: |
+      Execute ux-responsive-layout-test task to test mobile responsive design.
+      Tests: Touch targets (44px+), layout reflow (no horizontal scroll), mobile navigation clarity.
+      Captures mobile-only viewports: 320px, 375px, 667px (common device sizes).
+      Produces: Mobile layout gate file, assessment report with mobile user voice.
+      Gate file location: qa.qaLocation/gates/{epic}.{story}-responsive-{date}.yml
+      Run AFTER ux-review to complement persona testing with technical constraints.
   - ux-cleanup {story} --persona={code}: |
       Execute ux-cleanup-screenshots task to clean up screenshot artifacts after review.
       Moves annotated screenshots to docs/qa/screenshots/ (documentation value).
@@ -103,6 +110,7 @@ dependencies:
     - test-design.md
     - trace-requirements.md
     - ux-persona-review.md
+    - ux-responsive-layout-test.md
     - ux-cleanup-screenshots.md
   templates:
     - qa-gate-tmpl.yaml
