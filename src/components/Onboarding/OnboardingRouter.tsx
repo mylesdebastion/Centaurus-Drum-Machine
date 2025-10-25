@@ -25,9 +25,14 @@ export function OnboardingRouter() {
   const personaCode = getPersonaFromURL(searchParams);
   const referralCode = getReferralFromURL(searchParams);
 
+  console.log('[OnboardingRouter] Render - personaCode:', personaCode, 'completed:', hasCompletedOnboarding());
+
   useEffect(() => {
+    console.log('[OnboardingRouter] useEffect - personaCode:', personaCode, 'referralCode:', referralCode);
+
     // Track visit event (Story 22.3)
     if (personaCode) {
+      console.log('[OnboardingRouter] Tracking visit event for persona:', personaCode);
       trackReferralEvent('visit', personaCode, referralCode || undefined);
     }
 
@@ -40,6 +45,7 @@ export function OnboardingRouter() {
 
   // User has persona code → show specific tutorial
   if (personaCode) {
+    console.log('[OnboardingRouter] Rendering tutorial for persona:', personaCode);
     switch (personaCode) {
       case 'm':
         return <MusicianTutorial />;
@@ -59,5 +65,6 @@ export function OnboardingRouter() {
   }
 
   // No persona code → show PersonaSelector
+  console.log('[OnboardingRouter] No persona code, rendering PersonaSelector');
   return <PersonaSelector />;
 }

@@ -16,6 +16,8 @@ export function PersonaSelector() {
   const navigate = useNavigate();
 
   const handlePersonaSelect = (code: PersonaCode) => {
+    console.log('[PersonaSelector] Persona selected:', code);
+    console.log('[PersonaSelector] Navigating to: /?v=' + code);
     // Navigate to root with persona code (OnboardingRouter will show tutorial)
     navigate(`/?v=${code}`);
   };
