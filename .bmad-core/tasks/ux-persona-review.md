@@ -455,14 +455,38 @@ Stop the review and request clarification if:
 
 ## Completion
 
-After review:
+**CRITICAL**: All outputs must be generated before review is considered complete.
 
-1. Save gate YAML block for gate file
-2. Save markdown report to assessments directory
-3. Save annotated screenshots to feedback directory
-4. Recommend status: "UX approved" or "UX needs revision"
-5. Tag issues with suggested owner: `dev` (code), `design` (visual), `pm` (scope/messaging)
-6. **Offer screenshot cleanup** (unless *yolo mode - then auto-cleanup)
+### Completion Checklist
+
+Execute in order, DO NOT skip:
+
+- [ ] **Output 1**: Save gate YAML block
+  - Location: `docs/qa/gates/{epic}.{story}-ux-{persona}.yml`
+  - Confirm file created and verify content
+
+- [ ] **Output 2**: Save markdown report
+  - Location: `docs/qa/assessments/{epic}.{story}-ux-{persona}-{YYYYMMDD}.md`
+  - Confirm file created (should be 5000+ words with detailed analysis)
+  - **DO NOT SKIP THIS** - this is the human-readable documentation
+
+- [ ] **Output 3**: Save annotated screenshots (if annotations created)
+  - Location: `testing/persona-ux/feedback/{persona}/`
+  - Red/orange/yellow boxes with issue callouts
+
+- [ ] **Summary**: Print completion summary
+  - Gate decision (PASS/CONCERNS/FAIL)
+  - Score and file locations
+  - Recommend next steps
+
+- [ ] **Cleanup**: Offer screenshot cleanup options
+
+After checklist complete:
+
+1. Confirm all files created
+2. Recommend status: "UX approved" or "UX needs revision"
+3. Tag issues with suggested owner: `dev` (code), `design` (visual), `pm` (scope/messaging)
+4. **Offer screenshot cleanup** (unless *yolo mode - then auto-cleanup)
 
 ### Screenshot Cleanup Prompt
 
