@@ -5,6 +5,8 @@
  * Referral codes (r=hash) for attribution tracking
  */
 
+import { trackReferralEvent } from './referralTracking';
+
 export type PersonaCode = 'm' | 'd' | 'e' | 'v' | 'p' | 'i';
 
 export interface PersonaConfig {
@@ -135,8 +137,7 @@ export function trackPersonaEvent(
   personaCode: PersonaCode,
   metadata?: Record<string, any>
 ) {
-  // Import inline to avoid circular dependency
-  const { trackReferralEvent } = require('./referralTracking');
+  // Wrapper for backward compatibility - calls trackReferralEvent
   trackReferralEvent(event, personaCode, metadata?.referral, metadata);
 }
 
