@@ -117,8 +117,12 @@ export function PersonaSelector() {
             <span className="text-gray-600">•</span>
             <button
               onClick={() => {
+                console.log('[PersonaSelector] Dev Reset button clicked');
                 resetOnboarding();
-                window.location.reload();
+                console.log('[PersonaSelector] Reloading page...');
+                setTimeout(() => {
+                  window.location.reload();
+                }, 100);
               }}
               className="text-gray-500 hover:text-gray-400 text-sm transition-colors flex items-center gap-1"
               title="Reset onboarding (Alt+Shift+R)"

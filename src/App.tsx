@@ -7,6 +7,7 @@ import { WelcomeScreen } from './components/Welcome/WelcomeScreen';
 import { OnboardingRouter } from './components/Onboarding/OnboardingRouter';
 import { AnalyticsDashboard } from './components/Analytics/AnalyticsDashboard';
 import { JamSession } from './components/JamSession/JamSession';
+import { resetOnboarding, showOnboardingState } from '@/utils/devShortcuts';
 import '@/utils/devShortcuts'; // Load dev shortcuts globally
 import { JamSessionLegacy } from './components/JamSessionLegacy/JamSessionLegacy';
 import { EducationMode } from './components/Education/EducationMode';
@@ -63,17 +64,29 @@ function App() {
    */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Debug: Log all Alt+Shift keypresses
+      if (e.altKey && e.shiftKey) {
+        console.log('[DevShortcut] Alt+Shift+' + e.key + ' pressed');
+      }
+
       if (e.altKey && e.shiftKey && e.key === 'R') {
         e.preventDefault();
-        const { resetOnboarding } = require('@/utils/devShortcuts');
+        console.log('[DevShortcut] Resetting onboarding...');
+        console.log('[DevShortcut] BEFORE:', showOnboardingState());
         resetOnboarding();
+        console.log('[DevShortcut] AFTER:', showOnboardingState());
+        console.log('[DevShortcut] Navigating to / and reloading...');
         navigate('/');
-        window.location.reload();
+        setTimeout(() => window.location.reload(), 100);
       }
     };
 
+    console.log('[App] Dev shortcut listener registered: Alt+Shift+R');
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      console.log('[App] Dev shortcut listener removed');
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [navigate]);
 
   /**

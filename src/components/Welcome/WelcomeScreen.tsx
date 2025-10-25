@@ -504,8 +504,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             <span className="text-gray-600">•</span>
             <button
               onClick={() => {
+                console.log('[WelcomeScreen] Dev Reset button clicked');
                 resetOnboarding();
-                window.location.href = '/';
+                console.log('[WelcomeScreen] Redirecting to /...');
+                setTimeout(() => {
+                  window.location.href = '/';
+                }, 100);
               }}
               className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-400 text-sm transition-colors"
               title="Reset onboarding and return to persona selector (Alt+Shift+R)"
