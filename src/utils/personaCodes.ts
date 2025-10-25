@@ -128,26 +128,16 @@ export function buildShareURL(personaCode: PersonaCode, referralHash?: string): 
 
 /**
  * Track persona analytics event
+ * @deprecated Use trackReferralEvent from referralTracking.ts instead (Story 22.3)
  */
 export function trackPersonaEvent(
   event: 'tutorial_started' | 'tutorial_completed' | 'share_clicked' | 'converted_to_pro',
   personaCode: PersonaCode,
   metadata?: Record<string, any>
 ) {
-  const eventData = {
-    event,
-    persona: personaCode,
-    timestamp: new Date().toISOString(),
-    ...metadata,
-  };
-
-  // Store in localStorage for now (Story 22.3 will implement full analytics)
-  const analyticsKey = 'audiolux_persona_analytics';
-  const existing = JSON.parse(localStorage.getItem(analyticsKey) || '[]');
-  existing.push(eventData);
-  localStorage.setItem(analyticsKey, JSON.stringify(existing));
-
-  console.log('[Persona Analytics]', eventData);
+  // Import inline to avoid circular dependency
+  const { trackReferralEvent } = require('./referralTracking');
+  trackReferralEvent(event, personaCode, metadata?.referral, metadata);
 }
 
 /**

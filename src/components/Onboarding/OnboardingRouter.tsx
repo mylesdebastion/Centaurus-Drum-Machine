@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getPersonaFromURL, getReferralFromURL, hasCompletedOnboarding, trackPersonaEvent } from '@/utils/personaCodes';
+import { getPersonaFromURL, getReferralFromURL, hasCompletedOnboarding } from '@/utils/personaCodes';
+import { trackReferralEvent } from '@/utils/referralTracking';
 import { PersonaSelector } from './PersonaSelector';
 import { MusicianTutorial } from './tutorials/MusicianTutorial';
 import { EducatorTutorial } from './tutorials/EducatorTutorial';
@@ -8,12 +9,14 @@ import { VisualLearnerTutorial } from './tutorials/VisualLearnerTutorial';
 import { ProducerTutorial } from './tutorials/ProducerTutorial';
 
 /**
- * OnboardingRouter - Epic 22 Story 22.1
+ * OnboardingRouter - Epic 22 Story 22.1 + 22.3
  *
  * Routes users based on:
  * 1. URL params (?v=e → Educator tutorial)
  * 2. Onboarding completion (redirect to /studio)
  * 3. No params + not completed → PersonaSelector
+ *
+ * Story 22.3: Tracks visit + referral events
  */
 export function OnboardingRouter() {
   const [searchParams] = useSearchParams();
@@ -23,9 +26,9 @@ export function OnboardingRouter() {
   const referralCode = getReferralFromURL(searchParams);
 
   useEffect(() => {
-    // Track referral if present
-    if (referralCode && personaCode) {
-      trackPersonaEvent('tutorial_started', personaCode, { referral: referralCode });
+    // Track visit event (Story 22.3)
+    if (personaCode) {
+      trackReferralEvent('visit', personaCode, referralCode || undefined);
     }
 
     // Redirect returning users to Studio

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2, Piano, Guitar, Database, Grid2x2 } from 'lucide-react';
+import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2, Piano, Guitar, Database, Grid2x2, BarChart3 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface WelcomeScreenProps {
   onStartJam: () => void;
@@ -488,9 +489,16 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
         {/* Quick Info */}
         <div className="mt-8 sm:mt-12 text-center">
-          <p className="text-gray-500 text-xs sm:text-sm">
+          <p className="text-gray-500 text-xs sm:text-sm mb-4">
             Compatible with MIDI controllers • LED integration • Web Audio API
           </p>
+          <Link
+            to="/analytics"
+            className="inline-flex items-center gap-2 text-primary-400 hover:text-primary-300 text-sm transition-colors"
+          >
+            <BarChart3 className="w-4 h-4" />
+            Analytics Dashboard (Epic 22)
+          </Link>
         </div>
       </div>
     </div>
