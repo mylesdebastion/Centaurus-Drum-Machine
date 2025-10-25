@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getPersonaFromURL, getReferralFromURL, hasCompletedOnboarding } from '@/utils/personaCodes';
 import { trackReferralEvent } from '@/utils/referralTracking';
-import { resetOnboarding } from '@/utils/devShortcuts';
 import { PersonaSelector } from './PersonaSelector';
 import { MusicianTutorial } from './tutorials/MusicianTutorial';
 import { EducatorTutorial } from './tutorials/EducatorTutorial';
@@ -37,18 +36,6 @@ export function OnboardingRouter() {
       console.log('[OnboardingRouter] Returning user detected, redirecting to /studio');
       navigate('/studio');
     }
-
-    // Dev shortcut: Ctrl+Shift+R to reset onboarding
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'R') {
-        e.preventDefault();
-        resetOnboarding();
-        window.location.reload();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [personaCode, referralCode, navigate]);
 
   // User has persona code → show specific tutorial

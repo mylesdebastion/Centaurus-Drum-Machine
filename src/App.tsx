@@ -58,6 +58,25 @@ function App() {
   }, [location]);
 
   /**
+   * Global dev shortcut: Alt+Shift+R to reset onboarding
+   * (Ctrl+Shift+R conflicts with Chrome hard refresh)
+   */
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && e.shiftKey && e.key === 'R') {
+        e.preventDefault();
+        const { resetOnboarding } = require('@/utils/devShortcuts');
+        resetOnboarding();
+        navigate('/');
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigate]);
+
+  /**
    * Hide Crisp chat widget in Education Mode to avoid student distractions
    */
   useEffect(() => {

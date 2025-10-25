@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2, Piano, Guitar, Database, Grid2x2, BarChart3 } from 'lucide-react';
+import { Music, Users, Play, BookOpen, Sparkles, Gamepad2, Boxes, Grid3x3, Activity, Zap, Music2, Piano, Guitar, Database, Grid2x2, BarChart3, RotateCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { resetOnboarding } from '@/utils/devShortcuts';
 
 interface WelcomeScreenProps {
   onStartJam: () => void;
@@ -492,13 +493,27 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           <p className="text-gray-500 text-xs sm:text-sm mb-4">
             Compatible with MIDI controllers • LED integration • Web Audio API
           </p>
-          <Link
-            to="/analytics"
-            className="inline-flex items-center gap-2 text-primary-400 hover:text-primary-300 text-sm transition-colors"
-          >
-            <BarChart3 className="w-4 h-4" />
-            Analytics Dashboard (Epic 22)
-          </Link>
+          <div className="flex items-center justify-center gap-4 flex-wrap">
+            <Link
+              to="/analytics"
+              className="inline-flex items-center gap-2 text-primary-400 hover:text-primary-300 text-sm transition-colors"
+            >
+              <BarChart3 className="w-4 h-4" />
+              Analytics Dashboard (Epic 22)
+            </Link>
+            <span className="text-gray-600">•</span>
+            <button
+              onClick={() => {
+                resetOnboarding();
+                window.location.href = '/';
+              }}
+              className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-400 text-sm transition-colors"
+              title="Reset onboarding and return to persona selector (Alt+Shift+R)"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Dev Reset Onboarding
+            </button>
+          </div>
         </div>
       </div>
     </div>

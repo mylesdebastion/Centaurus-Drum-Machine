@@ -121,7 +121,7 @@ export function PersonaSelector() {
                 window.location.reload();
               }}
               className="text-gray-500 hover:text-gray-400 text-sm transition-colors flex items-center gap-1"
-              title="Reset onboarding (Ctrl+Shift+R)"
+              title="Reset onboarding (Alt+Shift+R)"
             >
               <RotateCcw className="w-3 h-3" />
               Dev Reset
