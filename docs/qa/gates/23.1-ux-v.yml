@@ -1,0 +1,79 @@
+ux_review:
+  persona: 'v'
+  persona_name: 'Visual Learner'
+  score: 68  # Concerns - major UX issue in step 1
+  screenshots_analyzed: 3
+  issues:
+    critical: 0
+    major: 1
+    minor: 2
+  categories:
+    visual_hierarchy: CONCERNS  # Can't find color selector in step 1
+    layout_responsive: PASS
+    cognitive_load: CONCERNS  # Confusing instruction mismatch
+    emotional_response: CONCERNS  # Confusion ruins initial excitement
+    persona_friction: CONCERNS  # Instruction doesn't match visual state
+  top_issues:
+    - severity: major
+      category: cognitive_load
+      description: 'Step 1 references "color mode selector" but it is not visible or highlighted in the screenshot'
+      screenshot: 'testing/persona-ux/screenshots/23.1-v/23.1-v-step1-desktop-20251026-1750.png'
+      persona_voice: '"Wait, where is the color mode selector? The piano is already rainbow! The tooltip says ''Click the color mode selector'' but I don''t see it. Am I supposed to click those buttons at the top? I''m confused and feel dumb."'
+      what_would_help_me: '"Show me WHERE to click! Put a blue highlight ring on the color mode selector buttons so I can see them. Or if I''m already in Rainbow mode, tell me ''Great! Try clicking a key to hear the sound.'' Don''t make me search for a button I can''t find!"'
+      suggested_fix: 'Add data-tour="color-mode-selector" attribute to color mode buttons in Piano Roll AND ensure they are visible/in-view during tour step. Alternatively, adjust tour step to highlight piano keyboard first if already in Rainbow mode.'
+    - severity: minor
+      category: persona_friction
+      description: 'MIDI Setup section shows technical error message "Web MIDI API not available in this browser" - intimidating for non-technical visual learners'
+      screenshot: 'testing/persona-ux/screenshots/23.1-v/23.1-v-step0-landing-desktop-20251026-1750.png'
+      persona_voice: '"I see ''MIDI Input Device'' and ''Web MIDI API not available'' below the piano - that looks scary and technical. I''m ignoring it but it makes me nervous that I might need to configure something."'
+      what_would_help_me: '"Hide the MIDI technical stuff or make it collapsible. I just want to focus on the colorful piano and patterns, not worry about ''API not available'' errors."'
+      suggested_fix: 'Hide MIDI Setup section by default in Piano Roll when loaded via preset (only show for advanced users who explicitly need it)'
+    - severity: minor
+      category: cognitive_load
+      description: 'Piano Roll already in Rainbow mode but tooltip asks user to "Try Rainbow mode first" - creates confusion'
+      screenshot: 'testing/persona-ux/screenshots/23.1-v/23.1-v-step1-desktop-20251026-1750.png'
+      persona_voice: '"The piano is already rainbow colors! Why is the tooltip telling me to try Rainbow mode? I''m confused - do I need to change it or not?"'
+      what_would_help_me: '"If I''m already in the right mode, tell me! Say ''You''re in Rainbow mode - see the colors?'' and then guide me to interact with the keyboard."'
+      suggested_fix: 'Update tour step logic to detect current color mode and adjust instruction accordingly'
+  recommendations:
+    immediate:  # Fix before launch
+      - 'Fix Step 1: Make color mode selector visible and highlighted, OR skip color mode selection if already in Rainbow mode'
+      - 'Verify data-tour="color-mode-selector" attribute exists and targets correct element'
+      - 'Test tour flow to ensure color mode buttons are in viewport when step 1 displays'
+    future:  # Nice to have improvements
+      - 'Hide MIDI Setup section by default when Piano Roll loaded via preset'
+      - 'Add smart tour step logic to skip already-completed steps (e.g., if already in Rainbow mode)'
+      - 'Add visual confirmation when user successfully selects color mode'
+  gate_decision: CONCERNS
+  notes: |
+    Epic 23 iOS-style tooltip redesign has MIXED results for Visual Learners.
+
+    What's Working:
+    - ✅ Rainbow piano is PERFECT (addresses "no sheet music" pain point)
+    - ✅ "No sheet music needed" message addresses core intimidation
+    - ✅ iOS-style tooltips are non-intrusive (no modal blocking)
+    - ✅ Preset auto-loads Piano Roll with colors
+
+    What's Broken:
+    - ❌ Step 1 instruction mismatch (can't find color selector)
+    - ❌ Confusion about current color mode state
+    - ⚠️ Technical MIDI text is intimidating (though ignorable)
+
+    Root Cause:
+    The color mode selector buttons are either:
+    1. Not in viewport when step 1 tooltip displays, OR
+    2. Not highlighted/obvious to user, OR
+    3. Missing data-tour attribute
+
+    This creates a critical UX breakdown for visual learners (who rely on SEEING elements).
+    The tour instructs them to click something they can't find, causing confusion and
+    making them feel "dumb" - exactly the opposite of the empowering experience intended.
+
+    Impact:
+    - Visual Learners may abandon tutorial at step 1 (high bounce risk)
+    - Confusion undermines initial excitement from step 0
+    - Persona needs clear visual guidance (this fails that need)
+
+    Recommended Fix Priority: HIGH
+    This should be fixed before Epic 23 ships to ensure Visual Learner persona
+    has successful onboarding experience.
