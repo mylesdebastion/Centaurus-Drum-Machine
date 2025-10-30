@@ -1,0 +1,70 @@
+schema: 1
+story: '22.1'
+gate: CONCERNS
+status_reason: 'Producer tutorial missing critical export/download mention - producers need to know they can export to external DAWs'
+reviewer: 'Quinn (Test Architect) - Producer Persona'
+updated: '2025-10-25T14:26:00Z'
+
+ux_review:
+  persona: p
+  persona_name: Producer
+  score: 78
+  screenshots_analyzed: 5
+  issues:
+    critical: 1
+    major: 2
+    minor: 1
+  categories:
+    visual_hierarchy: PASS
+    layout_responsive: PASS
+    cognitive_load: PASS
+    emotional_response: PASS
+    persona_friction: CONCERNS
+  top_issues:
+    - severity: critical
+      category: persona_friction
+      description: 'Tutorial never mentions export/download capabilities - critical for producer trust'
+      screenshot: 'testing/persona-ux/screenshots/adhoc-p/adhoc-p-step3-desktop-20251025-1426.png'
+      persona_voice: "Wait, can I export my work? I need to be able to download MIDI and WAV stems to finish in Ableton. If this is just a browser toy with no export, I'm out."
+      what_would_help_me: "Tell me early (Step 1 or 2) that I can 'Export MIDI/WAV stems to continue in your desktop DAW' - that's the key feature that makes this a pro tool, not a toy."
+      suggested_fix: 'Add export capability mention to Step 1 module list or Step 3 workflow'
+      refs: []
+
+    - severity: major
+      category: persona_friction
+      description: 'No technical specs mentioned (latency, sample rate, audio quality) - producers care about this'
+      screenshot: 'testing/persona-ux/screenshots/adhoc-p/adhoc-p-step2-desktop-20251025-1426.png'
+      persona_voice: "MIDI support is great, but what about latency? What sample rate? Is this actually usable for production or will I get audio glitches?"
+      what_would_help_me: "Mention 'Low-latency audio engine' or 'Professional-grade 48kHz audio' somewhere to build confidence in audio quality."
+      suggested_fix: 'Add brief technical spec callout to Step 2 or landing page'
+      refs: []
+
+    - severity: major
+      category: emotional_response
+      description: 'Completion screen emphasizes "Free tier" instead of Pro value - producers are willing to pay'
+      screenshot: 'testing/persona-ux/screenshots/adhoc-p/adhoc-p-step3-desktop-20251025-1426.png'
+      persona_voice: "Free tier available? I don't care about free - I want to know if Pro gives me unlimited exports and advanced modules. Sell me on quality, not price."
+      what_would_help_me: "Instead of 'Free tier available', say 'Upgrade to Pro for unlimited exports, advanced modules, and priority support' - tell me what I get, not what's cheap."
+      suggested_fix: 'Reframe Pro tier messaging to emphasize value, not free option'
+      refs: []
+
+    - severity: minor
+      category: cognitive_load
+      description: 'Step 1 module list could show sample count (6+ modules vs just listing 6)'
+      screenshot: 'testing/persona-ux/screenshots/adhoc-p/adhoc-p-step1-desktop-20251025-1426.png'
+      persona_voice: "6 modules? Is that all? BandLab has 20+. How do I know this has enough tools?"
+      what_would_help_me: "Say '30+ production modules including:' then list 6 examples - shows depth without overwhelming."
+      suggested_fix: 'Change heading to indicate total module count'
+      refs: []
+
+  recommendations:
+    immediate:
+      - action: 'Add export capability mention to Step 1 or Step 3 (MIDI/WAV stems)'
+        priority: critical
+        refs: []
+      - action: 'Add technical audio specs callout (latency, sample rate) to Step 2'
+        priority: major
+        refs: []
+    future:
+      - action: 'Reframe Pro tier messaging to emphasize value over free option'
+      - action: 'Show total module count (30+) with 6 examples instead of just listing 6'

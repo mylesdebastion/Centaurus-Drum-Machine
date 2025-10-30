@@ -44,46 +44,132 @@ Responsive layout testing evaluates whether the interface works smoothly on mobi
 
 ## Prerequisites
 
-- Dev server running (localhost:5173)
-- Playwright setup: `npm install && npx playwright install`
+**MCP Playwright Server**: Configured in `.mcp.json` (automatically available in Claude Code)
+
+**Dev Server Running**: `npm run dev` at localhost:5173
+
+**MCP Tools Available**:
+- `mcp__playwright__browser_navigate` - Navigate to test URLs
+- `mcp__playwright__browser_resize` - Set viewport sizes (320px, 375px, 768px)
+- `mcp__playwright__browser_snapshot` - Capture accessibility tree for touch targets
+- `mcp__playwright__browser_take_screenshot` - Visual evidence at each breakpoint
+- `mcp__playwright__browser_console_messages` - Monitor layout errors
 
 ---
 
 ## Process
 
-### Step 1: Capture Mobile Viewport Screenshots
+### Step 1: Navigate and Test Mobile Viewports
 
-Run Playwright with **responsive persona** (auto-activates mobile-only):
+Use MCP Playwright commands to test responsive layout across mobile breakpoints.
 
-```bash
-cd testing/persona-ux
-node capture-flow.js --persona=responsive --url="/?v=m"
+#### 1A. Navigate to Flow URL
+
+```
+Use: mcp__playwright__browser_navigate
+URL: http://localhost:5173{flow_url}
 ```
 
-**Script captures (mobile-only, auto-configured):**
-- Initial landing
-- Each tutorial/feature step
-- Completion/CTA screen
-- Multiple viewport sizes: 320px, 375px, 667px (common mobile sizes)
+#### 1B. Test Each Mobile Viewport
 
-**Output:** `testing/persona-ux/screenshots/responsive/{YYYYMMDD}-{step}-mobile-{size}px.png`
+**Small Mobile (320px) - iPhone SE:**
+```
+Use: mcp__playwright__browser_resize
+width: 320
+height: 568
+```
+
+Capture screenshot and accessibility snapshot:
+```
+Use: mcp__playwright__browser_take_screenshot
+filename: testing/persona-ux/screenshots/{story}-responsive/step0-mobile-320px-{date}.png
+
+Use: mcp__playwright__browser_snapshot
+Purpose: Check touch target sizes, button dimensions
+```
+
+**Standard Mobile (375px) - Most Common:**
+```
+Use: mcp__playwright__browser_resize
+width: 375
+height: 667
+```
+
+Repeat screenshot + snapshot capture.
+
+**Large Mobile/Tablet (768px):**
+```
+Use: mcp__playwright__browser_resize
+width: 768
+height: 1024
+```
+
+Repeat screenshot + snapshot capture.
+
+#### 1C. Monitor Console for Layout Errors
+
+```
+Use: mcp__playwright__browser_console_messages
+onlyErrors: false
+```
+
+**Check for:**
+- Horizontal scroll warnings
+- CSS overflow errors
+- React hydration mismatches
+- Touch target size warnings (if any validation exists)
+
+#### 1D. Navigate Through Flow at Each Viewport
+
+For each viewport size (320px, 375px, 768px):
+
+1. Reset to first step (reload or navigate)
+2. Resize viewport
+3. Capture initial state
+4. Click through flow, capturing each step
+5. Check console messages
+
+**Output Structure:**
+```
+testing/persona-ux/screenshots/{story}-responsive/
+  ├── step0-mobile-320px-{date}.png
+  ├── step0-mobile-375px-{date}.png
+  ├── step0-mobile-768px-{date}.png
+  ├── step1-mobile-320px-{date}.png
+  └── ...
+```
 
 ### Step 2: Analyze Mobile Navigation & Layout
 
 For each screenshot, evaluate:
 
 #### A. Touch Target Sizing
+
+**NEW: Use Accessibility Snapshot** to measure button dimensions:
 ```
-Check button/link sizes:
-- [ ] All buttons ≥44px (iOS accessibility guideline)
+From browser_snapshot:
+- Locate interactive elements (button, a, [role="button"])
+- Check computed width/height properties
+- Validate ≥44px minimum (iOS accessibility guideline)
+```
+
+**Check button/link sizes:**
+- [ ] All buttons ≥44px height (use snapshot dimensions)
 - [ ] All links ≥44px touch target
 - [ ] Spacing between targets ≥8px
 - [ ] No overlapping touch targets
 
-Scoring:
+**Scoring:**
 - PASS: All ≥44px, well-spaced
 - CONCERNS: Some 38-44px, spacing tight
 - FAIL: Buttons <38px, overlapping
+
+**Example Finding from Snapshot:**
+```
+Button: "Next Step"
+  Computed size: 38px × 36px
+  FAIL: Below 44px minimum (iOS guideline)
+  Fix: Increase height to 48px, add padding
 ```
 
 #### B. Responsive Layout

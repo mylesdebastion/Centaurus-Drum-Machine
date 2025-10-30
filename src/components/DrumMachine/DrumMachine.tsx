@@ -180,7 +180,7 @@ export const DrumMachine: React.FC<DrumMachineProps> = ({
       </div>
 
       {/* Tracks */}
-      <div className="space-y-3">
+      <div className="space-y-3" data-tour="drum-grid">
         {tracks.map((track) => (
           <TrackRow
             key={track.id}

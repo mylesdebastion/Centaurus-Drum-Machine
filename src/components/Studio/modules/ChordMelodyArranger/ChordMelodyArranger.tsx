@@ -279,12 +279,14 @@ export const ChordMelodyArranger: React.FC<ModuleComponentProps> = ({
       {/* Main Content Area */}
       <div className={`flex-1 overflow-auto ${embedded ? 'p-2 space-y-2' : 'p-4 space-y-4'}`}>
         {/* Chord Builder Section */}
-        <ChordBuilder
-          selectedProgression={selectedProgression}
-          onProgressionSelect={setSelectedProgression}
-          onClearProgression={handleClearProgression}
-          embedded={embedded}
-        />
+        <div data-tour="chord-selector">
+          <ChordBuilder
+            selectedProgression={selectedProgression}
+            onProgressionSelect={setSelectedProgression}
+            onClearProgression={handleClearProgression}
+            embedded={embedded}
+          />
+        </div>
 
         {/* Chord Timeline */}
         {currentChords.length > 0 && (

@@ -3,20 +3,17 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getPersonaFromURL, getReferralFromURL, hasCompletedOnboarding } from '@/utils/personaCodes';
 import { trackReferralEvent } from '@/utils/referralTracking';
 import { PersonaSelector } from './PersonaSelector';
-import { MusicianTutorial } from './tutorials/MusicianTutorial';
-import { EducatorTutorial } from './tutorials/EducatorTutorial';
-import { VisualLearnerTutorial } from './tutorials/VisualLearnerTutorial';
-import { ProducerTutorial } from './tutorials/ProducerTutorial';
 
 /**
- * OnboardingRouter - Epic 22 Story 22.1 + 22.3
+ * OnboardingRouter - Epic 22 Story 22.1 + 22.3 + Epic 23 Story 23.3
  *
  * Routes users based on:
- * 1. URL params (?v=e → Educator tutorial)
+ * 1. URL params (?v=e → Redirect to /studio with preset)
  * 2. Onboarding completion (redirect to /studio)
  * 3. No params + not completed → PersonaSelector
  *
  * Story 22.3: Tracks visit + referral events
+ * Story 23.3: Redirects to Studio with presets instead of separate tutorials
  */
 export function OnboardingRouter() {
   const [searchParams] = useSearchParams();
@@ -34,6 +31,13 @@ export function OnboardingRouter() {
     if (personaCode) {
       console.log('[OnboardingRouter] Tracking visit event for persona:', personaCode);
       trackReferralEvent('visit', personaCode, referralCode || undefined);
+
+      // Story 23.3: Redirect to Studio with preset instead of showing separate tutorial
+      const allowedPersonas = ['m', 'e', 'v']; // Only ready personas
+      if (allowedPersonas.includes(personaCode)) {
+        console.log('[OnboardingRouter] Redirecting to Studio with preset:', personaCode);
+        navigate(`/studio?v=${personaCode}&tour=true`);
+      }
     }
 
     // Redirect returning users to Studio
@@ -42,27 +46,6 @@ export function OnboardingRouter() {
       navigate('/studio');
     }
   }, [personaCode, referralCode, navigate]);
-
-  // User has persona code → show specific tutorial
-  if (personaCode) {
-    console.log('[OnboardingRouter] Rendering tutorial for persona:', personaCode);
-    switch (personaCode) {
-      case 'm':
-        return <MusicianTutorial />;
-      case 'e':
-        return <EducatorTutorial />;
-      case 'v':
-        return <VisualLearnerTutorial />;
-      case 'p':
-        return <ProducerTutorial />;
-      case 'd':
-      case 'i':
-        // Week 2/3 personas - fallback to PersonaSelector for now
-        return <PersonaSelector />;
-      default:
-        return <PersonaSelector />;
-    }
-  }
 
   // No persona code → show PersonaSelector
   console.log('[OnboardingRouter] No persona code, rendering PersonaSelector');

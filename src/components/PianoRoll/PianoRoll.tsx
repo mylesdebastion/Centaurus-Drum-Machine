@@ -816,7 +816,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
 
                 {/* Color Mode Toggle - Only show in standalone mode */}
                 {isStandalone && (
-                <div className="flex gap-1">
+                <div className="flex gap-1" data-tour="color-mode-selector">
                   <button
                     onClick={() => updateColorMode('chromatic')}
                     className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
@@ -1008,7 +1008,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
               )}
             </div>
 
-            <div className={isStandalone ? "h-64 sm:h-80 md:h-96" : "h-48 sm:h-56"}>
+            <div className={isStandalone ? "h-64 sm:h-80 md:h-96" : "h-48 sm:h-56"} data-tour="piano-grid">
               <PianoCanvas
                 activeNotes={activeNotes}
                 colorMode={colorMode}

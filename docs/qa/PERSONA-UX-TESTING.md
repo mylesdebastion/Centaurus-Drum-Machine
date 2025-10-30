@@ -1,6 +1,13 @@
 # Persona-Driven UX Testing with BMAD QA Agent
 
-BMAD extension for visual UX analysis from persona perspectives using Playwright screenshot capture and AI-powered critique.
+BMAD extension for visual UX analysis from persona perspectives using MCP Playwright browser automation and AI-powered critique.
+
+**NEW: MCP Playwright Integration** - Direct browser control via Model Context Protocol enables:
+- Live browser interaction (click, type, navigate)
+- Accessibility snapshots (DOM structure, semantic HTML)
+- Console log monitoring (JavaScript errors, warnings)
+- Network request inspection (API calls, failures)
+- No external scripts required
 
 ## Overview
 
@@ -12,15 +19,23 @@ This testing framework extends the BMAD QA agent to evaluate user experience fro
 - **Emotional response** - Intimidating, boring, exciting, confusing
 - **Persona-specific friction** - Features not aligned with goals
 
-## Quick Start (5 Minutes)
+## Quick Start (2 Minutes)
 
 ### 1. One-Time Setup
 
-```bash
-cd testing/persona-ux
-npm install
-npx playwright install chromium
+**MCP Playwright Server** (already configured in `.mcp.json`):
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    }
+  }
+}
 ```
+
+No additional installation required - Claude Code loads MCP servers automatically.
 
 ### 2. Start Dev Server
 
@@ -28,38 +43,52 @@ npx playwright install chromium
 npm run dev  # From project root
 ```
 
-### 3. Capture Screenshots
+### 3. Run UX Review (MCP handles browser automation)
 
 ```bash
-cd testing/persona-ux
-node capture-flow.js --persona=m
+@qa *ux-review 22.1 --persona=m --url="/?v=m"
 ```
 
-### 4. Run UX Review
-
-```bash
-@qa *ux-review 22.1 --persona=m
-```
+**What happens:**
+1. QA agent uses MCP Playwright to:
+   - Navigate to `http://localhost:5173/?v=m`
+   - Resize viewport (1920x1080 for desktop)
+   - Capture accessibility snapshots (DOM structure)
+   - Take visual screenshots (evidence)
+   - Monitor browser console (errors/warnings)
+   - Click through tutorial flow
+2. Agent embodies Musician persona and analyzes UX
+3. Generates gate file, report, and annotated screenshots
 
 **Output:**
 - Gate file: `docs/qa/gates/22.1-ux-m.yml`
 - Report: `docs/qa/assessments/22.1-ux-m-20250125.md`
 - Annotated screenshots: `testing/persona-ux/feedback/m/`
+- Console log analysis (JavaScript errors/warnings)
 
 ## How It Works
 
-### 1. Playwright Captures Screenshots
+### 1. MCP Playwright Browser Automation (NEW)
 
-The capture script navigates through the tutorial flow and takes screenshots at each step.
+QA agent uses MCP Playwright commands to control browser directly - no external scripts needed.
+
+**MCP Commands Used:**
+- `browser_navigate` - Navigate to test URL (e.g., `/?v=m`)
+- `browser_resize` - Set viewport (1920x1080 desktop, 375x667 mobile)
+- `browser_snapshot` - Capture accessibility tree (DOM structure, ARIA, semantic HTML)
+- `browser_take_screenshot` - Visual evidence capture (PNG images)
+- `browser_console_messages` - Monitor JavaScript errors/warnings
+- `browser_click` - Navigate through tutorial steps
+- `browser_wait_for` - Wait for animations/state changes
 
 **What it captures:**
-- Initial landing/selector screen
-- Each tutorial step
-- Completion/CTA screen
+- **Accessibility snapshots** - DOM structure, form labels, button dimensions
+- **Visual screenshots** - Initial landing, each tutorial step, completion screen
+- **Console logs** - JavaScript errors, React warnings, network failures
 - **Desktop viewport (1920px)** - Default for regular personas (m, e, v, p)
-- **Mobile viewport (375px)** - Only for responsive persona testing
+- **Mobile viewport (375px)** - For responsive testing (use `ux-responsive-layout-test`)
 
-**Note:** Regular persona testing defaults to desktop-only to speed up testing. Use `--mobile-only` flag if needed, or use `persona=responsive` for mobile-specific testing.
+**Key Benefit:** All browser automation happens within Claude Code workflow - no separate scripts to run.
 
 ### 2. QA Agent Embodies Persona
 
@@ -73,10 +102,24 @@ The QA agent loads persona context from `.bmad-core/data/persona-contexts.md`:
 
 The agent then "becomes" that persona, viewing the UX through their lens.
 
-### 3. Visual Analysis Framework
+### 3. Visual Analysis Framework (Enhanced with MCP Data)
 
-For each screenshot, the agent evaluates 5 categories using `.bmad-core/data/ux-analysis-framework.md`:
+For each screenshot and accessibility snapshot, the agent evaluates 5 categories using `.bmad-core/data/ux-analysis-framework.md`:
 
+**NEW: Browser Console Analysis**
+- JavaScript errors (red flags for code quality)
+- React warnings (hydration issues, deprecated APIs)
+- Performance warnings (large bundles, slow renders)
+- Network errors (failed API calls)
+
+**NEW: Accessibility Snapshot Analysis**
+- Semantic HTML structure (heading hierarchy)
+- Form label associations (aria-labelledby, for attributes)
+- Button/link accessibility (role, aria-label, name)
+- Touch target sizes (computed dimensions from DOM)
+- Keyboard navigation order (tab index analysis)
+
+**Visual Analysis Categories:**
 1. **Visual Hierarchy** - Primary CTA obvious? Text flow clear?
 2. **Layout & Responsiveness** - Aligned? Spaced? Mobile works?
 3. **Cognitive Load** - Scannable? Clear choices? No jargon?
@@ -178,25 +221,33 @@ ux_review:
 
 ## Workflow
 
-### First-Time Review
+### First-Time Review (MCP Playwright)
 
-1. **Capture**
+1. **Start Dev Server**
    ```bash
-   node capture-flow.js --persona=m
+   npm run dev  # Ensure localhost:5173 is running
    ```
 
-2. **Review**
+2. **Run UX Review** (MCP handles browser automation)
    ```bash
-   @qa *ux-review 22.1 --persona=m
+   @qa *ux-review 22.1 --persona=m --url="/?v=m"
    ```
 
-3. **Analyze**
+   **Behind the scenes:**
+   - QA agent uses MCP Playwright to navigate browser
+   - Captures accessibility snapshots + visual screenshots
+   - Monitors console for errors/warnings
+   - Clicks through tutorial flow
+   - Analyzes UX from Musician persona perspective
+
+3. **Analyze Outputs**
    - Gate file: Quick status (PASS/CONCERNS/FAIL)
-   - Markdown report: Detailed findings
+   - Markdown report: Detailed findings + console log analysis
    - Annotated screenshots: Visual evidence
+   - Accessibility findings: DOM structure issues
 
 4. **Fix**
-   - Address CRITICAL issues first
+   - Address CRITICAL issues first (console errors, UX blockers)
    - Implement recommendations
 
 5. **Clean up** (after review)
@@ -229,15 +280,11 @@ After implementing UX improvements, you have **two testing strategies**:
 # 2. Implement fixes
 # ... code changes ...
 
-# 3. Re-capture screenshots
-cd testing/persona-ux
-node capture-flow.js --persona=m
-# Creates: adhoc-m-step1-desktop-20251026-0915.png (new timestamp)
-
-# 4. Fresh review (no comparison)
-@qa *ux-review 22.1 --persona=m
+# 3. Fresh review (MCP handles browser automation)
+@qa *ux-review 22.1 --persona=m --url="/?v=m"
+# MCP Playwright navigates browser, captures new screenshots
 # Agent analyzes as if seeing UX for first time
-# Outputs new gate and report
+# Outputs new gate and report with new timestamp
 ```
 
 **Result:** New independent score, no explicit comparison to previous review.
@@ -258,18 +305,14 @@ node capture-flow.js --persona=m
 # 1. Save baseline after first review
 @qa *ux-cleanup 22.1 --persona=m --keep-baseline
 # Saves screenshots + baseline.json to testing/persona-ux/baseline/22.1-m/
-# baseline.json contains: score, gate, issues, categories
+# baseline.json contains: score, gate, issues, categories, console errors
 
 # 2. Implement fixes
 # ... code changes ...
 
-# 3. Re-capture screenshots
-cd testing/persona-ux
-node capture-flow.js --persona=m
-# Creates new screenshots with new timestamp
-
-# 4. Comparison review
-@qa *ux-review 22.1 --persona=m --baseline
+# 3. Comparison review (MCP handles browser automation)
+@qa *ux-review 22.1 --persona=m --url="/?v=m" --baseline
+# MCP Playwright captures new screenshots
 # Agent loads baseline.json + baseline screenshots
 # Compares old vs new side-by-side
 # Outputs comparison report with:
@@ -277,6 +320,7 @@ node capture-flow.js --persona=m
 #   - Issues resolved ✅
 #   - Issues persisting ⚠️
 #   - New issues introduced ❌
+#   - Console errors fixed/introduced
 ```
 
 **Result:** Explicit before/after comparison showing improvements and regressions.
@@ -356,16 +400,42 @@ After implementing fixes, ask:
 ### Testing All Personas
 
 ```bash
-# Capture all
-for persona in m e v p; do
-  node capture-flow.js --persona=$persona
-done
-
-# Review all
-@qa *ux-review 22.1 --persona=all
+# Review all personas (MCP handles automation for each)
+@qa *ux-review 22.1 --persona=all --url="/?v={persona}"
+# Runs review for m, e, v, p sequentially
+# Generates individual reports + aggregate gate
 ```
 
 Final gate = worst individual persona result
+
+---
+
+## Testing Types (MCP Playwright)
+
+### 1. UX Persona Review (`ux-persona-review.md`)
+**Focus:** Visual hierarchy, cognitive load, emotional response from persona perspective
+**Viewport:** Desktop (1920x1080) - Default for m/e/v/p personas
+**Tools:** `browser_snapshot`, `browser_take_screenshot`, `browser_console_messages`
+**Command:** `@qa *ux-review 22.1 --persona=m --url="/?v=m"`
+
+### 2. Responsive Layout Test (`ux-responsive-layout-test.md`)
+**Focus:** Mobile breakpoints, touch targets, layout reflow
+**Viewport:** Mobile (320px, 375px, 768px)
+**Tools:** `browser_resize`, `browser_snapshot` (touch target measurement)
+**Command:** `@qa *ux-responsive 22.1 --url="/?v=m"`
+
+### 3. Interactive Review (NEW - `ux-interactive-review.md`)
+**Focus:** Click interactions, form behavior, keyboard navigation, error handling
+**Viewport:** Desktop or Mobile
+**Tools:** `browser_click`, `browser_type`, `browser_fill_form`, `browser_press_key`, `browser_network_requests`
+**Command:** `@qa *ux-interactive 22.1 --url="/?v=m" --scenarios="click drums, change tempo"`
+
+**Use Interactive Review when:**
+- Testing button clicks, drum pad interactions
+- Validating form inputs (BPM, pattern name)
+- Testing keyboard shortcuts (Space = play/pause)
+- Monitoring network calls (save pattern, load preset)
+- Checking error handling (invalid BPM input)
 
 ---
 
@@ -699,25 +769,35 @@ See `testing/persona-ux/README.md` for detailed troubleshooting.
 
 ## Files
 
+**MCP Configuration:**
+- `.mcp.json` - Playwright MCP server configuration
+
 **BMAD Extensions:**
-- `.bmad-core/tasks/ux-persona-review.md` - UX review task definition
-- `.bmad-core/tasks/ux-solution-discovery.md` - Solution discovery task definition
+- `.bmad-core/tasks/ux-persona-review.md` - UX review task (MCP Playwright)
+- `.bmad-core/tasks/ux-responsive-layout-test.md` - Mobile responsive testing (MCP Playwright)
+- `.bmad-core/tasks/ux-interactive-review.md` - NEW: Interactive behavior testing (MCP Playwright)
+- `.bmad-core/tasks/ux-solution-discovery.md` - Solution discovery task
 - `.bmad-core/data/persona-contexts.md` - Persona backgrounds
 - `.bmad-core/data/ux-analysis-framework.md` - Evaluation criteria
-- `.bmad-core/agents/qa.md` - Updated with *ux-review and *ux-discover commands
+- `.bmad-core/agents/qa.md` - Updated with *ux-review, *ux-responsive, *ux-interactive, *ux-discover commands
 
-**Testing Infrastructure:**
-- `testing/persona-ux/capture-flow.js` - Playwright screenshot capture script
-- `testing/persona-ux/discover-solutions.js` - Playwright feature discovery script
-- `testing/persona-ux/package.json` - Dependencies
+**Testing Infrastructure (Legacy - Use MCP Playwright instead):**
+- `testing/persona-ux/capture-flow.js` - Node.js Playwright script (DEPRECATED - use MCP commands)
+- `testing/persona-ux/discover-solutions.js` - Feature discovery script
+- `testing/persona-ux/package.json` - Dependencies (only needed for legacy scripts)
 - `testing/persona-ux/README.md` - Detailed usage guide
 
 **Output Locations:**
-- `docs/qa/gates/{epic}.{story}-ux-{persona}.yml` - Gate files
-- `docs/qa/assessments/{epic}.{story}-ux-{persona}-{date}.md` - Assessment reports
+- `docs/qa/gates/{epic}.{story}-ux-{persona}.yml` - Gate files (includes console log findings)
+- `docs/qa/gates/{epic}.{story}-responsive-{date}.yml` - Responsive layout gate files
+- `docs/qa/gates/{epic}.{story}-interactive-{date}.yml` - Interactive review gate files
+- `docs/qa/assessments/{epic}.{story}-ux-{persona}-{date}.md` - UX assessment reports
+- `docs/qa/assessments/{epic}.{story}-responsive-{date}.md` - Responsive layout reports
+- `docs/qa/assessments/{epic}.{story}-interactive-{date}.md` - Interactive review reports
 - `docs/qa/discovery/{story}-{persona}-solutions-{date}.md` - Solution reports
-- `testing/persona-ux/screenshots/{persona}/` - Raw screenshots
-- `testing/persona-ux/feedback/{persona}/` - Annotated screenshots
+- `testing/persona-ux/screenshots/{story}-{persona}/` - Screenshots captured via MCP
+- `testing/persona-ux/feedback/{story}-{persona}/` - Annotated screenshots
+- `testing/persona-ux/baseline/{story}-{persona}/` - Baseline screenshots + metadata
 - `testing/persona-ux/discovery/{story}-{persona}/` - Discovery reports + screenshots
 
 ---
@@ -725,9 +805,17 @@ See `testing/persona-ux/README.md` for detailed troubleshooting.
 **Ready to test?**
 
 ```bash
-cd testing/persona-ux
-npm install
-npx playwright install chromium
-node capture-flow.js --persona=m
-# Then in IDE: @qa *ux-review 22.1 --persona=m
+# 1. Ensure dev server is running
+npm run dev
+
+# 2. Run UX review (MCP Playwright handles browser automation)
+@qa *ux-review 22.1 --persona=m --url="/?v=m"
+
+# 3. Test responsive layout
+@qa *ux-responsive 22.1 --url="/?v=m"
+
+# 4. Test interactive behaviors (NEW)
+@qa *ux-interactive 22.1 --url="/?v=m" --scenarios="click drums, change tempo"
 ```
+
+**No setup required** - MCP Playwright server configured in `.mcp.json` works automatically with Claude Code.

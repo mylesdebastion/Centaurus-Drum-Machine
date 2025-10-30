@@ -18,6 +18,12 @@ export function resetOnboarding() {
   console.log('  Removing: audiolux_persona');
   localStorage.removeItem('audiolux_persona');
 
+  // Clear Epic 23 tour completion flags
+  console.log('  Removing: hasCompletedTour_* (Epic 23 tours)');
+  localStorage.removeItem('hasCompletedTour_musician');
+  localStorage.removeItem('hasCompletedTour_visual-learner');
+  localStorage.removeItem('hasCompletedTour_educator');
+
   // Clear analytics events (optional - comment out to keep analytics)
   console.log('  Removing: audiolux_analytics_events');
   localStorage.removeItem('audiolux_analytics_events');
@@ -30,7 +36,7 @@ export function resetOnboarding() {
   sessionStorage.removeItem('audiolux_session_id');
 
   console.log('✅ Onboarding reset complete! Refresh to see PersonaSelector.');
-  console.log('Cleared: onboarding flags, persona, analytics, session ID');
+  console.log('Cleared: onboarding flags, persona, tour completions, analytics, session ID');
 
   return true;
 }
@@ -63,18 +69,31 @@ export function showOnboardingState() {
   const sessionId = sessionStorage.getItem('audiolux_session_id');
   const analyticsEvents = JSON.parse(localStorage.getItem('audiolux_analytics_events') || '[]');
 
+  // Epic 23 tour completion flags
+  const musicianTourCompleted = localStorage.getItem('hasCompletedTour_musician');
+  const visualLearnerTourCompleted = localStorage.getItem('hasCompletedTour_visual-learner');
+  const educatorTourCompleted = localStorage.getItem('hasCompletedTour_educator');
+
   console.log('📊 Onboarding State:');
   console.log('  audiolux_onboarding_completed:', completed === 'true' ? '✅ true' : '❌ ' + (completed || 'null'));
   console.log('  audiolux_persona:', persona || '(none)');
   console.log('  audiolux_session_id:', sessionId || '(none)');
   console.log('  audiolux_analytics_events:', analyticsEvents.length, 'events');
-  console.log('  Raw localStorage keys:', Object.keys(localStorage).filter(k => k.startsWith('audiolux_')));
+  console.log('  hasCompletedTour_musician:', musicianTourCompleted === 'true' ? '✅ true' : '❌ ' + (musicianTourCompleted || 'null'));
+  console.log('  hasCompletedTour_visual-learner:', visualLearnerTourCompleted === 'true' ? '✅ true' : '❌ ' + (visualLearnerTourCompleted || 'null'));
+  console.log('  hasCompletedTour_educator:', educatorTourCompleted === 'true' ? '✅ true' : '❌ ' + (educatorTourCompleted || 'null'));
+  console.log('  Raw localStorage keys:', Object.keys(localStorage).filter(k => k.startsWith('audiolux_') || k.startsWith('hasCompletedTour_')));
 
   return {
     completed: completed === 'true',
     persona,
     sessionId,
     eventCount: analyticsEvents.length,
+    tourCompletions: {
+      musician: musicianTourCompleted === 'true',
+      visualLearner: visualLearnerTourCompleted === 'true',
+      educator: educatorTourCompleted === 'true',
+    },
   };
 }
 

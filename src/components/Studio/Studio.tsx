@@ -8,11 +8,23 @@ import { MobileNavigation } from '../Layout/MobileNavigation';
 import { getModuleDefinition } from './moduleRegistry';
 import { ledCompositor, type CompositorEvent } from '../../services/LEDCompositor';
 import type { BlendMode } from '../../types';
+import { getPreset, type StudioPreset } from '../../config/studioPresets';
+import { StudioTourOverlay } from './StudioTourOverlay';
 
 /**
- * Studio - Dynamic Module Loading System (Story 4.7)
+ * Studio - Dynamic Module Loading System (Story 4.7 + 23.1 + 23.2)
  * Professional workspace that can load multiple music modules dynamically
  * Uses JamSession always-mount pattern for audio/viz persistence
+ *
+ * Story 23.1: Added preset system for persona-specific onboarding
+ * - Accepts ?preset=musician or ?v=m URL parameters
+ * - Auto-loads modules from preset configuration
+ * - Enables tour overlay if preset.tourEnabled=true
+ *
+ * Story 23.2: Added gradual interface reveal tour
+ * - StudioTourOverlay component highlights elements
+ * - Step-by-step guidance with user interaction
+ * - Saves completion to localStorage
  */
 
 interface StudioProps {
@@ -36,6 +48,9 @@ export const Studio: React.FC<StudioProps> = ({ onBack }) => {
   const [currentBlendMode, setCurrentBlendMode] = useState<BlendMode>(ledCompositor.getBlendMode());
   const [compositedFramePixels, setCompositedFramePixels] = useState<number>(0);
   const [deviceMap, setDeviceMap] = useState<Map<string, Set<string>>>(new Map()); // deviceId → Set<moduleId>
+  const [activePreset, setActivePreset] = useState<StudioPreset | null>(null);
+  const [showTour, setShowTour] = useState(false);
+  const [presetLoaded, setPresetLoaded] = useState(false);
 
   // Responsive detection
   useEffect(() => {
@@ -47,6 +62,46 @@ export const Studio: React.FC<StudioProps> = ({ onBack }) => {
     window.addEventListener('resize', checkScreenSize);
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
+
+  // Story 23.1: Parse URL parameters and load preset
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const presetParam = urlParams.get('preset'); // ?preset=musician
+    const personaParam = urlParams.get('v'); // ?v=m
+    const tourParam = urlParams.get('tour'); // ?tour=true
+
+    // Determine which preset to load
+    const presetCode = presetParam || personaParam;
+    if (presetCode) {
+      const preset = getPreset(presetCode);
+      setActivePreset(preset);
+
+      // Enable tour if explicitly requested OR if preset has tour enabled
+      if (tourParam === 'true' || preset.tourEnabled) {
+        // Check if user has already completed this preset's tour
+        const tourCompletedKey = `hasCompletedTour_${preset.id}`;
+        const hasCompletedTour = localStorage.getItem(tourCompletedKey) === 'true';
+
+        if (!hasCompletedTour) {
+          setShowTour(true);
+        }
+      }
+    }
+  }, []);
+
+  // Story 23.1: Auto-load modules from preset
+  useEffect(() => {
+    if (activePreset && !presetLoaded && activePreset.initialModules.length > 0) {
+      // Clear existing modules first (prevent stacking when switching personas)
+      loadedModules.forEach(module => removeModule(module.instanceId));
+
+      // Then load preset modules
+      activePreset.initialModules.forEach((moduleId) => {
+        addModule(moduleId);
+      });
+      setPresetLoaded(true);
+    }
+  }, [activePreset, presetLoaded, addModule, loadedModules, removeModule]);
 
   // Subscribe to compositor events
   useEffect(() => {
@@ -216,6 +271,16 @@ export const Studio: React.FC<StudioProps> = ({ onBack }) => {
               icon: definition?.icon || Music, // Fallback to generic Music icon
             };
           })}
+        />
+      )}
+
+      {/* Story 23.2: Tour Overlay */}
+      {showTour && activePreset && activePreset.tourSteps && (
+        <StudioTourOverlay
+          steps={activePreset.tourSteps}
+          presetId={activePreset.id}
+          onComplete={() => setShowTour(false)}
+          onSkip={() => setShowTour(false)}
         />
       )}
 

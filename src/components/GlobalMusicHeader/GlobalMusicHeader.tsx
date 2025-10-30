@@ -226,6 +226,7 @@ const TransportControls: React.FC<TransportControlsProps> = ({ isPlaying, onTogg
       }`}
       title={isPlaying ? 'Pause' : 'Play'}
       aria-label={isPlaying ? 'Pause global transport' : 'Play global transport'}
+      data-tour="playback-button"
     >
       {isPlaying ? (
         <Pause className="w-5 h-5 text-white" />

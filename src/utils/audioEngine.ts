@@ -19,6 +19,7 @@ export class AudioEngine {
   private pianoSynth: Tone.PolySynth | null = null;
   private guitarSynth: Tone.PolySynth | null = null;
   private masterVolume: Tone.Volume;
+  private hasWarnedNotInitialized = false; // Prevent console spam
 
   private constructor() {
     this.masterVolume = new Tone.Volume(-6).toDestination();
@@ -147,6 +148,7 @@ export class AudioEngine {
 
       this.isInitialized = true;
       this.isInitializing = false;
+      this.hasWarnedNotInitialized = false; // Reset warning flag on successful init
       console.log('[AudioEngine] ✅ Audio engine initialized successfully, isInitialized:', this.isInitialized);
       console.log('[AudioEngine] Drum samples created:', Object.keys(this.drumSamples));
       console.log('[AudioEngine] Piano and Guitar synths created');
@@ -159,13 +161,11 @@ export class AudioEngine {
 
   public playDrum(instrumentName: string, velocity: number = 0.8, time?: number): void {
     if (!this.isInitialized) {
-      console.error('[AudioEngine] ❌ Audio engine not initialized - cannot play', instrumentName);
-      console.error('[AudioEngine] Current state:', {
-        isInitialized: this.isInitialized,
-        isInitializing: this.isInitializing,
-        hasDrumSamples: Object.keys(this.drumSamples).length > 0,
-        drumSampleKeys: Object.keys(this.drumSamples)
-      });
+      // Only warn once to prevent console spam (100+ messages during playback)
+      if (!this.hasWarnedNotInitialized) {
+        console.warn('[AudioEngine] Audio engine not yet initialized. Call audioEngine.initialize() first.');
+        this.hasWarnedNotInitialized = true;
+      }
       return;
     }
 
@@ -253,7 +253,10 @@ export class AudioEngine {
    */
   public playPianoNote(note: number, velocity: number = 0.8, duration: string = '8n'): void {
     if (!this.isInitialized || !this.pianoSynth) {
-      console.error('[AudioEngine] Piano synth not initialized');
+      if (!this.hasWarnedNotInitialized) {
+        console.warn('[AudioEngine] Piano synth not yet initialized. Call audioEngine.initialize() first.');
+        this.hasWarnedNotInitialized = true;
+      }
       return;
     }
 
@@ -275,7 +278,10 @@ export class AudioEngine {
    */
   public triggerPianoNoteOn(note: number, velocity: number = 0.8): void {
     if (!this.isInitialized || !this.pianoSynth) {
-      console.error('[AudioEngine] Piano synth not initialized');
+      if (!this.hasWarnedNotInitialized) {
+        console.warn('[AudioEngine] Piano synth not yet initialized. Call audioEngine.initialize() first.');
+        this.hasWarnedNotInitialized = true;
+      }
       return;
     }
 
@@ -311,7 +317,10 @@ export class AudioEngine {
    */
   public playGuitarNote(note: number, velocity: number = 0.8, duration: string = '4n'): void {
     if (!this.isInitialized || !this.guitarSynth) {
-      console.error('[AudioEngine] Guitar synth not initialized');
+      if (!this.hasWarnedNotInitialized) {
+        console.warn('[AudioEngine] Guitar synth not yet initialized. Call audioEngine.initialize() first.');
+        this.hasWarnedNotInitialized = true;
+      }
       return;
     }
 
@@ -333,7 +342,10 @@ export class AudioEngine {
    */
   public triggerGuitarNoteOn(note: number, velocity: number = 0.8): void {
     if (!this.isInitialized || !this.guitarSynth) {
-      console.error('[AudioEngine] Guitar synth not initialized');
+      if (!this.hasWarnedNotInitialized) {
+        console.warn('[AudioEngine] Guitar synth not yet initialized. Call audioEngine.initialize() first.');
+        this.hasWarnedNotInitialized = true;
+      }
       return;
     }
 

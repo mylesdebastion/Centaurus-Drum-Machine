@@ -1,27 +1,33 @@
 import { useNavigate } from 'react-router-dom';
-import { Music, BookOpen, Eye, Sliders, RotateCcw } from 'lucide-react';
+import { Music, BookOpen, Eye, RotateCcw } from 'lucide-react';
 import { PersonaCode, getPersonaConfig } from '@/utils/personaCodes';
 import { resetOnboarding } from '@/utils/devShortcuts';
 
 /**
- * PersonaSelector - Epic 22 Story 22.1
+ * PersonaSelector - Epic 22 Story 22.1 + Epic 23 Story 23.3/23.4
  *
- * Shows 4 persona cards for Week 1 launch:
+ * Shows 3 ready persona cards for Week 1 launch:
  * - Musician (m)
  * - Educator (e)
  * - Visual Learner (v)
- * - Producer (p)
+ *
+ * Story 23.3: Routes to /studio with preset configuration
+ * Story 23.4: Removed Producer (p) - not ready until Epic 24 (export feature)
  */
 export function PersonaSelector() {
   const navigate = useNavigate();
 
   const handlePersonaSelect = (code: PersonaCode) => {
     console.log('[PersonaSelector] Persona selected:', code);
-    console.log('[PersonaSelector] Navigating to: /?v=' + code);
-    // Navigate to root with persona code (OnboardingRouter will show tutorial)
-    navigate(`/?v=${code}`);
+    // Story 23.3: Route to Studio with preset and tour enabled
+    const route = `/studio?v=${code}&tour=true`;
+    console.log('[PersonaSelector] Navigating to:', route);
+    navigate(route);
   };
 
+  // Story 23.4: Only show ready personas (Musician, Educator, Visual Learner)
+  // Producer (p) removed - blocked until Epic 24 (export feature)
+  // Enterprise (i) not included - blocked until Epic 25 (admin dashboard)
   const personaCards: Array<{
     code: PersonaCode;
     icon: typeof Music;
@@ -45,12 +51,6 @@ export function PersonaSelector() {
       icon: Eye,
       gradient: 'from-purple-900/50 to-violet-900/50',
       borderColor: 'border-purple-500/30 hover:border-purple-400',
-    },
-    {
-      code: 'p',
-      icon: Sliders,
-      gradient: 'from-orange-900/50 to-red-900/50',
-      borderColor: 'border-orange-500/30 hover:border-orange-400',
     },
   ];
 
@@ -97,7 +97,7 @@ export function PersonaSelector() {
                   </div>
                 </div>
                 <div className="text-sm text-white/70 group-hover:text-white transition-colors">
-                  → Start 30-second tutorial
+                  → Start interactive tour
                 </div>
               </button>
             );

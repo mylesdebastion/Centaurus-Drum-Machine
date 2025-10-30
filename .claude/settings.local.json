@@ -12,7 +12,10 @@
       "Bash(git checkout:*)",
       "Bash(npm run build:*)",
       "WebFetch(domain:www.audiolux.app)",
-      "WebFetch(domain:jam.audiolux.app)"
+      "WebFetch(domain:jam.audiolux.app)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)"
     ],
     "deny": [],
     "ask": []

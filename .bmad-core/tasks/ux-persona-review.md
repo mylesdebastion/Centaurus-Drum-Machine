@@ -30,14 +30,17 @@ Evaluate user experience from a specific persona's perspective, catching issues 
 
 ## Prerequisites
 
-**Playwright Setup** (if not already installed):
-```bash
-cd testing/persona-ux
-npm install playwright
-npx playwright install chromium
-```
+**MCP Playwright Server**: Configured in `.mcp.json` (automatically available in Claude Code)
 
 **Dev Server Running**: `npm run dev` at localhost:5173
+
+**MCP Tools Available**:
+- `mcp__playwright__browser_navigate` - Navigate to test URLs
+- `mcp__playwright__browser_resize` - Set viewport sizes
+- `mcp__playwright__browser_snapshot` - Capture accessibility tree
+- `mcp__playwright__browser_take_screenshot` - Visual evidence capture
+- `mcp__playwright__browser_console_messages` - Error/warning detection
+- `mcp__playwright__browser_wait_for` - Wait for elements/animations
 
 ## Dependencies
 
@@ -50,22 +53,99 @@ external:
 
 ## Process
 
-### Step 1: Capture Screenshots
+### Step 1: Navigate and Capture Screenshots
 
-Run the Playwright capture script:
+Use MCP Playwright commands to navigate, capture screenshots, and monitor browser behavior.
 
-```bash
-node testing/persona-ux/capture-flow.js --persona={persona_code} --url={flow_url}
+#### 1A. Navigate to Flow URL
+
+```
+Use: mcp__playwright__browser_navigate
+URL: http://localhost:5173{flow_url}
 ```
 
-**Script captures:**
-- Initial landing/selector screen
-- Each tutorial step
-- Completion/CTA screen
-- Mobile viewport (375px)
-- Desktop viewport (1920px)
+**Example:** Navigate to `http://localhost:5173/?v=m` for Musician persona
 
-**Output:** `testing/persona-ux/screenshots/{persona_code}/{YYYYMMDD}-{step}.png`
+#### 1B. Set Viewport (Desktop-First for Persona Reviews)
+
+```
+Use: mcp__playwright__browser_resize
+Desktop: width=1920, height=1080
+Mobile: width=375, height=667 (if testing mobile)
+```
+
+**Default Strategy:**
+- Regular personas (m, e, v, p): Desktop-only (speeds up testing)
+- Responsive testing: Use ux-responsive-layout-test.md instead
+
+#### 1C. Capture Initial State
+
+**Accessibility Snapshot (Preferred):**
+```
+Use: mcp__playwright__browser_snapshot
+Purpose: Capture DOM structure, semantic HTML, accessibility tree
+Better than screenshots for: aria labels, form associations, keyboard nav
+```
+
+**Visual Screenshot:**
+```
+Use: mcp__playwright__browser_take_screenshot
+Options:
+  - filename: testing/persona-ux/screenshots/{story}-{persona}/step0-landing-{date}.png
+  - fullPage: false (viewport only)
+  - type: png
+```
+
+#### 1D. Monitor Browser Console (NEW)
+
+```
+Use: mcp__playwright__browser_console_messages
+onlyErrors: false (get all messages including warnings)
+```
+
+**Check for:**
+- JavaScript errors (red flags for code quality)
+- React warnings (hydration issues, deprecated APIs)
+- Performance warnings (large bundles, slow renders)
+- Network errors (failed API calls)
+
+**Save console output** for inclusion in assessment report.
+
+#### 1E. Navigate Through Flow
+
+For each tutorial step:
+
+1. **Find and click** "Next"/"Continue" button:
+   ```
+   Use: mcp__playwright__browser_click
+   element: "Next button"
+   ref: [from browser_snapshot]
+   ```
+
+2. **Wait for transition**:
+   ```
+   Use: mcp__playwright__browser_wait_for
+   time: 1 (seconds for animations)
+   ```
+
+3. **Capture snapshot and screenshot** of new step
+
+4. **Check console messages** for new errors
+
+**Repeat** until completion screen reached.
+
+#### 1F. Organize Screenshots
+
+**Directory structure:**
+```
+testing/persona-ux/screenshots/{story}-{persona}/
+  ├── step0-landing-desktop-{YYYYMMDD-HHMM}.png
+  ├── step1-desktop-{YYYYMMDD-HHMM}.png
+  ├── step2-desktop-{YYYYMMDD-HHMM}.png
+  └── completion-desktop-{YYYYMMDD-HHMM}.png
+```
+
+**Naming convention:** `{step}-{viewport}-{timestamp}.png`
 
 ### Step 2: Load Persona Context
 
@@ -172,7 +252,16 @@ During Step 3 analysis, you'll compare:
 
 ### Step 3: Visual Analysis Framework
 
-For each screenshot, analyze using `ux-analysis-framework.md`:
+For each screenshot and accessibility snapshot, analyze using `ux-analysis-framework.md`.
+
+**NEW: Use Accessibility Snapshots** from `browser_snapshot` to validate:
+- Semantic HTML structure (proper heading hierarchy)
+- Form label associations (aria-labelledby, for attributes)
+- Keyboard navigation order (tab index, focus management)
+- Button/link accessibility (role, aria-label, name)
+- ARIA attributes (aria-hidden, aria-live, aria-expanded)
+
+**Combine with Visual Screenshots** for complete analysis:
 
 #### A. Visual Hierarchy (What do I notice first/second/third?)
 
@@ -379,11 +468,53 @@ Flow Tested: {flow_url}
 **What frustrates me?** {Frustrations}
 **I'd quit if...** {Bailout triggers}
 
+## Browser Console Analysis (NEW)
+
+**Console Messages Captured:** {count} messages ({errors} errors, {warnings} warnings)
+
+### Critical JavaScript Errors
+
+{List any console errors that impact functionality}
+
+**Example:**
+```
+[ERROR] Uncaught TypeError: Cannot read property 'play' of null
+  at DrumMachine.tsx:45
+  Impact: Drum sounds not playing on button click
+```
+
+### Warnings & Performance Issues
+
+{List React warnings, performance warnings, network errors}
+
+**Example:**
+```
+[WARNING] Component re-rendering 15 times per second
+  at Studio.tsx:122
+  Impact: May cause performance issues on slower devices
+```
+
+## Accessibility Snapshot Findings (NEW)
+
+**Semantic HTML Issues:**
+- {List heading hierarchy problems, missing landmarks, etc.}
+
+**Form Accessibility:**
+- {List missing labels, improper associations, etc.}
+
+**Keyboard Navigation:**
+- {List tab order issues, missing focus styles, trapped focus}
+
+**ARIA Issues:**
+- {List incorrect ARIA usage, missing attributes}
+
 ## Flow Analysis
 
 ### Screenshot 1: {Step Name} (Desktop)
 
 **First Impression:** "{Persona voice - what I notice immediately}"
+
+**Accessibility Snapshot:** {Link to snapshot data or key findings}
 
 #### Visual Hierarchy: [PASS|CONCERNS|FAIL]
 - Primary CTA prominence: {assessment}
@@ -644,16 +775,20 @@ When reviewing all 4 personas:
 - **Actionable feedback** - "This sucks" → "Change X to Y because Z"
 - **Emotional honesty** - Capture frustration, confusion, delight
 - **Persona-first decisions** - Generic UX rules don't apply if persona doesn't care
+- **NEW: Browser console monitoring** - JavaScript errors indicate code quality issues
+- **NEW: Accessibility snapshots** - DOM structure reveals semantic HTML quality
+- **NEW: Visual mode first** - Use `browser_snapshot` before screenshots for structure analysis
 
 ## Blocking Conditions
 
 Stop the review and request clarification if:
 
-- Dev server not running (can't capture screenshots)
+- Dev server not running (browser navigation fails)
+- MCP Playwright server not configured (.mcp.json missing playwright entry)
 - Persona code invalid or context data missing
 - Story doesn't involve user-facing UX
 - Flow URL returns 404 or errors
-- Screenshots fail to capture (missing Playwright setup)
+- Browser fails to launch (run `mcp__playwright__browser_install` if needed)
 
 ## Completion
 
