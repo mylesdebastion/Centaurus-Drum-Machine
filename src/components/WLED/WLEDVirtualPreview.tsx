@@ -10,7 +10,7 @@ import { WLEDVirtualPreviewProps } from './types';
 import { ledCompositor } from '@/services/LEDCompositor';
 import type { CompositorEvent } from '@/services/LEDCompositor';
 
-const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColors, showLivePreview = false }) => {
+const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColors, matrixColors, showLivePreview = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [compositedColors, setCompositedColors] = useState<string[]>([]);
 
@@ -131,11 +131,35 @@ const WLEDVirtualPreview: React.FC<WLEDVirtualPreviewProps> = ({ device, ledColo
     );
   }
 
-  // Render matrix (2D) - Future enhancement
-  if (device.deviceType === 'matrix' && device.matrixConfig) {
+  // Render matrix (2D) - Based on LEDMatrixManager pattern
+  if (device.deviceType === 'matrix' && device.matrixConfig && matrixColors) {
+    const { width, height } = device.matrixConfig;
+
     return (
-      <div className="w-full bg-gray-800 rounded-lg p-2">
-        <p className="text-xs text-gray-500 text-center">Matrix visualization coming soon</p>
+      <div className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2">
+        <div className="bg-gray-800 rounded p-2 inline-block">
+          <div
+            className="grid gap-0.5"
+            style={{
+              gridTemplateColumns: `repeat(${width}, minmax(0, 1fr))`,
+            }}
+          >
+            {matrixColors.map((row, y) =>
+              row.map((pixel, x) => (
+                <div
+                  key={`${x}-${y}`}
+                  className="w-3 h-3 rounded-sm"
+                  style={{
+                    backgroundColor: `rgb(${pixel.r}, ${pixel.g}, ${pixel.b})`,
+                  }}
+                />
+              ))
+            )}
+          </div>
+        </div>
+        <div className="mt-2 text-xs text-gray-400 text-center">
+          {width}×{height} Matrix ({width * height} LEDs)
+        </div>
       </div>
     );
   }

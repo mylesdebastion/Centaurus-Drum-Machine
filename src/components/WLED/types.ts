@@ -78,5 +78,6 @@ export interface WLEDDeviceCardProps {
 export interface WLEDVirtualPreviewProps {
   device: WLEDDevice;
   ledColors?: string[];
+  matrixColors?: { r: number; g: number; b: number }[][]; // 2D matrix support (DJ Visualizer)
   showLivePreview?: boolean;
 }

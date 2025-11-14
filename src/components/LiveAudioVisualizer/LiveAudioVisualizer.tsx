@@ -640,8 +640,8 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
               )}
             </div>
 
-            {/* LED Matrix Manager - Always rendered for LED output (hidden from UI) */}
-            <div style={{ display: 'none' }}>
+            {/* LED Matrix Manager - Virtual pixel preview and LED output */}
+            <div className="mt-4">
               <LEDMatrixManager />
             </div>
 
@@ -669,9 +669,6 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                         </p>
                       )}
                     </div>
-
-                    {/* LED Matrix Manager UI - Shown in settings panel */}
-                    <LEDMatrixManager />
                   </div>
                 </CollapsiblePanel>
               </div>
