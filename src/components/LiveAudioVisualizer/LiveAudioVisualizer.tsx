@@ -294,13 +294,22 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
     }
   }, [colorMode]);
 
-  // Auto-start visualization in embedded mode (no mic input required for drums-only)
+  // Start visualization when initialized and canvas is ready
+  // Fixes race condition: handleStart() called startVisualization() before canvas mounted
   useEffect(() => {
-    if (embedded && vizEngineRef.current && adapterRef.current && !animationFrameRef.current) {
-      console.log('[LiveAudioVisualizer] Auto-starting visualization for embedded mode');
+    if (isInitialized && canvasRef.current && vizEngineRef.current && adapterRef.current && !animationFrameRef.current) {
+      console.log('[LiveAudioVisualizer] Starting visualization (canvas now ready)');
       startVisualization();
     }
-  }, [embedded]);
+  }, [isInitialized]);
+
+  // Also support embedded mode without mic (drums-only)
+  useEffect(() => {
+    if (embedded && !isInitialized && vizEngineRef.current && adapterRef.current && !animationFrameRef.current) {
+      console.log('[LiveAudioVisualizer] Auto-starting visualization for embedded mode (no mic)');
+      startVisualization();
+    }
+  }, [embedded, isInitialized]);
 
   // Handle mode change
   const handleModeChange = (mode: VisualizationMode) => {

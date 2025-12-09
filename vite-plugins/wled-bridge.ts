@@ -23,6 +23,11 @@ export function wledBridgePlugin(): Plugin {
   let udpClient: any = null;
   let bridgePort: number;
 
+  // Rate-limited logging to reduce terminal spam
+  const packetCounts: Record<string, number> = {};
+  let lastLogTime = Date.now();
+  const LOG_INTERVAL_MS = 5000; // Log summary every 5 seconds
+
   return {
     name: 'wled-bridge',
     async configureServer() {
@@ -71,7 +76,18 @@ export function wledBridgePlugin(): Plugin {
                 console.error(`❌ UDP send failed to ${ipAddress}:`, error.message);
                 ws.send(JSON.stringify({ success: false, error: error.message }));
               } else {
-                console.log(`✅ Bridge sent ${ledData.length} LEDs to ${ipAddress}`);
+                // Rate-limited logging: count packets and log summary periodically
+                packetCounts[ipAddress] = (packetCounts[ipAddress] || 0) + 1;
+                const now = Date.now();
+                if (now - lastLogTime >= LOG_INTERVAL_MS) {
+                  const summary = Object.entries(packetCounts)
+                    .map(([ip, count]) => `${ip}: ${count} packets`)
+                    .join(', ');
+                  console.log(`📊 WLED Bridge [${LOG_INTERVAL_MS / 1000}s]: ${summary}`);
+                  // Reset counters
+                  Object.keys(packetCounts).forEach(key => delete packetCounts[key]);
+                  lastLogTime = now;
+                }
                 ws.send(JSON.stringify({ success: true }));
               }
             });
