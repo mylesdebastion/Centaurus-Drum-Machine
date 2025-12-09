@@ -1868,11 +1868,14 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     }
 
     // Second half: descending (steps 8-15)
+    // Start from second-to-last note to avoid repeating the top note
     for (let step = 8; step < 16; step++) {
-      const descendingStep = 15 - step; // 7, 6, 5, 4, 3, 2, 1, 0
-      const scaleIndex = descendingStep % currentScale.length;
-      const noteIndex = currentScale[scaleIndex];
-      newPattern[noteIndex][step] = true;
+      const offset = step - 8; // 0 to 7
+      const scaleIndex = currentScale.length - 1 - offset;
+      if (scaleIndex >= 0) {
+        const noteIndex = currentScale[scaleIndex];
+        newPattern[noteIndex][step] = true;
+      }
     }
 
     setPattern(newPattern);
