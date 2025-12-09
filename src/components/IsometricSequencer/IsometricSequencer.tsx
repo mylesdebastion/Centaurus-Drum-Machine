@@ -1843,11 +1843,10 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     const newPattern: boolean[][] = Array(12).fill(null).map(() => Array(16).fill(false));
     const currentScale = getCurrentScale();
 
-    // Place one note per step, ascending through the scale
-    // Uses all 16 steps, cycling through scale notes
-    for (let step = 0; step < 16; step++) {
-      const scaleIndex = step % currentScale.length;
-      const noteIndex = currentScale[scaleIndex];
+    // Play scale once, then rest (clean loop for warm-up exercise)
+    // For C major: C D E F G A B (rest rest rest...)
+    for (let step = 0; step < Math.min(currentScale.length, 16); step++) {
+      const noteIndex = currentScale[step];
       newPattern[noteIndex][step] = true;
     }
 
@@ -1860,22 +1859,22 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     const newPattern: boolean[][] = Array(12).fill(null).map(() => Array(16).fill(false));
     const currentScale = getCurrentScale();
 
-    // First half: ascending (steps 0-7)
-    for (let step = 0; step < 8; step++) {
-      const scaleIndex = step % currentScale.length;
-      const noteIndex = currentScale[scaleIndex];
-      newPattern[noteIndex][step] = true;
+    const scaleLength = currentScale.length;
+    let currentStep = 0;
+
+    // Ascending: play full scale (C D E F G A B)
+    for (let i = 0; i < scaleLength && currentStep < 16; i++) {
+      const noteIndex = currentScale[i];
+      newPattern[noteIndex][currentStep] = true;
+      currentStep++;
     }
 
-    // Second half: descending (steps 8-15)
-    // Start from second-to-last note to avoid repeating the top note
-    for (let step = 8; step < 16; step++) {
-      const offset = step - 8; // 0 to 7
-      const scaleIndex = currentScale.length - 1 - offset;
-      if (scaleIndex >= 0) {
-        const noteIndex = currentScale[scaleIndex];
-        newPattern[noteIndex][step] = true;
-      }
+    // Descending: start from second-to-last note to avoid double top note
+    // Play B A G F E D C (reverse, excluding the top note we just played)
+    for (let i = scaleLength - 2; i >= 0 && currentStep < 16; i--) {
+      const noteIndex = currentScale[i];
+      newPattern[noteIndex][currentStep] = true;
+      currentStep++;
     }
 
     setPattern(newPattern);
