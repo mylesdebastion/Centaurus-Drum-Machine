@@ -212,7 +212,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
   const soundEngineRef = useRef<SoundEngine | null>(null);
 
   // Melody generation mode state
-  type MelodyMode = 'melody' | 'random' | 'chords' | 'beats' | 'twinkle';
+  type MelodyMode = 'melody' | 'random' | 'chords' | 'beats' | 'ascending' | 'updown' | 'twinkle';
   const [selectedMelodyMode, setSelectedMelodyMode] = useState<MelodyMode>('melody');
   const [showMelodyMenu, setShowMelodyMenu] = useState(false);
   const melodyModeNames: Record<MelodyMode, string> = {
@@ -220,6 +220,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     random: 'Random',
     chords: 'Chords',
     beats: 'Beats',
+    ascending: 'Ascending',
+    updown: 'Up/Down',
     twinkle: 'Twinkle'
   };
 
@@ -1834,6 +1836,48 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     setPattern(newPattern);
   };
 
+
+  // Generate ascending scale pattern (C to B, left to right)
+  // Warm-up exercise for students to hit boomwhackers in order
+  const generateAscending = () => {
+    const newPattern: boolean[][] = Array(12).fill(null).map(() => Array(16).fill(false));
+    const currentScale = getCurrentScale();
+
+    // Place one note per step, ascending through the scale
+    // Uses all 16 steps, cycling through scale notes
+    for (let step = 0; step < 16; step++) {
+      const scaleIndex = step % currentScale.length;
+      const noteIndex = currentScale[scaleIndex];
+      newPattern[noteIndex][step] = true;
+    }
+
+    setPattern(newPattern);
+  };
+
+  // Generate up/down scale pattern (C to B and back)
+  // Warm-up exercise: ascending then descending
+  const generateUpDown = () => {
+    const newPattern: boolean[][] = Array(12).fill(null).map(() => Array(16).fill(false));
+    const currentScale = getCurrentScale();
+
+    // First half: ascending (steps 0-7)
+    for (let step = 0; step < 8; step++) {
+      const scaleIndex = step % currentScale.length;
+      const noteIndex = currentScale[scaleIndex];
+      newPattern[noteIndex][step] = true;
+    }
+
+    // Second half: descending (steps 8-15)
+    for (let step = 8; step < 16; step++) {
+      const descendingStep = 15 - step; // 7, 6, 5, 4, 3, 2, 1, 0
+      const scaleIndex = descendingStep % currentScale.length;
+      const noteIndex = currentScale[scaleIndex];
+      newPattern[noteIndex][step] = true;
+    }
+
+    setPattern(newPattern);
+  };
+
   // Unified pattern generator based on selected mode
   const generatePattern = () => {
     switch (selectedMelodyMode) {
@@ -1848,6 +1892,12 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
         break;
       case 'beats':
         generateBeats();
+        break;
+      case 'ascending':
+        generateAscending();
+        break;
+      case 'updown':
+        generateUpDown();
         break;
       case 'twinkle':
         generateTwinkle();
@@ -1867,7 +1917,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     setSelectedScale(randomScale);
 
     // Randomly select melody mode
-    const melodyModes: MelodyMode[] = ['melody', 'random', 'chords', 'beats', 'twinkle'];
+    const melodyModes: MelodyMode[] = ['melody', 'random', 'chords', 'beats', 'ascending', 'updown', 'twinkle'];
     const randomMelodyMode = melodyModes[Math.floor(Math.random() * melodyModes.length)];
     setSelectedMelodyMode(randomMelodyMode);
 
@@ -1890,6 +1940,12 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
           break;
         case 'beats':
           generateBeats();
+          break;
+        case 'ascending':
+          generateAscending();
+          break;
+        case 'updown':
+          generateUpDown();
           break;
         case 'twinkle':
           generateTwinkle();
@@ -2190,6 +2246,12 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
                           break;
                         case 'beats':
                           generateBeats();
+                          break;
+                        case 'ascending':
+                          generateAscending();
+                          break;
+                        case 'updown':
+                          generateUpDown();
                           break;
                         case 'twinkle':
                           generateTwinkle();
