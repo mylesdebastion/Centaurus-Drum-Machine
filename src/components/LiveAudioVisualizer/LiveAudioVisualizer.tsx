@@ -190,13 +190,42 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
       // Render visualization using adapter (which mixes all sources)
       vizEngine.render(ctx, adapter as any, width, height);
 
-      // Update LED matrix if enabled
+      // WORKSHOP QUICK FIX: Broadcast to all 9 WLED devices
+      // Workshop tomorrow (2025-12-10) - 8 student tubes + 1 demo tube
+      const WORKSHOP_DEVICES = [
+        '192.168.8.101', '192.168.8.102', '192.168.8.103', '192.168.8.104',
+        '192.168.8.105', '192.168.8.106', '192.168.8.107', '192.168.8.108',
+        '192.168.8.158' // Master demo device
+      ];
+
       const ledManager = (window as any).ledMatrixManager;
-      if (ledManager && ledManager.getConfig && ledManager.getConfig().enabled) {
-        // Extract canvas pixel data and convert to LED matrix grid
+      if (ledManager && ledManager.getConfig) {
         const matrixConfig = ledManager.getConfig();
         const grid = extractMatrixGrid(ctx, matrixConfig.width, matrixConfig.height, width, height);
-        ledManager.sendToWLED(grid);
+
+        // Flatten 2D grid to 1D array for WLED transmission
+        const linearData: { r: number; g: number; b: number }[] = [];
+        for (let y = 0; y < grid.length; y++) {
+          for (let x = 0; x < grid[y].length; x++) {
+            linearData.push(grid[y][x]);
+          }
+        }
+
+        // Send FULL array - WLED devices use configured LED count, ignore extras (no dark LEDs!)
+        const ledData = linearData;
+
+        // Broadcast to all workshop devices simultaneously
+        if (window.wledBridge && window.wledBridge.readyState === WebSocket.OPEN) {
+          for (const ip of WORKSHOP_DEVICES) {
+            try {
+              window.wledBridge.send(JSON.stringify({ ipAddress: ip, ledData }));
+            } catch (err) {
+              console.warn(`[DJ Visualizer] Failed to send to ${ip}:`, err);
+            }
+          }
+        } else {
+          console.warn('[DJ Visualizer] WLED WebSocket bridge not connected');
+        }
       }
 
       // Update stats from adapter
