@@ -1843,11 +1843,14 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     const newPattern: boolean[][] = Array(12).fill(null).map(() => Array(16).fill(false));
     const currentScale = getCurrentScale();
 
-    // Play scale once, then rest (clean loop for warm-up exercise)
-    // For C major: C D E F G A B (rest rest rest...)
-    for (let step = 0; step < Math.min(currentScale.length, 16); step++) {
-      const noteIndex = currentScale[step];
-      newPattern[noteIndex][step] = true;
+    // Play scale with 1 rest between each note (beginner warm-up)
+    // For C major: C (rest) D (rest) E (rest) F (rest) G (rest) A (rest) B (rest)
+    // 7 notes + 7 rests = 14 steps, fits perfectly in 16 steps
+    let currentStep = 0;
+    for (let i = 0; i < currentScale.length && currentStep < 16; i++) {
+      const noteIndex = currentScale[i];
+      newPattern[noteIndex][currentStep] = true;
+      currentStep += 2; // Skip 1 step for rest
     }
 
     setPattern(newPattern);
