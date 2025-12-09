@@ -190,6 +190,17 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
       // Render visualization using adapter (which mixes all sources)
       vizEngine.render(ctx, adapter as any, width, height);
 
+      // Update LED matrix if enabled
+      const ledManager = (window as any).ledMatrixManager;
+      if (ledManager && ledManager.getConfig && ledManager.getConfig().enabled) {
+        // Extract canvas pixel data and convert to LED matrix grid
+        const matrixConfig = ledManager.getConfig();
+        const grid = extractMatrixGrid(ctx, matrixConfig.width, matrixConfig.height, width, height);
+
+        // Send to LEDMatrixManager (handles virtual preview + single device WLED)
+        ledManager.sendToWLED(grid);
+      }
+
       // WORKSHOP QUICK FIX: Broadcast to all 9 WLED devices
       // Workshop tomorrow (2025-12-10) - 8 student tubes + 1 demo tube
       const WORKSHOP_DEVICES = [
@@ -198,7 +209,6 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
         '192.168.8.158' // Master demo device
       ];
 
-      const ledManager = (window as any).ledMatrixManager;
       if (ledManager && ledManager.getConfig) {
         const matrixConfig = ledManager.getConfig();
         const grid = extractMatrixGrid(ctx, matrixConfig.width, matrixConfig.height, width, height);
