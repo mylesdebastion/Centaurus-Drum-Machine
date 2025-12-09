@@ -9,7 +9,7 @@
  * - Support for horizontal/vertical orientation
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Wifi, WifiOff, Eye, EyeOff, Settings } from 'lucide-react';
 
 export interface LEDMatrixConfig {
@@ -67,10 +67,60 @@ export const LEDMatrixManager: React.FC<LEDMatrixManagerProps> = ({
     setPreviewData(grid);
   }, [config.width, config.height]);
 
+  // Cleanup function to exit WLED realtime mode
+  const exitRealtimeMode = useCallback(async (ipAddress: string) => {
+    try {
+      const response = await fetch(`http://${ipAddress}/json/state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ live: false }),
+        signal: AbortSignal.timeout(1000)
+      });
+      console.log(`🚪 Exit realtime mode for ${ipAddress}: ${response.ok ? 'success' : 'failed'}`);
+      return response.ok;
+    } catch (error) {
+      console.warn(`⚠️ Failed to exit realtime mode for ${ipAddress}:`, error);
+      return false;
+    }
+  }, []);
+
   // Connect to WLED WebSocket bridge (use global window.wledBridge)
   useEffect(() => {
     if (!config.enabled) {
       setWsConnected(false);
+
+      // Cleanup: Exit realtime mode for configured device (async, fire and forget)
+      (async () => {
+        console.log('🔌 LED Matrix Manager disabled - starting cleanup...');
+
+        // Close WebSocket first
+        if (window.wledBridge) {
+          if (window.wledBridge.readyState === WebSocket.OPEN ||
+              window.wledBridge.readyState === WebSocket.CONNECTING) {
+            window.wledBridge.close(1000, 'LED Matrix Manager disabled');
+          }
+          window.wledBridge = null;
+          console.log('✅ WebSocket closed.');
+        }
+
+        // Wait for in-flight packets
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        // Exit realtime mode on configured device
+        await exitRealtimeMode(config.ipAddress);
+
+        // WORKSHOP FIX: Also exit realtime on all workshop devices
+        const WORKSHOP_DEVICES = [
+          '192.168.8.101', '192.168.8.102', '192.168.8.103', '192.168.8.104',
+          '192.168.8.105', '192.168.8.106', '192.168.8.107', '192.168.8.108',
+          '192.168.8.158'
+        ];
+
+        console.log(`🚪 Sending {"live":false} to ${WORKSHOP_DEVICES.length} workshop devices...`);
+        await Promise.all(WORKSHOP_DEVICES.map(ip => exitRealtimeMode(ip)));
+        console.log('✅ WLED cleanup complete. Devices returned to standalone mode.');
+      })();
+
       return;
     }
 
@@ -173,7 +223,7 @@ export const LEDMatrixManager: React.FC<LEDMatrixManagerProps> = ({
       // Just clear our ref, don't close the global bridge
       wsRef.current = null;
     };
-  }, [config.enabled]);
+  }, [config.enabled, config.ipAddress, exitRealtimeMode]);
 
   // Notify parent of config changes
   useEffect(() => {

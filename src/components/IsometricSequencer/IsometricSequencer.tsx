@@ -201,6 +201,15 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
   // Animation mode toggle (default to smooth scrolling for better musical flow)
   const [smoothScrolling, setSmoothScrolling] = useState(true);
 
+  // Cleanup WebSocket bridge when LED visualization is disabled
+  useEffect(() => {
+    if (!ledEnabled) {
+      // Send shutdown packets and close WebSocket connection
+      // This allows WLED devices to exit realtime mode and revert to standalone
+      SingleLaneVisualizer.cleanupWebSocketBridge(ledVisualizers);
+    }
+  }, [ledEnabled, ledVisualizers]);
+
   // APC40 hardware control state
   const [apc40Controller] = useState(() => new APC40Controller());
   const [apc40Connected, setAPC40Connected] = useState(false);

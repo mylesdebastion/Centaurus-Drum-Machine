@@ -910,7 +910,7 @@ export class SingleLaneVisualizer {
   }
 
   /**
-   * Turn off the LED strip
+   * Turn off the LED strip via HTTP JSON API
    */
   async turnOff(): Promise<boolean> {
     try {
@@ -922,6 +922,58 @@ export class SingleLaneVisualizer {
       });
       return response.ok;
     } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Exit WLED realtime mode using JSON API
+   * This is the proper way to exit UDP realtime mode according to WLED docs
+   */
+  async exitRealtimeMode(): Promise<boolean> {
+    try {
+      const response = await fetch(`http://${this.config.ipAddress}/json/state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ live: false }),
+        signal: AbortSignal.timeout(1000)
+      });
+      console.log(`🚪 Exit realtime mode for ${this.config.ipAddress}: ${response.ok ? 'success' : 'failed'}`);
+      return response.ok;
+    } catch (error) {
+      console.warn(`⚠️ Failed to exit realtime mode for ${this.config.ipAddress}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Send a shutdown UDP packet to exit realtime mode gracefully
+   * This sends a black frame with a 1-second timeout, allowing the device
+   * to return to standalone mode after 1 second of no UDP data
+   */
+  async sendShutdownPacket(): Promise<boolean> {
+    try {
+      // Send black frame with 1-second timeout via WebSocket bridge
+      if (!window.wledBridge || window.wledBridge.readyState !== WebSocket.OPEN) {
+        console.warn(`⚠️ Cannot send shutdown packet - WebSocket bridge not connected`);
+        return false;
+      }
+
+      // Create black LED array (turn off all LEDs)
+      const blackFrame: LEDColor[] = new Array(this.config.ledCount).fill({ r: 0, g: 0, b: 0 });
+
+      // Send through WebSocket bridge with special shutdown flag
+      const message = {
+        ipAddress: this.config.ipAddress,
+        ledData: blackFrame,
+        shutdown: true // Flag to use 1-second timeout instead of 255
+      };
+
+      window.wledBridge.send(JSON.stringify(message));
+      console.log(`🛑 Sent shutdown packet to ${this.config.ipAddress} (will exit realtime mode in 1 second)`);
+      return true;
+    } catch (error) {
+      console.warn(`⚠️ Failed to send shutdown packet to ${this.config.ipAddress}:`, error);
       return false;
     }
   }
@@ -1149,4 +1201,53 @@ export class SingleLaneVisualizer {
   //     b: Math.min(255, Math.round(color.b * multiplier))
   //   };
   // }
+
+  /**
+   * Static cleanup method to properly close WebSocket bridge connection
+   * and exit WLED realtime mode. Call this when disabling LED visualization.
+   *
+   * CRITICAL: The correct way to exit WLED realtime mode is:
+   * 1. Stop sending UDP packets (close WebSocket)
+   * 2. Send {"live":false} via JSON API to explicitly exit realtime mode
+   *
+   * Do NOT send UDP shutdown packets - any UDP packet resets the timeout!
+   *
+   * @param visualizers - Optional array of active visualizers to shut down
+   */
+  static async cleanupWebSocketBridge(visualizers?: SingleLaneVisualizer[]): Promise<void> {
+    console.log('🔌 Starting WLED cleanup sequence (v3 - JSON API exit)...');
+
+    // Step 1: Close the WebSocket connection FIRST (stop sending UDP packets)
+    if (window.wledBridge) {
+      if (window.wledBridge.readyState === WebSocket.OPEN ||
+          window.wledBridge.readyState === WebSocket.CONNECTING) {
+        window.wledBridge.close(1000, 'LED visualization disabled');
+      }
+
+      // Clear the global reference
+      window.wledBridge = null;
+      console.log('✅ WebSocket closed. No more UDP packets will be sent.');
+    }
+
+    // Step 2: Wait 200ms for any in-flight packets to complete
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // Step 3: Use JSON API to explicitly exit realtime mode
+    if (visualizers && visualizers.length > 0) {
+      console.log(`🚪 Sending {"live":false} to ${visualizers.length} WLED devices...`);
+
+      const exitPromises = visualizers.map(async (visualizer) => {
+        try {
+          await visualizer.exitRealtimeMode();
+        } catch (error) {
+          console.warn(`⚠️ Failed to exit realtime mode for ${visualizer.getConfig().ipAddress}:`, error);
+        }
+      });
+
+      await Promise.all(exitPromises);
+      console.log('✅ All devices should have exited realtime mode.');
+    }
+
+    console.log('✅ WLED cleanup complete. Devices returned to standalone mode.');
+  }
 }

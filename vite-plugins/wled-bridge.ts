@@ -49,7 +49,7 @@ export function wledBridgePlugin(): Plugin {
         ws.on('message', (message) => {
           try {
             const data = JSON.parse(message.toString());
-            const { ipAddress, ledData } = data;
+            const { ipAddress, ledData, shutdown } = data;
 
             if (!ipAddress || !Array.isArray(ledData)) {
               console.error('❌ Invalid bridge message format. Expected: { ipAddress, ledData }');
@@ -57,10 +57,12 @@ export function wledBridgePlugin(): Plugin {
               return;
             }
 
-            // Create WARLS protocol packet: [2, 255, ...rgb_data...]
+            // Create WARLS protocol packet: [2, timeout, ...rgb_data...]
+            // Byte 0: Protocol (2 = DRGB, supports up to 490 LEDs)
+            // Byte 1: Timeout in seconds (1 = exit after 1 second, 255 = never timeout)
             const packet = Buffer.alloc(2 + ledData.length * 3);
-            packet[0] = 2;   // WARLS protocol identifier
-            packet[1] = 255; // Second byte
+            packet[0] = 2;   // DRGB protocol identifier
+            packet[1] = shutdown ? 1 : 255; // 1 second timeout for shutdown, infinite for normal operation
 
             // Fill RGB data
             for (let i = 0; i < ledData.length; i++) {
@@ -76,17 +78,22 @@ export function wledBridgePlugin(): Plugin {
                 console.error(`❌ UDP send failed to ${ipAddress}:`, error.message);
                 ws.send(JSON.stringify({ success: false, error: error.message }));
               } else {
-                // Rate-limited logging: count packets and log summary periodically
-                packetCounts[ipAddress] = (packetCounts[ipAddress] || 0) + 1;
-                const now = Date.now();
-                if (now - lastLogTime >= LOG_INTERVAL_MS) {
-                  const summary = Object.entries(packetCounts)
-                    .map(([ip, count]) => `${ip}: ${count} packets`)
-                    .join(', ');
-                  console.log(`📊 WLED Bridge [${LOG_INTERVAL_MS / 1000}s]: ${summary}`);
-                  // Reset counters
-                  Object.keys(packetCounts).forEach(key => delete packetCounts[key]);
-                  lastLogTime = now;
+                // Log shutdown packets immediately (they're important!)
+                if (shutdown) {
+                  console.log(`🛑 Shutdown packet sent to ${ipAddress} (byte[1]=1, will exit realtime in 1s)`);
+                } else {
+                  // Rate-limited logging: count packets and log summary periodically
+                  packetCounts[ipAddress] = (packetCounts[ipAddress] || 0) + 1;
+                  const now = Date.now();
+                  if (now - lastLogTime >= LOG_INTERVAL_MS) {
+                    const summary = Object.entries(packetCounts)
+                      .map(([ip, count]) => `${ip}: ${count} packets`)
+                      .join(', ');
+                    console.log(`📊 WLED Bridge [${LOG_INTERVAL_MS / 1000}s]: ${summary}`);
+                    // Reset counters
+                    Object.keys(packetCounts).forEach(key => delete packetCounts[key]);
+                    lastLogTime = now;
+                  }
                 }
                 ws.send(JSON.stringify({ success: true }));
               }
@@ -98,8 +105,9 @@ export function wledBridgePlugin(): Plugin {
           }
         });
 
-        ws.on('close', () => {
-          console.log('🔌 Browser disconnected from WLED bridge');
+        ws.on('close', (code, reason) => {
+          const reasonText = reason.toString() || 'No reason provided';
+          console.log(`🔌 Browser disconnected from WLED bridge (code: ${code}, reason: ${reasonText})`);
         });
 
         ws.on('error', (error) => {
