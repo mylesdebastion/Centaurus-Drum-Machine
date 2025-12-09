@@ -72,7 +72,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
         {/* Action Buttons Section */}
         <div className="mb-12 sm:mb-16">
-          <div className="grid sm:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* 3D Sequencer - Primary */}
             <button
               onClick={onIsometricMode}
@@ -123,6 +123,24 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 <div className="mt-2 flex items-center gap-2 text-xs text-green-300">
                   <BookOpen className="w-4 h-4" />
                   <span>Learn Music</span>
+                </div>
+              </div>
+            </button>
+
+            {/* DJ Visualizer */}
+            <button
+              onClick={onDJVisualizer}
+              className="group bg-gradient-to-br from-orange-900/50 to-red-900/50 hover:from-orange-800/60 hover:to-red-800/60 p-6 rounded-xl border-2 border-orange-500/30 hover:border-orange-400 transition-all transform hover:scale-105 shadow-lg hover:shadow-orange-500/20"
+            >
+              <div className="flex flex-col items-center gap-3 text-center">
+                <Activity className="w-12 h-12 text-orange-400 group-hover:text-orange-300 transition-colors" />
+                <h3 className="text-lg font-bold text-white">DJ Visualizer</h3>
+                <p className="text-sm text-gray-300">
+                  Live audio visualization with spectrum, ripple, and LED output
+                </p>
+                <div className="mt-2 flex items-center gap-2 text-xs text-orange-300">
+                  <Play className="w-4 h-4" />
+                  <span>Launch Visualizer</span>
                 </div>
               </div>
             </button>
@@ -374,25 +392,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 </div>
               </button>
             )}
-
-            {/* DJ Visualizer */}
-            <button
-              onClick={onDJVisualizer}
-              className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-orange-500/50 transition-colors text-left"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <Activity className="w-6 h-6 text-orange-400" />
-                <h3 className="font-semibold text-white">DJ Visualizer</h3>
-                <span className="text-xs bg-orange-600/30 text-orange-300 px-2 py-1 rounded">Beta</span>
-              </div>
-              <p className="text-sm text-gray-400 mb-4">
-                Live audio visualization with spectrum analyzer, ripple effects, and LED matrix output
-              </p>
-              <div className="flex items-center gap-2 text-sm text-orange-400 group-hover:text-orange-300">
-                <span>Launch Visualizer</span>
-                <Play className="w-4 h-4" />
-              </div>
-            </button>
 
             {/* Multiplayer Jam */}
             <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
