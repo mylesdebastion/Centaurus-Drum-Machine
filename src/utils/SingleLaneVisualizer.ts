@@ -373,16 +373,16 @@ export class SingleLaneVisualizer {
     const ledBoomwhackerColors: LEDColor[] = [
       { r: 255, g: 0, b: 0 },     // C - Bright Red
       { r: 255, g: 100, b: 0 },   // C# - Red-Orange
-      { r: 255, g: 150, b: 0 },   // D - Orange
+      { r: 255, g: 136, b: 0 },   // D - Warm Orange
       { r: 255, g: 200, b: 0 },   // D# - Yellow-Orange
       { r: 255, g: 255, b: 0 },   // E - Bright Yellow
       { r: 150, g: 255, b: 0 },   // F - Yellow-Green
       { r: 0, g: 255, b: 0 },     // F# - Bright Green
       { r: 0, g: 255, b: 100 },   // G - Green-Blue
       { r: 0, g: 255, b: 200 },   // G# - Blue-Green
-      { r: 0, g: 150, b: 255 },   // A - Bright Blue
-      { r: 100, g: 0, b: 255 },   // A# - Blue-Purple
-      { r: 200, g: 0, b: 255 }    // B - Purple
+      { r: 100, g: 0, b: 255 },   // A - Purple
+      { r: 68, g: 102, b: 255 },  // A# - Blue-Purple
+      { r: 255, g: 0, b: 255 }    // B - Pink
     ];
 
     // Helper function to calculate LED position accounting for direction
@@ -494,16 +494,16 @@ export class SingleLaneVisualizer {
     const ledBoomwhackerColors: LEDColor[] = [
       { r: 255, g: 0, b: 0 },     // C - Bright Red
       { r: 255, g: 100, b: 0 },   // C# - Red-Orange
-      { r: 255, g: 150, b: 0 },   // D - Orange
+      { r: 255, g: 136, b: 0 },   // D - Warm Orange
       { r: 255, g: 200, b: 0 },   // D# - Yellow-Orange
       { r: 255, g: 255, b: 0 },   // E - Bright Yellow
       { r: 150, g: 255, b: 0 },   // F - Yellow-Green
       { r: 0, g: 255, b: 0 },     // F# - Bright Green
       { r: 0, g: 255, b: 100 },   // G - Green-Blue
       { r: 0, g: 255, b: 200 },   // G# - Blue-Green
-      { r: 0, g: 150, b: 255 },   // A - Bright Blue
-      { r: 100, g: 0, b: 255 },   // A# - Blue-Purple
-      { r: 200, g: 0, b: 255 }    // B - Purple
+      { r: 100, g: 0, b: 255 },   // A - Purple
+      { r: 68, g: 102, b: 255 },  // A# - Blue-Purple
+      { r: 255, g: 0, b: 255 }    // B - Pink
     ];
 
     // Helper function to calculate LED position accounting for direction (same as in static visualization)
@@ -1103,16 +1103,16 @@ export class SingleLaneVisualizer {
     const ledBoomwhackerColors: LEDColor[] = [
       { r: 255, g: 0, b: 0 },     // C - Bright Red
       { r: 255, g: 100, b: 0 },   // C# - Red-Orange
-      { r: 255, g: 150, b: 0 },   // D - Orange
+      { r: 255, g: 136, b: 0 },   // D - Warm Orange
       { r: 255, g: 200, b: 0 },   // D# - Yellow-Orange
       { r: 255, g: 255, b: 0 },   // E - Bright Yellow
       { r: 150, g: 255, b: 0 },   // F - Yellow-Green
       { r: 0, g: 255, b: 0 },     // F# - Bright Green
       { r: 0, g: 255, b: 100 },   // G - Green-Blue
       { r: 0, g: 255, b: 200 },   // G# - Blue-Green
-      { r: 0, g: 150, b: 255 },   // A - Bright Blue
-      { r: 100, g: 0, b: 255 },   // A# - Blue-Purple
-      { r: 200, g: 0, b: 255 }    // B - Purple
+      { r: 100, g: 0, b: 255 },   // A - Purple
+      { r: 68, g: 102, b: 255 },  // A# - Blue-Purple
+      { r: 255, g: 0, b: 255 }    // B - Pink
     ];
 
     if (!this.config.multiNotesMode || this.config.assignedLanes.length === 0) {

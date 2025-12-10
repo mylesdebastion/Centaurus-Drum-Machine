@@ -249,16 +249,16 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
   const boomwhackerColors = [
     '#ff4444', // C - Red
     '#ff8844', // C# - Orange-Red
-    '#ffaa44', // D - Orange
+    '#ff8800', // D - Warm Orange
     '#ffcc44', // D# - Yellow-Orange
     '#ffff44', // E - Yellow
     '#aaff44', // F - Yellow-Green
     '#66ff44', // F# - Green-Yellow
     '#44ff44', // G - Green
     '#44ffaa', // G# - Blue-Green
-    '#44aaff', // A - Blue
+    '#6644ff', // A - Purple
     '#4466ff', // A# - Blue-Purple
-    '#6644ff'  // B - Purple
+    '#ff44ff'  // B - Pink
   ];
 
   // Complete chromatic scale frequencies (C4 to B4)

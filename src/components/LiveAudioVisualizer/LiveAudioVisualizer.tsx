@@ -62,7 +62,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
   // Use controlled mode if provided, otherwise use internal state
   const currentMode = controlledMode ?? internalMode;
 
-  const [gain, setGain] = useState(0.5); // 50%
+  const [gain, setGain] = useState(0.1); // 10%
   const [frequencyScale, setFrequencyScale] = useState<'log' | 'linear' | 'quadratic'>('log');
   const [showSettings, setShowSettings] = useState(false);
   const [fps, setFps] = useState(0);
@@ -593,7 +593,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                         type="range"
                         min="0"
                         max="2"
-                        step="0.1"
+                        step="0.01"
                         value={gain}
                         onChange={(e) => handleGainChange(parseFloat(e.target.value))}
                         className="w-24"
@@ -911,7 +911,7 @@ export const LiveAudioVisualizer: React.FC<LiveAudioVisualizerProps> = ({
                       type="range"
                       min="0"
                       max="2"
-                      step="0.1"
+                      step="0.01"
                       value={gain}
                       onChange={(e) => handleGainChange(parseFloat(e.target.value))}
                       className="w-32"
