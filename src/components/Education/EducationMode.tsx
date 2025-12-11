@@ -11,6 +11,7 @@ import type { LEDStripConfig } from '../../types/led';
 import { IsometricSequencer } from '../IsometricSequencer/IsometricSequencer';
 import { generateTwinkle, generateAscending, generateUpDown, getCMajorScale } from '../../utils/isometricPatterns';
 import { convertToEducationPattern } from '../../utils/educationPatternConverter';
+import { WorkshopInstructionsPanel } from './WorkshopInstructionsPanel';
 
 interface EducationModeProps {
   onExitEducation: () => void;
@@ -863,6 +864,9 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
         {/* Embedded Isometric Sequencer for Workshop Boomwhacker Lesson - Story 21.1 */}
         {selectedLesson?.id === 'workshop-boomwhacker' && currentStep.educationConfig && (
           <div className="space-y-6 mb-6">
+            {/* Workshop Instructions Panel - Story 21.2 */}
+            <WorkshopInstructionsPanel />
+
             {/* Isometric Sequencer in Workshop Mode */}
             <IsometricSequencer
               onBack={() => {}} // Disabled in education mode
