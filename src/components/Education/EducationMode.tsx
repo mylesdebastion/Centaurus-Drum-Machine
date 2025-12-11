@@ -9,6 +9,8 @@ import type { VisualizationMode } from '../LiveAudioVisualizer/VisualizationEngi
 import { SingleLaneVisualizer } from '../../utils/SingleLaneVisualizer';
 import type { LEDStripConfig } from '../../types/led';
 import { IsometricSequencer } from '../IsometricSequencer/IsometricSequencer';
+import { generateTwinkle, generateAscending, generateUpDown, getCMajorScale } from '../../utils/isometricPatterns';
+import { convertToEducationPattern } from '../../utils/educationPatternConverter';
 
 interface EducationModeProps {
   onExitEducation: () => void;
@@ -401,6 +403,71 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
           completed: false
         }
       ]
+    },
+    // Workshop lesson - preceded by visual separator
+    {
+      id: 'workshop-boomwhacker',
+      title: 'Boomwhacker Workshop',
+      description: 'Learn rhythm and melody fundamentals with color-coded Boomwhacker notes. Perfect for group workshops and classroom settings.',
+      difficulty: 'beginner',
+      steps: [
+        {
+          id: 'wb-1',
+          instruction: 'INSTRUCTOR: Explain the moving white bar (timeline) and how it shows beats. Each colored block is a note. Empty spaces are rests (wait silently).',
+          hint: 'Students watch the timeline move. No playing yet - just observation.',
+          completed: false,
+          educationConfig: {
+            visibleLanes: ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
+            pattern: {}, // Empty pattern - just show grid
+            tempo: 90,
+            enableCountIn: false,
+            showTimeline: true,
+            showBeatCounter: false
+          }
+        },
+        {
+          id: 'wb-2',
+          instruction: 'INSTRUCTOR: "Look for YOUR color note! When the white bar reaches your color, play your Boomwhacker." Use the Ascending pattern - one note at a time with rests between.',
+          hint: 'Pattern: C (rest) D (rest) E (rest) F (rest) G (rest) A (rest) B (rest)',
+          completed: false,
+          educationConfig: {
+            visibleLanes: ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
+            pattern: convertToEducationPattern(generateAscending(getCMajorScale())),
+            tempo: 90,
+            enableCountIn: true,
+            showTimeline: true,
+            showBeatCounter: true
+          }
+        },
+        {
+          id: 'wb-3',
+          instruction: 'INSTRUCTOR: "Now we go up the scale AND come back down. Watch for your color twice!" Pattern: C D E F G A B A G F E D C',
+          hint: 'Play your note when the bar reaches your color block. You may play twice!',
+          completed: false,
+          educationConfig: {
+            visibleLanes: ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
+            pattern: convertToEducationPattern(generateUpDown(getCMajorScale())),
+            tempo: 90,
+            enableCountIn: true,
+            showTimeline: true,
+            showBeatCounter: true
+          }
+        },
+        {
+          id: 'wb-4',
+          instruction: 'INSTRUCTOR: "Let\'s play a song you know! Listen for the melody of \'Twinkle Twinkle Little Star.\'"',
+          hint: 'Pattern: C C G G A A G (rest) F F E E D D C (rest)',
+          completed: false,
+          educationConfig: {
+            visibleLanes: ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
+            pattern: convertToEducationPattern(generateTwinkle(getCMajorScale())),
+            tempo: 90,
+            enableCountIn: true,
+            showTimeline: true,
+            showBeatCounter: true
+          }
+        }
+      ]
     }
   ];
 
@@ -640,36 +707,54 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
 
           {/* Lesson Cards */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {lessons.map((lesson) => (
-              <div
-                key={lesson.id}
-                className="bg-white/10 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-white/20 hover:bg-white/20 transition-all cursor-pointer touch-target"
-                onClick={() => setSelectedLesson(lesson)}
-              >
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-3">
-                  <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    lesson.difficulty === 'beginner' ? 'bg-green-500/20 text-green-300' :
-                    lesson.difficulty === 'intermediate' ? 'bg-yellow-500/20 text-yellow-300' :
-                    'bg-red-500/20 text-red-300'
-                  }`}>
-                    {lesson.difficulty}
+            {lessons.map((lesson) => {
+              const isWorkshopLesson = lesson.id === 'workshop-boomwhacker';
+
+              return (
+                <React.Fragment key={lesson.id}>
+                  {/* Visual separator before workshop lesson */}
+                  {isWorkshopLesson && (
+                    <hr className="col-span-full border-white/20 my-6" />
+                  )}
+
+                  <div
+                    className="bg-white/10 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-white/20 hover:bg-white/20 transition-all cursor-pointer touch-target"
+                    onClick={() => setSelectedLesson(lesson)}
+                  >
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-3">
+                      <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        lesson.difficulty === 'beginner' ? 'bg-green-500/20 text-green-300' :
+                        lesson.difficulty === 'intermediate' ? 'bg-yellow-500/20 text-yellow-300' :
+                        'bg-red-500/20 text-red-300'
+                      }`}>
+                        {lesson.difficulty}
+                      </div>
+
+                      {/* Workshop badge */}
+                      {isWorkshopLesson && (
+                        <div className="px-2 py-1 rounded-full text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                          Workshop
+                        </div>
+                      )}
+
+                      <div className="flex">
+                        {Array.from({ length: lesson.difficulty === 'beginner' ? 1 : lesson.difficulty === 'intermediate' ? 2 : 3 }, (_, i) => (
+                          <Star key={i} className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current" />
+                        ))}
+                      </div>
+                    </div>
+
+                    <h3 className="text-lg sm:text-xl font-bold text-white mb-2">{lesson.title}</h3>
+                    <p className="text-white/70 mb-4 text-sm sm:text-base">{lesson.description}</p>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-white/60">{lesson.steps.length} steps</span>
+                      <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-white/60" />
+                    </div>
                   </div>
-                  <div className="flex">
-                    {Array.from({ length: lesson.difficulty === 'beginner' ? 1 : lesson.difficulty === 'intermediate' ? 2 : 3 }, (_, i) => (
-                      <Star key={i} className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current" />
-                    ))}
-                  </div>
-                </div>
-                
-                <h3 className="text-lg sm:text-xl font-bold text-white mb-2">{lesson.title}</h3>
-                <p className="text-white/70 mb-4 text-sm sm:text-base">{lesson.description}</p>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-white/60">{lesson.steps.length} steps</span>
-                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-white/60" />
-                </div>
-              </div>
-            ))}
+                </React.Fragment>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -769,6 +854,53 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                 className="btn-accent flex items-center gap-2 px-8 py-4 text-lg font-semibold touch-target"
               >
                 <span>{currentStepIndex < selectedLesson.steps.length - 1 ? 'Next Step' : 'Complete Lesson'}</span>
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Embedded Isometric Sequencer for Workshop Boomwhacker Lesson - Story 21.1 */}
+        {selectedLesson?.id === 'workshop-boomwhacker' && currentStep.educationConfig && (
+          <div className="space-y-6 mb-6">
+            {/* Isometric Sequencer in Workshop Mode */}
+            <IsometricSequencer
+              onBack={() => {}} // Disabled in education mode
+              educationConfig={currentStep.educationConfig}
+              workshopMode={true} // Enable workshop mode for simplified UI
+              onPlayStateChange={(isPlaying, togglePlay) => {
+                setIsoSeqPlaying(isPlaying);
+                setIsoSeqTogglePlay(() => togglePlay);
+              }}
+            />
+
+            {/* Workshop Step Navigation - Note: IsometricSequencer already has minimal controls (Play/Pause, BPM, LED) */}
+            {/* These buttons are only for step navigation */}
+            <div className="flex items-center justify-center gap-4 p-4 bg-gradient-to-r from-gray-900 to-gray-800 rounded-lg border border-gray-700">
+              {/* Back Button - hidden on first step */}
+              {currentStepIndex > 0 && (
+                <button
+                  onClick={() => setCurrentStepIndex(currentStepIndex - 1)}
+                  className="flex items-center gap-2 px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors font-semibold touch-target"
+                >
+                  Back
+                </button>
+              )}
+
+              {/* Next/Finish Button */}
+              <button
+                onClick={() => {
+                  if (currentStepIndex < selectedLesson.steps.length - 1) {
+                    setCurrentStepIndex(currentStepIndex + 1);
+                  } else {
+                    // Finish lesson - return to lesson selection
+                    setSelectedLesson(null);
+                    setCurrentStepIndex(0);
+                  }
+                }}
+                className="btn-accent flex items-center gap-2 px-8 py-4 text-lg font-semibold touch-target"
+              >
+                <span>{currentStepIndex < selectedLesson.steps.length - 1 ? 'Next Step' : 'Finish Lesson'}</span>
                 <ArrowRight className="w-5 h-5" />
               </button>
             </div>

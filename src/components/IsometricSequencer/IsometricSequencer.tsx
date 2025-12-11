@@ -6,12 +6,14 @@ import { APC40Controller, APC40ButtonEvent } from '../../utils/APC40Controller';
 import { createSoundEngine, SoundEngine, SoundEngineType, soundEngineNames } from '../../utils/soundEngines';
 import { useModuleContext } from '../../hooks/useModuleContext';
 import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
+import { generateTwinkle, generateAscending, generateUpDown } from '../../utils/isometricPatterns';
 import type { EducationConfig } from '../../types';
 
 interface IsometricSequencerProps {
   onBack: () => void;
   educationConfig?: EducationConfig; // Optional - undefined = standalone mode
   onPlayStateChange?: (isPlaying: boolean, togglePlay: () => void) => void; // Expose play controls for education mode
+  workshopMode?: boolean; // Workshop mode for read-only, simplified UI
 }
 
 // Vector3 class for 3D calculations
@@ -105,7 +107,7 @@ class Camera3D {
   }
 }
 
-export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, educationConfig, onPlayStateChange }) => {
+export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, educationConfig, onPlayStateChange, workshopMode = false }) => {
   // Module Adapter Pattern - Context Detection (Epic 14, Story 14.5)
   const context = useModuleContext();
   const globalMusic = useGlobalMusic();
@@ -1389,8 +1391,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
   }, [isPlaying, bpm, currentBeat, steps, effectiveLanes, activeLanes, pattern, playNote]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Prevent editing in education mode (Story 20.6)
-    if (isEducationMode) return;
+    // Prevent editing in education mode and workshop mode (Story 20.6, Story 21.1)
+    if (isEducationMode || workshopMode) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1413,7 +1415,7 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
       // Play note for feedback
       playNote(chromaticLane);
     }
-  }, [getMouseWorldPosition, playNote, isEducationMode]);
+  }, [getMouseWorldPosition, playNote, isEducationMode, workshopMode]);
 
   // Control handlers
   const togglePlay = () => {
@@ -1818,77 +1820,24 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
     setPattern(newPattern);
   };
 
-  const generateTwinkle = () => {
-    // Clear current pattern
-    const newPattern: boolean[][] = Array(12).fill(null).map(() => Array(16).fill(false));
-
-    // Use the current root and scale
+  // Pattern generator wrapper - calls shared utility with current scale
+  const generateTwinklePattern = () => {
     const currentScale = getCurrentScale();
-
-    // Twinkle Twinkle Little Star melody in scale degrees (1-indexed)
-    // "Twinkle twinkle little star, how I wonder what you are"
-    // C C G G A A G - F F E E D D C
-    // Scale degrees: 1 1 5 5 6 6 5 - 4 4 3 3 2 2 1
-    const scaleDegrees = [
-      1, 1, 5, 5, 6, 6, 5, 0, // Twinkle twinkle little star (0 = rest)
-      4, 4, 3, 3, 2, 2, 1, 0  // How I wonder what you are
-    ];
-
-    // Map scale degrees to actual notes in current scale
-    scaleDegrees.forEach((degree, step) => {
-      if (degree > 0 && degree <= currentScale.length) {
-        const noteIndex = currentScale[degree - 1]; // Convert 1-indexed to 0-indexed
-        newPattern[noteIndex][step] = true;
-      }
-    });
-
+    const newPattern = generateTwinkle(currentScale);
     setPattern(newPattern);
   };
 
-
-  // Generate ascending scale pattern (C to B, left to right)
-  // Warm-up exercise for students to hit boomwhackers in order
-  const generateAscending = () => {
-    const newPattern: boolean[][] = Array(12).fill(null).map(() => Array(16).fill(false));
+  // Pattern generator wrapper - calls shared utility with current scale
+  const generateAscendingPattern = () => {
     const currentScale = getCurrentScale();
-
-    // Play scale with 1 rest between each note (beginner warm-up)
-    // For C major: C (rest) D (rest) E (rest) F (rest) G (rest) A (rest) B (rest)
-    // 7 notes + 7 rests = 14 steps, fits perfectly in 16 steps
-    let currentStep = 0;
-    for (let i = 0; i < currentScale.length && currentStep < 16; i++) {
-      const noteIndex = currentScale[i];
-      newPattern[noteIndex][currentStep] = true;
-      currentStep += 2; // Skip 1 step for rest
-    }
-
+    const newPattern = generateAscending(currentScale);
     setPattern(newPattern);
   };
 
-  // Generate up/down scale pattern (C to B and back)
-  // Warm-up exercise: ascending then descending
-  const generateUpDown = () => {
-    const newPattern: boolean[][] = Array(12).fill(null).map(() => Array(16).fill(false));
+  // Pattern generator wrapper - calls shared utility with current scale
+  const generateUpDownPattern = () => {
     const currentScale = getCurrentScale();
-
-    const scaleLength = currentScale.length;
-    let currentStep = 0;
-
-    // Ascending: play full scale (C D E F G A B)
-    for (let i = 0; i < scaleLength && currentStep < 16; i++) {
-      const noteIndex = currentScale[i];
-      newPattern[noteIndex][currentStep] = true;
-      currentStep++;
-    }
-
-    // Descending: start from second-to-last note to avoid double top note
-    // Play B A G F E D C (reverse, excluding the top note we just played)
-    for (let i = scaleLength - 2; i >= 0 && currentStep < 16; i--) {
-      const noteIndex = currentScale[i];
-      newPattern[noteIndex][currentStep] = true;
-      currentStep++;
-    }
-
+    const newPattern = generateUpDown(currentScale);
     setPattern(newPattern);
   };
 
@@ -1908,13 +1857,13 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
         generateBeats();
         break;
       case 'ascending':
-        generateAscending();
+        generateAscendingPattern();
         break;
       case 'updown':
-        generateUpDown();
+        generateUpDownPattern();
         break;
       case 'twinkle':
-        generateTwinkle();
+        generateTwinklePattern();
         break;
     }
   };
@@ -1956,13 +1905,13 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
           generateBeats();
           break;
         case 'ascending':
-          generateAscending();
+          generateAscendingPattern();
           break;
         case 'updown':
-          generateUpDown();
+          generateUpDownPattern();
           break;
         case 'twinkle':
-          generateTwinkle();
+          generateTwinklePattern();
           break;
       }
     }, 50);
@@ -1970,8 +1919,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
 
   return (
     <div className={`${isEducationMode ? 'h-[600px]' : 'min-h-screen'} bg-black flex flex-col`}>
-      {/* Header - hidden in education mode */}
-      {!isEducationMode && (
+      {/* Header - hidden in education mode and workshop mode */}
+      {!isEducationMode && !workshopMode && (
         <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 to-gray-800 border-b border-gray-700">
           <button
             onClick={onBack}
@@ -2095,8 +2044,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
         </div>
       )}
 
-      {/* LED Strip Manager Panel - hidden in education mode */}
-      {!isEducationMode && showLEDManager && (
+      {/* LED Strip Manager Panel - hidden only in non-workshop education mode */}
+      {(!isEducationMode || workshopMode) && showLEDManager && (
         <div className="border-b border-gray-700">
           <LEDStripManager
             boomwhackerColors={getEffectiveColors()}
@@ -2125,8 +2074,66 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
 
       </div>
 
-      {/* Controls - hidden in education mode */}
-      {!isEducationMode && (
+      {/* Workshop Mode Controls - Minimal UI */}
+      {workshopMode && (
+        <div className="flex items-center justify-between gap-4 p-4 bg-gradient-to-r from-gray-900 to-gray-800 border-t border-gray-700">
+          {/* Left side - Play/Pause */}
+          <button
+            onClick={togglePlay}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 rounded-lg transition-all transform hover:scale-105 font-semibold"
+          >
+            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+            {isPlaying ? 'Pause' : 'Play'}
+          </button>
+
+          {/* Center - BPM Control */}
+          <div className="flex items-center gap-2">
+            <Music className="w-5 h-5 text-cyan-400" />
+            <span className="text-sm text-gray-300">BPM:</span>
+            <input
+              type="range"
+              min="60"
+              max="180"
+              value={bpm}
+              onChange={(e) => setBpm(parseInt(e.target.value))}
+              className="w-32"
+            />
+            <span className="text-lg text-cyan-400 font-semibold w-12">{bpm}</span>
+          </div>
+
+          {/* Right side - LED Manager and Enable */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowLEDManager(!showLEDManager)}
+              className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-all transform hover:scale-105 font-semibold ${
+                showLEDManager
+                  ? 'bg-yellow-600 hover:bg-yellow-500'
+                  : 'bg-gray-700 hover:bg-gray-600'
+              }`}
+            >
+              <Lightbulb className="w-5 h-5" />
+              LED
+            </button>
+
+            {/* LED Enable Checkbox */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="ledEnabledWorkshop"
+                checked={ledEnabled}
+                onChange={(e) => setLEDEnabled(e.target.checked)}
+                className="w-5 h-5"
+              />
+              <label htmlFor="ledEnabledWorkshop" className="text-sm text-gray-300 font-semibold">
+                Enable
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Controls - hidden in education mode and workshop mode */}
+      {!isEducationMode && !workshopMode && (
         <div className="flex items-center justify-center gap-4 p-4 bg-gradient-to-r from-gray-900 to-gray-800 border-t border-gray-700">
           <button
             onClick={togglePlay}
@@ -2262,13 +2269,13 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
                           generateBeats();
                           break;
                         case 'ascending':
-                          generateAscending();
+                          generateAscendingPattern();
                           break;
                         case 'updown':
-                          generateUpDown();
+                          generateUpDownPattern();
                           break;
                         case 'twinkle':
-                          generateTwinkle();
+                          generateTwinklePattern();
                           break;
                       }
                     }, 0);
@@ -2331,8 +2338,8 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
         </div>
       )}
 
-      {/* Instructions - hidden in education mode */}
-      {!isEducationMode && (
+      {/* Instructions - hidden in education mode and workshop mode */}
+      {!isEducationMode && !workshopMode && (
         <div className="text-center p-4 bg-gray-900 text-gray-400 text-sm">
         <div className="mb-2">
           Click anywhere on the 3D view to add/remove notes • Use Melody for musical patterns • Random for noise • Clear to reset
