@@ -237,7 +237,92 @@ const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
     }
   };
 
-  // Send LED data to device via WebSocket/UDP WARLS protocol
+  // Send LED data to device via HTTP JSON API (Direct browser → WLED)
+  const sendLEDDataHTTP = async (deviceId: string, colors: string[]) => {
+    const device = devices.find((d) => d.id === deviceId);
+    if (!device || device.connectionStatus !== 'connected') {
+      console.log(`📍 sendLEDDataHTTP early return: device=${!!device}, connected=${device?.connectionStatus === 'connected'}`);
+      return;
+    }
+
+    try {
+      // Slice to device LED count
+      let ledColors = colors.slice(0, device.ledCount);
+
+      // Apply reverse direction BEFORE brightness adjustment
+      if (device.reverseDirection) {
+        ledColors = [...ledColors].reverse();
+      }
+
+      // Apply brightness by adjusting hex colors
+      const brightness = device.brightness / 255;
+      const adjustedColors = ledColors.map((hex) => {
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+
+        const newR = Math.round(r * brightness).toString(16).padStart(2, '0');
+        const newG = Math.round(g * brightness).toString(16).padStart(2, '0');
+        const newB = Math.round(b * brightness).toString(16).padStart(2, '0');
+
+        return `${newR}${newG}${newB}`;
+      });
+
+      // Build WLED JSON API payload
+      // Using "i" property for individual LED control
+      // Hex format is preferred for efficiency (WLED docs recommendation)
+      const payload = {
+        seg: {
+          i: adjustedColors
+        }
+      };
+
+      // Send HTTP POST to WLED device
+      const url = `http://${device.ip}:${device.port || 80}/json/state`;
+      console.log(`🔵 Sending ${adjustedColors.length} LEDs to ${device.name} via HTTP`);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        mode: 'cors',
+        signal: AbortSignal.timeout(3000), // 3 second timeout
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      console.log(`✅ HTTP: Sent ${adjustedColors.length} LEDs to ${device.name}`);
+
+      // Update device state
+      updateDevice(deviceId, {
+        dataFlowStatus: 'sending',
+        lastDataSent: Date.now(),
+      });
+
+      // Update FPS counter
+      updateFPS(deviceId);
+
+    } catch (error) {
+      console.error(`❌ HTTP: Failed to send LED data to ${device.name}:`, error);
+
+      // Log detailed error information
+      if (error instanceof TypeError) {
+        console.error('🔴 TypeError - likely CORS or network issue:', error.message);
+      } else if (error instanceof DOMException) {
+        console.error('🔴 DOMException - likely timeout or abort:', error.message);
+      }
+
+      // Don't mark as error for send failures (might be temporary)
+      // Just update data flow status to idle
+      updateDevice(deviceId, {
+        dataFlowStatus: 'idle',
+      });
+    }
+  };
+
+  // Send LED data to device via WebSocket/UDP WARLS protocol (LEGACY - uses wled-bridge)
   const sendLEDData = async (deviceId: string, colors: string[]) => {
     const device = devices.find((d) => d.id === deviceId);
     if (!device || device.connectionStatus !== 'connected') {
@@ -245,6 +330,16 @@ const WLEDDeviceManager: React.FC<WLEDDeviceManagerProps> = ({
       return;
     }
 
+    // NEW: Try HTTP JSON API first (direct communication)
+    // If this works, we don't need the wled-bridge!
+    try {
+      await sendLEDDataHTTP(deviceId, colors);
+      return; // Success! No need for bridge fallback
+    } catch (error) {
+      console.warn(`⚠️ HTTP method failed, trying WebSocket bridge fallback...`, error);
+    }
+
+    // FALLBACK: Use WebSocket bridge if HTTP fails
     try {
       // Check if WebSocket bridge is available
       if (!window.wledBridge || window.wledBridge.readyState !== WebSocket.OPEN) {
