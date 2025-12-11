@@ -1,10 +1,10 @@
 # Epic 22: WLED Direct Browser Communication - Brownfield Enhancement
 
-**Status:** 🚧 **PLANNED**
+**Status:** 🚧 **IN PROGRESS** (Story 22.1 ✅ Complete, Story 22.2 ✅ Complete, Story 22.3 📝 Planned)
 **Priority:** Medium
 **Type:** Brownfield Enhancement (Investigation & Fix)
 **Target Completion:** 1-2 weeks
-**Scope:** 1-3 focused stories
+**Scope:** 3 focused stories
 
 ---
 
@@ -124,17 +124,65 @@ After reviewing the code:
 - Measure performance (FPS, latency) vs wled-bridge UDP
 - Handle CORS errors and connection failures gracefully
 
-### Story 22.3: Implement Direct WebSocket Communication (If HTTP is Too Slow)
+### Story 22.3: Add Chrome Local Network Access Permission UI Guidance
 
-**Description:** If HTTP polling is too slow for real-time LED streaming (Story 22.2 findings), implement WebSocket connection to WLED's native `/ws` endpoint.
+**Description:** Add tooltips, help text, and troubleshooting instructions throughout the WLED Manager UI to guide users through Chrome's Local Network Access permission requirement and increase consistency of permission prompt appearance.
+
+**Context:**
+- Chrome 142+ (Oct 2025) requires Local Network Access permission for HTTPS sites accessing local devices
+- Permission prompt triggers on first local network request to private IP addresses
+- Users report inconsistent prompt behavior (sometimes doesn't appear on first try)
+- Production deployment (`https://jam.audiolux.app`) requires this permission for direct WLED communication
+- Mixed Content exemption applies when using private IP literals (e.g., `192.168.1.50`)
 
 **Deliverables:**
-- Connect to `ws://[ip]/ws` endpoint (WLED native WebSocket)
-- Send LED data via WebSocket JSON protocol
-- Compare performance with HTTP (Story 22.2) and UDP bridge (baseline)
-- Document WebSocket message format and connection lifecycle
-- Add fallback chain: WebSocket → HTTP → wled-bridge
-- **Note:** Only implement if HTTP proves insufficient for real-time streaming
+- Add permission status indicator to WLEDDeviceManager header
+- Add help tooltip explaining Local Network Access requirement
+- Add troubleshooting expandable panel for connection failures
+- Add "Request Permission" button that triggers test request (forces Chrome prompt)
+- Add browser compatibility check (Chrome 141+ required for Local Network Access)
+- Update WLEDDirectTest with permission setup instructions
+- Add documentation link to Chrome permission settings page
+- Add note about Chrome 2026 HTTPS roadmap (private networks exempt from warnings)
+
+**UI Locations for Help Text:**
+1. **WLEDDeviceManager header** - Permission status badge (Chrome 142+, Granted/Denied/Unknown)
+2. **Device connection failure** - Error message with "Request Permission" button
+3. **Empty state** (no devices) - Setup instructions including permission requirements
+4. **Settings panel** - Troubleshooting section with manual permission link
+5. **Test button failure** - Inline help text explaining permission requirement
+
+**Browser Detection Logic:**
+- Detect Chrome 141+ (supports Local Network Access)
+- Show warning for older Chrome versions ("Please update Chrome to 142+")
+- Show info banner for Firefox/Safari ("Chrome 142+ recommended for best experience")
+- Detect if permission already granted (check for successful prior requests)
+
+**Permission Request Flow:**
+1. User tries to add WLED device or click Test button
+2. Connection fails (permission not granted or prompt didn't show)
+3. Error UI shows: "Chrome needs permission to access local network devices"
+4. User clicks "Request Permission" button
+5. App triggers test HTTP request to device → Chrome shows permission prompt
+6. User grants permission in Chrome prompt
+7. Device automatically retries connection
+8. Success: Green badge shows "Permission Granted"
+
+**Troubleshooting Content:**
+- "Permission prompt didn't appear?" → Try reload or manual settings
+- Link to `chrome://settings/content/siteDetails?site=https://jam.audiolux.app`
+- Explain Mixed Content exemption for private IP addresses (192.168.x.x, 10.x.x.x)
+- Note about Chrome 2026: Private networks won't get HTTP warnings
+- FAQ: "Why does my colleague see the prompt but I don't?" → HTTPS vs HTTP difference
+
+**Acceptance Criteria:**
+- Clear explanation of Chrome Local Network Access requirement with "why" context
+- One-click "Request Permission" button that reliably triggers Chrome prompt
+- Troubleshooting guide accessible from connection error states
+- Direct link to manual permission settings (opens in new tab)
+- Browser compatibility warnings for non-Chrome or outdated Chrome
+- Visual feedback when permission is granted (green badge, success message)
+- Documentation references Chrome 2026 roadmap and private network exemptions
 
 ---
 
@@ -246,7 +294,53 @@ This epic directly investigates the blocker described in **Epic 6: Multi-Client 
 
 ## Next Steps After Epic Completion
 
-1. Update Epic 6 documentation with findings (viable web solution or Capacitor required?)
-2. If direct communication works: Plan migration of LiveAudioVisualizer to use HTTP/WebSocket
-3. If direct communication fails: Proceed with Capacitor native app for Epic 6
-4. Archive or improve `/wled-test` based on results (deprecate if not viable)
+1. ✅ **Update Epic 6 documentation** with findings (viable web solution via Chrome Local Network Access permission)
+2. **Story 22.3:** Add Chrome Local Network Access permission UI guidance to WLEDDeviceManager
+3. **Production Strategy:** Rely on Chrome 142+ Local Network Access permission (no Capacitor native app needed)
+4. **Future:** Monitor Chrome 2026 HTTPS roadmap updates (private networks exempt from HTTP warnings)
+5. **Integration:** Migrate other WLED features to use direct HTTP communication (LiveAudioVisualizer, Education Mode)
+
+## Key Findings (Stories 22.1 & 22.2)
+
+### Technical Feasibility: ✅ VALIDATED
+
+- ✅ Direct HTTP JSON API works (20-40 FPS, acceptable for visual effects)
+- ✅ WLED HTTP endpoint: `POST /json/state` with hex color format
+- ✅ CORS supported by WLED firmware (confirmed by working HTTP calls)
+- ✅ Mixed Content exemption for private IP literals (192.168.x.x, 10.x.x.x)
+- ✅ Chrome Local Network Access permission enables production deployment
+
+### Production Deployment: ✅ VIABLE
+
+**Strategy:** Chrome Local Network Access permission (no native app required!)
+
+**User Experience:**
+1. User visits `https://jam.audiolux.app` (HTTPS production site)
+2. User adds WLED device with private IP (e.g., `192.168.1.50`)
+3. Chrome shows "Allow local network access?" prompt (first time)
+4. User clicks "Allow" once
+5. All future visits: Direct WLED control works (permission persists)
+
+**Browser Compatibility:**
+- ✅ Chrome 142+ (Oct 2025) - Full support with permission prompt
+- ✅ Chrome 141+ (with flag enabled) - Testing/preview support
+- ⚠️ Firefox/Safari - Different security models (recommend Chrome)
+
+**Chrome 2026 Roadmap:**
+- October 2026: Chrome 154 enforces HTTPS by default for public websites
+- **Private networks (192.168.x.x, 10.x.x.x) EXEMPT from HTTP warnings**
+- WLED devices won't trigger scary "Not Secure" warnings (recognized as local)
+
+### Performance Results (Story 22.2)
+
+- **HTTP JSON API:** 20-40 FPS (good for visual effects)
+- **UDP WARLS Bridge:** 60-120 FPS (baseline for comparison)
+- **Verdict:** HTTP performance sufficient, eliminates server dependency
+
+### Epic 6 Impact
+
+**Original Blocker:** "Production deployment requires Capacitor native app due to Mixed Content blocking"
+
+**Resolution:** Chrome Local Network Access permission + Mixed Content exemption for private IPs makes web deployment viable without native app!
+
+**Recommendation:** Proceed with web-first strategy for multi-client sessions (Epic 6), leveraging Chrome 142+ Local Network Access permission. Native app (Capacitor) is optional for enhanced features (Bluetooth MIDI, offline mode) but not required for core WLED functionality.
