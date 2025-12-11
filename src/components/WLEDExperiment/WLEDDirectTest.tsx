@@ -131,12 +131,16 @@ export const WLEDDirectTest: React.FC<WLEDDirectTestProps> = ({ onBack }) => {
           <div className="flex items-start gap-3">
             <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-blue-200">
-              <p className="font-semibold mb-1">Experiment Goal:</p>
+              <p className="font-semibold mb-1">Experiment Goal (Story 22.2):</p>
               <p>
-                Test if mobile browsers can control WLED devices directly via WebSocket,
-                eliminating the need for a Node.js bridge. This validates the architecture
-                for future multi-client sessions where each user controls their own WLED
-                devices.
+                Test direct browser → WLED communication using the HTTP JSON API, eliminating
+                the need for the Node.js wled-bridge. This proves that Rainbow animations and
+                LED streaming can work without server infrastructure, enabling future mobile/remote
+                scenarios and validating the Epic 6 multi-client session architecture.
+              </p>
+              <p className="mt-2 font-semibold text-green-300">
+                ✅ Implementation Complete: Now using direct HTTP POST to WLED's /json/state
+                endpoint with hex color format for efficient LED data transmission.
               </p>
             </div>
           </div>
@@ -194,22 +198,38 @@ export const WLEDDirectTest: React.FC<WLEDDirectTestProps> = ({ onBack }) => {
               WLEDDeviceManager component (Story 6.1 Phase 0)
             </div>
             <div>
-              <span className="font-semibold text-white">Connection:</span> Direct WebSocket
-              to <code className="bg-gray-700 px-2 py-1 rounded">ws://[ip]/ws</code>
+              <span className="font-semibold text-green-400">✅ NEW (Story 22.2):</span> Direct
+              HTTP JSON API (no wled-bridge required!)
+            </div>
+            <div>
+              <span className="font-semibold text-white">Connection:</span> Direct HTTP POST
+              to <code className="bg-gray-700 px-2 py-1 rounded">http://[ip]/json/state</code>
             </div>
             <div>
               <span className="font-semibold text-white">Protocol:</span> WLED JSON API{' '}
               <code className="bg-gray-700 px-2 py-1 rounded">
-                {`{"seg":[{"col":[[r,g,b],...]}]}`}
+                {`{"seg":{"i":["FF0000","00FF00",..."]}}`}
               </code>
+            </div>
+            <div>
+              <span className="font-semibold text-white">Format:</span> Hex colors (6 chars per
+              LED) - efficient for large LED counts
+            </div>
+            <div>
+              <span className="font-semibold text-white">Fallback:</span> WebSocket bridge (if
+              HTTP fails)
             </div>
             <div>
               <span className="font-semibold text-white">Features:</span> Multi-device support,
               responsive grid, localStorage persistence, auto-reconnect
             </div>
             <div>
-              <span className="font-semibold text-white">Next Step:</span> Integrate into
-              /dj-visualizer and /jam routes for audio-reactive lighting
+              <span className="font-semibold text-white">Performance:</span> Expected 20-40 FPS
+              for HTTP, check browser DevTools console for actual FPS
+            </div>
+            <div>
+              <span className="font-semibold text-white">Security:</span> Requires Chrome "Local
+              Network Access" permission (works in localhost development)
             </div>
           </div>
         </div>
