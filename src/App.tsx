@@ -24,6 +24,7 @@ import { supabaseSessionService } from './services/supabaseSession';
 import { AuthTest } from './components/AuthTest';
 import { LaunchpadProExperiment } from './components/LaunchpadProExperiment';
 import { AnnouncementBanner } from './components/AnnouncementBanner';
+import { PixelBoopSequencer } from './components/PixelBoop';
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
@@ -278,6 +279,14 @@ function App() {
     navigate('/');
   };
 
+  const handlePixelBoop = () => {
+    navigate('/pixelboop');
+  };
+
+  const handleExitPixelBoop = () => {
+    navigate('/');
+  };
+
   return (
     <>
     <GlobalMusicProvider>
@@ -311,6 +320,7 @@ function App() {
               onSupabaseTest={handleSupabaseTest}
               onChordMelodyTest={handleChordMelodyTest}
               onLaunchpadTest={handleLaunchpadTest}
+              onPixelBoop={handlePixelBoop}
             />
           }
         />
@@ -456,6 +466,14 @@ function App() {
         <Route
           path="/auth-test"
           element={<AuthTest />}
+        />
+        <Route
+          path="/pixelboop"
+          element={
+            <PixelBoopSequencer
+              onBack={handleExitPixelBoop}
+            />
+          }
         />
       </Routes>
       </HardwareManager>
