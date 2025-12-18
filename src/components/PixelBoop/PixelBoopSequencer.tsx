@@ -310,12 +310,37 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
   // AUDIO INITIALIZATION
   // ============================================================================
 
-  const initAudio = useCallback(() => {
+  const audioUnlockedRef = useRef(false);
+
+  const initAudio = useCallback(async () => {
     if (!audioContextRef.current) {
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
-    if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
+
+    const ctx = audioContextRef.current;
+
+    if (ctx.state === 'suspended') {
+      try {
+        await ctx.resume();
+      } catch (e) {
+        console.warn('[PixelBoop] Failed to resume AudioContext:', e);
+      }
+    }
+
+    // iOS Safari requires playing audio during user gesture to "unlock" the AudioContext
+    // Play a silent buffer to unlock audio playback
+    if (!audioUnlockedRef.current && ctx.state === 'running') {
+      try {
+        const silentBuffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+        const source = ctx.createBufferSource();
+        source.buffer = silentBuffer;
+        source.connect(ctx.destination);
+        source.start(0);
+        audioUnlockedRef.current = true;
+        console.log('[PixelBoop] Audio context unlocked for iOS');
+      } catch (e) {
+        console.warn('[PixelBoop] Failed to unlock audio:', e);
+      }
     }
   }, []);
 
@@ -1330,13 +1355,10 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
   // ============================================================================
 
   const playDrum = useCallback((drumType: string, velocity = 1) => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
     const ctx = audioContextRef.current;
-
-    if (ctx.state === 'suspended') {
-      ctx.resume();
+    // Bail if no context or if still suspended (initAudio should be called first on user gesture)
+    if (!ctx || ctx.state !== 'running') {
+      return;
     }
 
     const now = ctx.currentTime;
@@ -1556,13 +1578,10 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
   }, []);
 
   const playNote = useCallback((frequency: number, duration: number, trackType: TrackType, velocity = 1) => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
     const ctx = audioContextRef.current;
-
-    if (ctx.state === 'suspended') {
-      ctx.resume();
+    // Bail if no context or if still suspended (initAudio should be called first on user gesture)
+    if (!ctx || ctx.state !== 'running') {
+      return;
     }
 
     const now = ctx.currentTime;
@@ -1653,12 +1672,8 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
 
   useEffect(() => {
     if (isPlaying) {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      if (audioContextRef.current.state === 'suspended') {
-        audioContextRef.current.resume();
-      }
+      // Audio context should already be initialized via initAudio on user gesture
+      // Just start the interval
       intervalRef.current = setInterval(() => {
         setCurrentStep(prev => (prev + 1) % patternLength);
       }, 60000 / bpm / 4);
