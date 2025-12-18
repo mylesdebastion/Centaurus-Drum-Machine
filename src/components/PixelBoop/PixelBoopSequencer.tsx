@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Maximize2, Minimize2, X, ArrowLeft } from 'lucide-react';
 import { ViewTemplate } from '../Layout/ViewTemplate';
 
 // ============================================================================
@@ -284,6 +285,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
   const [tooltipPixels, setTooltipPixels] = useState<TooltipPixel[]>([]);
   const [pixelSize, setPixelSize] = useState(12);
   const [isMobile, setIsMobile] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Shake detection state
   const [shakeDirectionChanges, setShakeDirectionChanges] = useState(0);
@@ -328,20 +330,27 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
       const mobile = width < 768 || 'ontouchstart' in window;
       setIsMobile(mobile);
 
-      const availableWidth = width - 20;
-      const availableHeight = height - 200; // Account for ViewTemplate header
+      // In fullscreen: use full viewport minus small margins for safe areas
+      // Normal mode: account for ViewTemplate header (~200px)
+      const horizontalPadding = isFullscreen ? 16 : 20;
+      const verticalPadding = isFullscreen ? 60 : 200; // 60px for info bar + exit button in fullscreen
+
+      const availableWidth = width - horizontalPadding;
+      const availableHeight = height - verticalPadding;
 
       const maxPixelWidth = Math.floor(availableWidth / COLS) - 1;
       const maxPixelHeight = Math.floor(availableHeight / ROWS) - 1;
 
-      const size = Math.max(6, Math.min(20, Math.min(maxPixelWidth, maxPixelHeight)));
+      // Allow larger pixels in fullscreen mode
+      const maxSize = isFullscreen ? 24 : 20;
+      const size = Math.max(6, Math.min(maxSize, Math.min(maxPixelWidth, maxPixelHeight)));
       setPixelSize(size);
     };
 
     updateSize();
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
-  }, []);
+  }, [isFullscreen]);
 
   // Prevent pull-to-refresh
   useEffect(() => {
@@ -1677,66 +1686,72 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
   const gridWidth = COLS * (pixelSize + 1);
   const gridHeight = ROWS * (pixelSize + 1);
 
-  return (
-    <ViewTemplate
-      title="PixelBoop"
-      subtitle="Gesture-based pixel sequencer"
-      onBack={onBack}
-      variant="full-width"
-      maxWidth="7xl"
-      badge="Experiment"
-      badgeVariant="blue"
-    >
-      <div className="flex flex-col items-center justify-center">
-        {/* Info bar */}
-        <div className="flex items-center gap-2 mb-2 text-xs text-gray-400 flex-wrap justify-center">
-          <span style={{ color: NOTE_COLORS[rootNote] }}>{NOTE_NAMES[rootNote]}</span>
-          <span className="text-orange-400">{scale}</span>
-          <span className="text-red-400">{bpm}bpm</span>
-          <span className="text-purple-400">{patternLength}st</span>
-          {isShaking && <span className="text-yellow-400 animate-pulse">~SHAKE~</span>}
-        </div>
+  // Shared grid content
+  const gridContent = (
+    <>
+      {/* Info bar */}
+      <div className={`flex items-center gap-2 mb-2 text-xs text-gray-400 flex-wrap justify-center ${isFullscreen ? 'mt-2' : ''}`}>
+        <span style={{ color: NOTE_COLORS[rootNote] }}>{NOTE_NAMES[rootNote]}</span>
+        <span className="text-orange-400">{scale}</span>
+        <span className="text-red-400">{bpm}bpm</span>
+        <span className="text-purple-400">{patternLength}st</span>
+        {isShaking && <span className="text-yellow-400 animate-pulse">~SHAKE~</span>}
 
-        {/* Main grid */}
-        <div
-          ref={gridRef}
-          className="relative select-none touch-none"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${COLS}, ${pixelSize}px)`,
-            gap: '1px',
-            backgroundColor: '#111',
-            padding: '2px',
-            borderRadius: '4px',
-            width: gridWidth,
-            height: gridHeight,
-          }}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
+        {/* Fullscreen toggle button */}
+        <button
+          onClick={() => setIsFullscreen(!isFullscreen)}
+          className="ml-2 p-1.5 rounded-lg bg-gray-700/50 hover:bg-gray-600/50 transition-colors"
+          title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
         >
-          {grid.map((row, rowIdx) =>
-            row.map((pixel, colIdx) => (
-              <div
-                key={`${rowIdx}-${colIdx}`}
-                style={{
-                  width: pixelSize,
-                  height: pixelSize,
-                  backgroundColor: pixel.color,
-                  borderRadius: pixelSize > 10 ? '2px' : '1px',
-                  cursor: pixel.action ? 'pointer' : 'default',
-                  boxShadow: pixel.glow ? `0 0 ${pixelSize / 2}px ${pixel.color}` :
-                    pixel.isTooltip ? `0 0 ${pixelSize / 3}px ${pixel.color}` : 'none',
-                  transition: 'background-color 0.05s',
-                }}
-                onMouseDown={() => handleMouseDown(rowIdx, colIdx)}
-                onMouseEnter={() => handleMouseMove(rowIdx, colIdx)}
-              />
-            ))
+          {isFullscreen ? (
+            <Minimize2 className="w-4 h-4 text-gray-300" />
+          ) : (
+            <Maximize2 className="w-4 h-4 text-gray-300" />
           )}
-        </div>
+        </button>
+      </div>
 
-        {/* Legend */}
+      {/* Main grid */}
+      <div
+        ref={gridRef}
+        className="relative select-none touch-none"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${COLS}, ${pixelSize}px)`,
+          gap: '1px',
+          backgroundColor: '#111',
+          padding: '2px',
+          borderRadius: '4px',
+          width: gridWidth,
+          height: gridHeight,
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {grid.map((row, rowIdx) =>
+          row.map((pixel, colIdx) => (
+            <div
+              key={`${rowIdx}-${colIdx}`}
+              style={{
+                width: pixelSize,
+                height: pixelSize,
+                backgroundColor: pixel.color,
+                borderRadius: pixelSize > 10 ? '2px' : '1px',
+                cursor: pixel.action ? 'pointer' : 'default',
+                boxShadow: pixel.glow ? `0 0 ${pixelSize / 2}px ${pixel.color}` :
+                  pixel.isTooltip ? `0 0 ${pixelSize / 3}px ${pixel.color}` : 'none',
+                transition: 'background-color 0.05s',
+              }}
+              onMouseDown={() => handleMouseDown(rowIdx, colIdx)}
+              onMouseEnter={() => handleMouseMove(rowIdx, colIdx)}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Legend - hidden in fullscreen on mobile, shown on desktop */}
+      {(!isFullscreen || !isMobile) && (
         <div className="mt-3 text-center max-w-full px-2">
           <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-gray-500">
             <span><span className="text-green-400">●</span> Tap</span>
@@ -1760,6 +1775,66 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
             </div>
           )}
         </div>
+      )}
+    </>
+  );
+
+  // Fullscreen mode - bypass ViewTemplate
+  if (isFullscreen) {
+    return (
+      <div
+        className="fixed inset-0 bg-black flex flex-col items-center justify-center z-50"
+        style={{
+          // Handle iOS safe areas (notch, home indicator)
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          paddingLeft: 'env(safe-area-inset-left, 0px)',
+          paddingRight: 'env(safe-area-inset-right, 0px)',
+        }}
+      >
+        {/* Exit button - top left corner */}
+        <button
+          onClick={() => setIsFullscreen(false)}
+          className="absolute top-2 left-2 p-2 rounded-lg bg-gray-800/80 hover:bg-gray-700 transition-colors z-10"
+          style={{
+            marginTop: 'env(safe-area-inset-top, 0px)',
+            marginLeft: 'env(safe-area-inset-left, 0px)',
+          }}
+        >
+          <X className="w-5 h-5 text-gray-300" />
+        </button>
+
+        {/* Back to home button - top right corner */}
+        <button
+          onClick={onBack}
+          className="absolute top-2 right-2 p-2 rounded-lg bg-gray-800/80 hover:bg-gray-700 transition-colors z-10 flex items-center gap-1"
+          style={{
+            marginTop: 'env(safe-area-inset-top, 0px)',
+            marginRight: 'env(safe-area-inset-right, 0px)',
+          }}
+        >
+          <ArrowLeft className="w-4 h-4 text-gray-300" />
+          <span className="text-xs text-gray-300">Exit</span>
+        </button>
+
+        {gridContent}
+      </div>
+    );
+  }
+
+  // Normal mode - use ViewTemplate
+  return (
+    <ViewTemplate
+      title="PixelBoop"
+      subtitle="Gesture-based pixel sequencer"
+      onBack={onBack}
+      variant="full-width"
+      maxWidth="7xl"
+      badge="Experiment"
+      badgeVariant="blue"
+    >
+      <div className="flex flex-col items-center justify-center">
+        {gridContent}
       </div>
     </ViewTemplate>
   );
