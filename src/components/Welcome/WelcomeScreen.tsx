@@ -18,6 +18,7 @@ interface WelcomeScreenProps {
   onStudio?: () => void;
   onSupabaseTest?: () => void;
   onChordMelodyTest?: () => void;
+  onPixelBoop?: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
@@ -36,7 +37,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onHeaderTest,
   onStudio,
   onSupabaseTest,
-  onChordMelodyTest
+  onChordMelodyTest,
+  onPixelBoop
 }) => {
   const [joinCode, setJoinCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
@@ -211,6 +213,27 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 <Play className="w-4 h-4" />
               </div>
             </button>
+
+            {/* PixelBoop Sequencer */}
+            {onPixelBoop && (
+              <button
+                onClick={onPixelBoop}
+                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <Grid3x3 className="w-6 h-6 text-cyan-400" />
+                  <h3 className="font-semibold text-white">PixelBoop</h3>
+                  <span className="text-xs bg-cyan-600/30 text-cyan-300 px-2 py-1 rounded">New</span>
+                </div>
+                <p className="text-sm text-gray-400 mb-4">
+                  Gesture-based pixel sequencer with 4 tracks and touch gestures
+                </p>
+                <div className="flex items-center gap-2 text-sm text-cyan-400 group-hover:text-cyan-300">
+                  <span>Launch PixelBoop</span>
+                  <Play className="w-4 h-4" />
+                </div>
+              </button>
+            )}
 
             {/* Guitar Fretboard Visualizer */}
             <button
