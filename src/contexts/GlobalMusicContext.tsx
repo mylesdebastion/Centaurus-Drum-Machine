@@ -78,9 +78,10 @@ export interface GlobalMusicContextValue extends GlobalMusicState {
   /**
    * Update global transport state (Epic 14, Story 14.2)
    * Synchronizes Tone.js Transport with global state
+   * Ensures audio engine is initialized before starting playback
    * @param playing - true to start playback, false to pause
    */
-  updateTransportState: (playing: boolean) => void;
+  updateTransportState: (playing: boolean) => Promise<void>;
   updateMidiInput: (device: string | null) => void;
   updateMidiOutput: (device: string | null) => void;
   updateMidiConnected: (connected: boolean) => void;
@@ -332,11 +333,24 @@ export const GlobalMusicProvider: React.FC<GlobalMusicProviderProps> = ({ childr
 
   // Subscribe to remote playback changes (global transport sync)
   useEffect(() => {
-    const unsubscribe = supabaseSessionService.onPlaybackChange((playing: boolean) => {
+    const unsubscribe = supabaseSessionService.onPlaybackChange(async (playing: boolean) => {
       console.log('[GlobalMusicContext] Remote playback change:', playing);
 
       // Mark this as a remote change to prevent broadcast loop
       isRemotePlaybackChangeRef.current = true;
+
+      // Initialize audio engine if playing (required for Web Audio API)
+      if (playing) {
+        try {
+          console.log('[GlobalMusicContext] Initializing audio engine for remote playback...');
+          await audioEngine.initialize();
+          await audioEngine.ensureAudioContext();
+          console.log('[GlobalMusicContext] Audio engine ready');
+        } catch (error) {
+          console.error('[GlobalMusicContext] Failed to initialize audio engine:', error);
+          return; // Don't update state if initialization failed
+        }
+      }
 
       setState(prev => ({ ...prev, isPlaying: playing }));
 
@@ -462,12 +476,26 @@ export const GlobalMusicProvider: React.FC<GlobalMusicProviderProps> = ({ childr
   /**
    * Update global transport state (Epic 14, Story 14.2)
    * Syncs React state with Tone.js Transport
+   * Ensures audio engine is initialized before starting playback
    */
-  const updateTransportState = useCallback((playing: boolean) => {
+  const updateTransportState = useCallback(async (playing: boolean) => {
     // Validation
     if (typeof playing !== 'boolean') {
       console.warn(`[GlobalMusicContext] Invalid transport state: ${playing}. Must be boolean.`);
       return;
+    }
+
+    // Initialize audio engine if playing (required for Web Audio API)
+    if (playing) {
+      try {
+        console.log('[GlobalMusicContext] Initializing audio engine...');
+        await audioEngine.initialize();
+        await audioEngine.ensureAudioContext();
+        console.log('[GlobalMusicContext] Audio engine ready');
+      } catch (error) {
+        console.error('[GlobalMusicContext] Failed to initialize audio engine:', error);
+        return; // Don't update state if initialization failed
+      }
     }
 
     // Update React state
