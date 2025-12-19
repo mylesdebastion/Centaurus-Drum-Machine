@@ -450,6 +450,7 @@ export class AudioEngine {
   /**
    * Ensure audio context is running
    * Resumes suspended contexts (required for browser autoplay policies)
+   * Includes iOS Safari unlock pattern (silent buffer playback)
    */
   public async ensureAudioContext(): Promise<void> {
     try {
@@ -457,6 +458,23 @@ export class AudioEngine {
         console.log('[AudioEngine] Audio context suspended, resuming...');
         await Tone.context.resume();
         console.log('[AudioEngine] Audio context resumed successfully');
+      }
+
+      // iOS Safari requires playing audio during user gesture to "unlock" the AudioContext
+      // Play a silent buffer to ensure audio is fully unlocked
+      if (Tone.context.state === 'running') {
+        try {
+          const ctx = Tone.context.rawContext as AudioContext;
+          const silentBuffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+          const source = ctx.createBufferSource();
+          source.buffer = silentBuffer;
+          source.connect(ctx.destination);
+          source.start(0);
+          console.log('[AudioEngine] iOS Safari audio unlock complete');
+        } catch (unlockError) {
+          // Silent failure - not critical
+          console.warn('[AudioEngine] Silent buffer playback failed (non-critical):', unlockError);
+        }
       }
     } catch (error) {
       console.error('[AudioEngine] Failed to resume audio context:', error);
