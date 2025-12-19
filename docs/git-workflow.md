@@ -116,7 +116,19 @@ git push origin --delete feature/my-feature
 
 ## Pre-Push Hook Protection
 
-The `.git/hooks/pre-push` hook automatically checks:
+### Setup (Required Once Per Machine)
+
+After cloning the repository, configure git to use the tracked hooks:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This tells git to use hooks from the `.githooks/` directory (which is version controlled) instead of the default `.git/hooks/` directory.
+
+### Hook Behavior
+
+The `pre-push` hook automatically checks:
 
 ### 1. Build Artifact Prevention
 - **Check**: Scans for `dist/` files in commits
@@ -128,10 +140,12 @@ The `.git/hooks/pre-push` hook automatically checks:
 - **Action**: Blocks push if build fails
 - **Reason**: Prevents broken deployments to Vercel
 
-### 3. Main Branch Warning
-- **Check**: Confirms direct pushes to main
-- **Action**: Prompts for confirmation
-- **Reason**: Encourages dev → main workflow
+### 3. Main Branch Protection (Smart Detection)
+- **Check**: Detects merge commits vs direct commits to main
+- **Action**:
+  - ✅ **Merge from dev**: Allowed automatically (standard workflow)
+  - ⚠️ **Direct commit**: Prompts for confirmation
+- **Reason**: Enforces staging validation while allowing smooth merges
 
 ---
 

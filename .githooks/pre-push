@@ -1,0 +1,60 @@
+#!/bin/bash
+# Pre-push hook for Centaurus Drum Machine
+# Prevents common deployment issues
+
+echo "🔍 Pre-push checklist running..."
+
+# Check if dist/ files would be pushed (should never happen with .gitignore)
+if git diff --cached --name-only | grep -q "^dist/"; then
+  echo "❌ ERROR: dist/ files detected in commit!"
+  echo "   Run: git reset HEAD dist/"
+  echo "   dist/ should be in .gitignore and built by Vercel"
+  exit 1
+fi
+
+# Get current branch
+current_branch=$(git symbolic-ref --short HEAD)
+
+# Force build check before pushing to main/dev (production/staging branches)
+if [[ "$current_branch" == "main" ]] || [[ "$current_branch" == "dev" ]]; then
+  echo "🔨 Building before push to $current_branch..."
+
+  # Run TypeScript check and build
+  npm run build
+  build_status=$?
+
+  if [ $build_status -ne 0 ]; then
+    echo ""
+    echo "❌ BUILD FAILED!"
+    echo "   Fix TypeScript errors before pushing to $current_branch"
+    echo "   This prevents broken deployments to Vercel"
+    exit 1
+  fi
+
+  echo "✅ Build successful - safe to deploy"
+fi
+
+# Check if pushing to main
+if [[ "$current_branch" == "main" ]]; then
+  # Check if this is a merge commit from dev (standard workflow)
+  if git log -1 --pretty=%B | grep -qE "^Merge branch 'dev'"; then
+    echo ""
+    echo "✅ Merging dev → main (standard workflow)"
+  else
+    # Direct commit to main - warn and confirm
+    echo ""
+    echo "⚠️  WARNING: Direct push to main detected!"
+    echo "   Recommended workflow: feature → dev (staging) → main (production)"
+    echo "   Current: Direct commit on main (bypasses staging)"
+    echo ""
+    read -p "   Continue pushing to main? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      echo "❌ Push cancelled"
+      exit 1
+    fi
+  fi
+fi
+
+echo "✅ Pre-push checks passed"
+exit 0

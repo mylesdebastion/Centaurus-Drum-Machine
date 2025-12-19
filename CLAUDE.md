@@ -306,6 +306,42 @@ const MyView = ({ onBack }) => (
 
 **Remember**: The original bolt.new code achieved high quality through systematic design thinking, comprehensive component patterns, and consistent visual hierarchies. All additions should maintain this same level of quality and consistency while leveraging modern UI patterns from shadcn/ui.
 
+## File Path Handling
+
+### Use Relative Paths for File Operations
+
+**IMPORTANT**: When using file editing tools (Edit, Write, Read), **always use relative paths** instead of absolute paths.
+
+**Why?**
+- Edit tool string matching works more reliably with relative paths
+- Avoids issues with backslash escaping on Windows (`D:\Github\...`)
+- Makes code more portable across different development environments
+- Reduces path-related matching errors
+
+**Examples:**
+
+```typescript
+// ✅ GOOD - Relative path
+Edit("src/components/MyComponent.tsx", ...)
+Read("docs/stories/story-4.1.md")
+Write(".claude/settings.local.json", ...)
+
+// ❌ BAD - Absolute path (Windows)
+Edit("D:\\Github\\Centaurus-Drum-Machine\\src\\components\\MyComponent.tsx", ...)
+Read("D:\\Github\\Centaurus-Drum-Machine\\docs\\stories\\story-4.1.md")
+
+// ❌ BAD - Absolute path (Unix)
+Edit("/home/user/projects/Centaurus-Drum-Machine/src/components/MyComponent.tsx", ...)
+```
+
+**Working Directory:**
+The working directory is already set to the project root (`D:\Github\Centaurus-Drum-Machine`), so all relative paths are automatically resolved from there.
+
+**When Absolute Paths Are Acceptable:**
+- Bash commands that require system-level paths
+- External file references outside the project directory
+- Configuration that explicitly requires absolute paths
+
 ## TypeScript Error Handling
 
 ### Unused Variable Errors (`noUnusedLocals: true`)
@@ -386,3 +422,31 @@ If you encounter `Port 5173 is already in use`, this means the server is actuall
 - Check if the app is already accessible at `http://localhost:5173`
 - If accessible, the "error" indicates the server is running - no action needed
 - Only kill/restart if the running server is unresponsive or stuck
+
+## Git Workflow & Branch Management
+
+### ⚠️ Known Issue: Branch Housekeeping Needed
+
+**Status:** Deferred until after pixel sequencer prototype validation
+**Documentation:** See [docs/GIT_HOUSEKEEPING.md](./docs/GIT_HOUSEKEEPING.md) for full details
+
+**Current branch divergence:**
+- `main`, `dev`, and `boomwhacker` have diverged with independent work
+- WLED code conflicts likely when merging
+- Orphaned branches (`education-workshop`, `epic-16-wip`) need evaluation
+
+**Temporary workflow:**
+- Use `boomwhacker` branch for active feature development
+- Deploy to preview URLs for colleague testing
+- Defer cleanup until feature validation complete
+
+**Target workflow (post-cleanup):**
+```
+feature/* → dev → main
+            ↓
+      dev-jam.audiolux.app
+                        ↓
+                  jam.audiolux.app
+```
+
+**Action required:** Address branch divergence before next major release (estimated 30-45min)
