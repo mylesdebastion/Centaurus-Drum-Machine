@@ -78,6 +78,8 @@ export interface GlobalMusicContextValue extends GlobalMusicState {
   /**
    * Update global transport state (Epic 14, Story 14.2)
    * Synchronizes Tone.js Transport with global state
+   * Ensures audio engine is initialized before starting playback
+   * Uses optimistic update for iOS Safari user gesture requirements
    * @param playing - true to start playback, false to pause
    */
   updateTransportState: (playing: boolean) => void;
@@ -338,12 +340,28 @@ export const GlobalMusicProvider: React.FC<GlobalMusicProviderProps> = ({ childr
       // Mark this as a remote change to prevent broadcast loop
       isRemotePlaybackChangeRef.current = true;
 
+      // OPTIMISTIC UPDATE: Update state immediately
       setState(prev => ({ ...prev, isPlaying: playing }));
 
-      // Sync with Tone.js Transport via AudioEngine
+      // Initialize audio engine if playing (async, but state already updated)
       if (playing) {
-        audioEngine.startTransport();
+        (async () => {
+          try {
+            console.log('[GlobalMusicContext] Initializing audio engine for remote playback...');
+            await audioEngine.initialize();
+            await audioEngine.ensureAudioContext();
+            console.log('[GlobalMusicContext] Audio engine ready');
+
+            // Start transport after successful initialization
+            audioEngine.startTransport();
+          } catch (error) {
+            console.error('[GlobalMusicContext] Failed to initialize audio engine:', error);
+            // REVERT: Stop playback if initialization failed
+            setState(prev => ({ ...prev, isPlaying: false }));
+          }
+        })();
       } else {
+        // Stop transport immediately when pausing
         audioEngine.stopTransport();
       }
     });
@@ -462,6 +480,12 @@ export const GlobalMusicProvider: React.FC<GlobalMusicProviderProps> = ({ childr
   /**
    * Update global transport state (Epic 14, Story 14.2)
    * Syncs React state with Tone.js Transport
+   * Ensures audio engine is initialized before starting playback
+   *
+   * IMPORTANT: Uses optimistic update for iOS Safari user gesture requirements
+   * - State updates immediately (within user gesture context)
+   * - Audio initialization happens asynchronously
+   * - Reverts state if initialization fails
    */
   const updateTransportState = useCallback((playing: boolean) => {
     // Validation
@@ -470,14 +494,29 @@ export const GlobalMusicProvider: React.FC<GlobalMusicProviderProps> = ({ childr
       return;
     }
 
-    // Update React state
+    // OPTIMISTIC UPDATE: Update state immediately (required for iOS Safari user gesture)
     setState(prev => ({ ...prev, isPlaying: playing }));
 
-    // Sync with Tone.js Transport via AudioEngine
+    // Initialize audio engine if playing (async, but state already updated)
     if (playing) {
-      audioEngine.startTransport();
-      console.log('[GlobalMusicContext] Transport started');
+      (async () => {
+        try {
+          console.log('[GlobalMusicContext] Initializing audio engine...');
+          await audioEngine.initialize();
+          await audioEngine.ensureAudioContext();
+          console.log('[GlobalMusicContext] Audio engine ready');
+
+          // Start transport after successful initialization
+          audioEngine.startTransport();
+          console.log('[GlobalMusicContext] Transport started');
+        } catch (error) {
+          console.error('[GlobalMusicContext] Failed to initialize audio engine:', error);
+          // REVERT: Stop playback if initialization failed
+          setState(prev => ({ ...prev, isPlaying: false }));
+        }
+      })();
     } else {
+      // Stop transport immediately when pausing
       audioEngine.stopTransport();
       console.log('[GlobalMusicContext] Transport stopped');
     }
