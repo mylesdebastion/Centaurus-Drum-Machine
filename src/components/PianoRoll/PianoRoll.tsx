@@ -555,20 +555,32 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
 
   // BPM pulse animation for LED 0 (data transmission mode)
   useEffect(() => {
-    if (!wledEnabled || !wledDataLEDsEnabled) return;
+    if (!wledEnabled || !wledDataLEDsEnabled) {
+      console.log('[PianoRoll WLED] BPM pulse effect - disabled (wledEnabled:', wledEnabled, ', dataLEDs:', wledDataLEDsEnabled, ')');
+      return;
+    }
 
     // Get tempo from global context (fallback to 120 BPM if standalone)
     const tempo = isStandalone ? 120 : globalMusic.tempo;
     const beatIntervalMs = (60 / tempo) * 1000; // Convert BPM to milliseconds per beat
     const pulseDurationMs = 100; // Flash duration (100ms)
 
+    console.log('[PianoRoll WLED] Starting BPM pulse - Tempo:', tempo, 'BPM, Interval:', beatIntervalMs, 'ms');
+
     const beatInterval = setInterval(() => {
+      console.log('[PianoRoll WLED] BPM pulse ON');
       setBpmPulseOn(true);
       // Turn off after pulse duration
-      setTimeout(() => setBpmPulseOn(false), pulseDurationMs);
+      setTimeout(() => {
+        console.log('[PianoRoll WLED] BPM pulse OFF');
+        setBpmPulseOn(false);
+      }, pulseDurationMs);
     }, beatIntervalMs);
 
-    return () => clearInterval(beatInterval);
+    return () => {
+      console.log('[PianoRoll WLED] Stopping BPM pulse');
+      clearInterval(beatInterval);
+    };
   }, [wledEnabled, wledDataLEDsEnabled, isStandalone, globalMusic.tempo]);
 
   // Initialize audio engine on mount
@@ -662,6 +674,8 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
 
     // Data LEDs mode: First 5 LEDs show BPM pulse + key
     if (wledDataLEDsEnabled) {
+      console.log('[PianoRoll WLED] Data LEDs enabled - BPM pulse:', bpmPulseOn, 'Root:', selectedRoot);
+
       // LED 0: BPM pulse (white flash)
       if (bpmPulseOn) {
         ledData.push({ r: 255, g: 255, b: 255 }); // White pulse
@@ -671,7 +685,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
 
       // LEDs 1-4: Show current key (root note color)
       const rootNoteClass = rootPositions[selectedRoot];
-      const keyColor = getNoteColor(rootNoteClass, colorMode);
+      if (rootNoteClass === undefined) {
+        console.warn('[PianoRoll WLED] Root note class undefined for:', selectedRoot);
+      }
+      const keyColor = getNoteColor(rootNoteClass ?? 0, colorMode);
+      console.log('[PianoRoll WLED] Key color for', selectedRoot, ':', keyColor);
       for (let i = 0; i < 4; i++) {
         ledData.push({
           r: keyColor.r,
@@ -684,6 +702,10 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     // Calculate how many LEDs are left for note data
     const dataLEDOffset = wledDataLEDsEnabled ? 5 : 0;
     const noteLEDCount = wledLEDCount - dataLEDOffset;
+
+    if (wledDataLEDsEnabled) {
+      console.log('[PianoRoll WLED] Total LEDs:', wledLEDCount, 'Data offset:', dataLEDOffset, 'Note LEDs:', noteLEDCount, 'Current ledData length:', ledData.length);
+    }
 
     // Generate note data for remaining LEDs
     for (let ledIndex = 0; ledIndex < noteLEDCount; ledIndex++) {
@@ -719,6 +741,10 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
         g: Math.round(color.g * brightness),
         b: Math.round(color.b * brightness),
       });
+    }
+
+    if (wledDataLEDsEnabled && ledData.length > 0) {
+      console.log('[PianoRoll WLED] Final LED array length:', ledData.length, 'First 5 LEDs:', ledData.slice(0, 5));
     }
 
     return ledData;
