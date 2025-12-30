@@ -190,12 +190,15 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   const playCurrentChord = useCallback(() => {
     if (!soundEngineRef.current) return;
 
-    const chordNotes = Array.from(getChordMIDINotes());
+    const chordNotesArray = Array.from(getChordMIDINotes());
+
+    // Track chord notes for WLED visualization
+    setChordNotes(new Set(chordNotesArray));
 
     // Send MIDI to visualizer (Studio inter-module communication)
     const sourceManager = (window as any).frequencySourceManager;
     if (sourceManager) {
-      chordNotes.forEach((midiNote) => {
+      chordNotesArray.forEach((midiNote) => {
         const noteClass = midiNote % 12;
         const noteColor = getNoteColor(noteClass, colorMode);
         sourceManager.addMidiNote(midiNote, 89, noteColor); // velocity ~70% (89/127)
@@ -203,7 +206,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     }
 
     // Emit MIDI events to event bus for cross-module communication (Epic 14)
-    chordNotes.forEach((midiNote) => {
+    chordNotesArray.forEach((midiNote) => {
       const noteForColor = colorMode === 'spectrum' ? midiNote : (midiNote % 12);
       const noteColor = getNoteColor(noteForColor, colorMode);
       midiEventBus.emitNoteOn({
@@ -216,7 +219,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     });
 
     // Trigger chord attack with error handling
-    chordNotes.forEach((midiNote) => {
+    chordNotesArray.forEach((midiNote) => {
       const frequency = 440 * Math.pow(2, (midiNote - 69) / 12);
       try {
         if (soundEngineRef.current?.triggerAttack) {
@@ -233,7 +236,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     // Release notes after 1 second
     const releaseTimeout = setTimeout(() => {
       if (soundEngineRef.current?.triggerRelease) {
-        chordNotes.forEach((midiNote) => {
+        chordNotesArray.forEach((midiNote) => {
           const frequency = 440 * Math.pow(2, (midiNote - 69) / 12);
           try {
             soundEngineRef.current?.triggerRelease?.(frequency);
@@ -244,9 +247,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
         });
       }
       // Emit note-off events
-      chordNotes.forEach((midiNote) => {
+      chordNotesArray.forEach((midiNote) => {
         midiEventBus.emitNoteOff(midiNote, 'piano-roll');
       });
+      // Clear chord notes from WLED visualization
+      setChordNotes(new Set());
       // Remove this timeout from tracking set
       noteReleaseTimeoutsRef.current.delete(releaseTimeout);
     }, 1000);
@@ -427,6 +432,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   // Track Piano Roll's own mouse/keyboard clicks for LED visualization
   const [selfClickedNotes, setSelfClickedNotes] = useState<Set<number>>(new Set());
 
+  // Track chord progression notes for LED visualization
+  const [chordNotes, setChordNotes] = useState<Set<number>>(new Set());
+
   // Cross-module MIDI listening (Epic 14 - Inter-Module Communication)
   // Listen to MIDI notes from other modules (Guitar, Drums) via MIDI event bus
   const [crossModuleNotes, setCrossModuleNotes] = useState<Set<number>>(new Set());
@@ -500,13 +508,14 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     };
   }, [instanceId, routingService]);
 
-  // Merge local MIDI input, self-clicked notes, and cross-module MIDI notes
+  // Merge local MIDI input, self-clicked notes, chord notes, and cross-module MIDI notes
   const activeNotes = useMemo(() => {
     const merged = new Set<number>(localActiveNotes);
     selfClickedNotes.forEach(note => merged.add(note));
+    chordNotes.forEach(note => merged.add(note));
     crossModuleNotes.forEach(note => merged.add(note));
     return merged;
-  }, [localActiveNotes, selfClickedNotes, crossModuleNotes]);
+  }, [localActiveNotes, selfClickedNotes, chordNotes, crossModuleNotes]);
 
   // Reset idle timer when notes are played
   useEffect(() => {
