@@ -220,7 +220,7 @@ development_status:
   # Epic 19: Education DJ Visualizer Integration
   epic-19: in-progress
   19-1-live-audio-visualizer-embedded-mode: ready-for-dev
-  19-2-lesson-2-color-pitch-visualizer-integration: in-progress
+  19-2-lesson-2-color-pitch-visualizer-integration: review
   19-3-performance-optimization-polish-lessons-2-4: ready-for-dev
   19-4-lesson-4-melody-harmony-visualizer-integration: ready-for-dev
   19-5-spectrum-mode-wled-visualization-1d-led-strips: done
