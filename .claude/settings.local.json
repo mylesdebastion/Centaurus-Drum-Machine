@@ -10,7 +10,8 @@
       "Bash(git push:*)",
       "Bash(git cherry-pick:*)",
       "Bash(git stash:*)",
-      "Bash(npm install)"
+      "Bash(npm install)",
+      "Bash(sort:*)"
     ],
     "deny": [],
     "ask": []
