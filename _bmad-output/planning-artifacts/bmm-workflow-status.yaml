@@ -1,0 +1,56 @@
+# Workflow Status Template
+
+# This tracks progress through BMM methodology Analysis, Planning, and Solutioning phases.
+# Implementation phase is tracked separately in sprint-status.yaml
+
+# STATUS DEFINITIONS:
+# ==================
+# Initial Status (before completion):
+#   - required: Must be completed to progress
+#   - optional: Can be completed but not required
+#   - recommended: Strongly suggested but not required
+#   - conditional: Required only if certain conditions met (e.g., if_has_ui)
+#
+# Completion Status:
+#   - {file-path}: File created/found (e.g., "docs/product-brief.md")
+#   - skipped: Optional/conditional workflow that was skipped
+
+generated: "2026-01-02"
+project: "Centaurus-Drum-Machine"
+project_type: "brownfield"
+selected_track: "method"
+field_type: "brownfield"
+workflow_path: "method-brownfield.yaml"
+
+workflow_status:
+  # Phase 0: Documentation (Prerequisite for brownfield)
+  phase-0-documentation:
+    document-project: "docs/project-documentation/architecture-overview.md"
+
+  # Phase 1: Analysis (Optional - User-selected during init)
+  phase-1-analysis:
+    brainstorm-project: "skipped"
+    research: "skipped"
+    product-brief: "skipped"
+
+  # Phase 2: Planning (Required)
+  phase-2-planning:
+    prd: "docs/prd/"
+    create-ux-design: "docs/UX_STANDARDS.md"
+
+  # Phase 3: Solutioning (Required)
+  phase-3-solutioning:
+    create-architecture: "docs/architecture/component-architecture.md"
+    create-epics-and-stories: "docs/epics/"
+    test-design: "skipped"
+    implementation-readiness: "skipped"
+
+  # Phase 4: Implementation (Required)
+  # Detailed implementation tracking is in sprint-status.yaml
+  phase-4-implementation:
+    sprint-planning: "_bmad-output/implementation-artifacts/sprint-status.yaml"
+
+# Next Steps:
+# - Use /bmad:bmm:workflows:sprint-status to view sprint dashboard
+# - Use dev agent with /bmad:bmm:workflows:dev-story to implement stories
+# - Track story progress in sprint-status.yaml

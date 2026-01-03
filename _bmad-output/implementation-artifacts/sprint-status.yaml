@@ -1,0 +1,245 @@
+# generated: 2026-01-02
+# project: Centaurus-Drum-Machine
+# project_key: centaurus-dm
+# tracking_system: file-system
+# story_location: docs/stories
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-01-02
+project: Centaurus-Drum-Machine
+project_key: centaurus-dm
+tracking_system: file-system
+story_location: docs/stories
+
+development_status:
+  # Epic 1: APC40 Hardware Controller Integration
+  epic-1: in-progress
+  1-1-core-midi-event-handling-device-discovery: ready-for-dev
+  1-2-track-selection-navigation: ready-for-dev
+  1-3-step-button-led-feedback: ready-for-dev
+  1-4-pattern-control-navigation: ready-for-dev
+  1-5-velocity-sensitive-drum-pads: ready-for-dev
+  1-6-apc40-control-surface-documentation: ready-for-dev
+  epic-1-retrospective: optional
+
+  # Epic 2: Education Mode (Boomwhacker Integration)
+  epic-2: in-progress
+  2-1-education-mode-architecture-core-lesson-framework: ready-for-dev
+  2-2-basic-boomwhacker-lesson-color-recognition-single-notes: ready-for-dev
+  2-3-color-pitch-lesson-scale-degrees: ready-for-dev
+  2-4-rhythm-timing-lesson-duration-tempo: ready-for-dev
+  2-5-melody-harmony-lesson-simple-songs: ready-for-dev
+  2-6-classroom-session-management-teacher-dashboard: backlog
+  2-7-offline-education-mode-export-import: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3: Multi-Controller Support & Pro Monetization
+  epic-3: in-progress
+  3-1-controller-abstraction-layer: ready-for-dev
+  3-2-launchpad-pro-integration: backlog
+  3-3-generic-midi-controller-mapper-ui: backlog
+  3-4-pro-version-feature-gating: backlog
+  3-5-stripe-payment-integration: backlog
+  3-6-license-key-management-system: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4: Global Music Controls & Context
+  epic-4: done
+  4-1-global-music-context-key-scale-tempo: done
+  4-2-global-transport-controls-play-pause-stop: done
+  4-3-global-midi-output-routing: done
+  4-4-module-state-synchronization: done
+  4-5-preset-management-save-load-system: done
+  epic-4-retrospective: optional
+
+  # Epic 5: Universal Responsive Architecture
+  epic-5: done
+  5-1-universal-mobile-responsive-architecture: done
+  epic-5-retrospective: optional
+
+  # Epic 6: Multi-Client Sessions & WLED Integration
+  epic-6: in-progress
+  6-1-wled-discovery-connection-management: done
+  6-2-real-time-drum-state-sync-supabase-realtime: backlog
+  6-3-multi-client-session-ui-lobby-system: backlog
+  6-4-wled-led-output-integration: backlog
+  6-5-conflict-resolution-state-merging: backlog
+  epic-6-retrospective: optional
+
+  # Epic 7: Jam Session Backend (Supabase)
+  epic-7: done
+  7-1-supabase-project-setup-schema-design: done
+  7-2-session-management-api-create-join-leave: done
+  7-3-real-time-drum-state-sync-supabase-realtime: done
+  7-4-user-presence-activity-tracking: done
+  7-5-session-history-playback: done
+  7-6-security-rate-limiting: done
+  epic-7-retrospective: optional
+
+  # Epic 8: Launchpad Pro Integration
+  epic-8: in-progress
+  8-0-hardware-controller-selection-infrastructure: done
+  8-1-launchpad-pro-controller-implementation: done
+  8-2-drum-sequencer-integration-layout: done
+  8-3-performance-optimization-testing: ready-for-dev
+  epic-8-retrospective: optional
+
+  # Epic 9: Multi-Instrument MIDI Visualization
+  epic-9: in-progress
+  9-1-midi-input-router-instrument-classifier: done
+  9-2-piano-roll-visualizer-88-key-keyboard-support: done
+  9-3-guitar-fretboard-visualizer-6-string-24-fret: ready-for-dev
+  9-4-drum-kit-visualizer-general-midi-mapping: backlog
+  9-5-instrument-specific-wled-led-mappings: backlog
+  9-6-multi-instrument-session-switching: backlog
+  epic-9-retrospective: optional
+
+  # Epic 10: WLED Preset Management
+  epic-10: in-progress
+  10-1-wled-preset-discovery-introspection: ready-for-dev
+  10-2-preset-selection-ui-preview: backlog
+  10-3-preset-to-module-mapping-system: backlog
+  10-4-custom-preset-creation-upload: backlog
+  10-5-preset-backup-restore: backlog
+  epic-10-retrospective: optional
+
+  # Epic 11: ROLI Lumi Integration
+  epic-11: in-progress
+  11-1-roli-lumi-midi-discovery-connection: ready-for-dev
+  11-2-polyphonic-led-feedback-rgb-per-key: backlog
+  11-3-scale-highlighting-music-theory-modes: backlog
+  11-4-chord-detection-visualization: backlog
+  11-5-lumi-specific-lesson-modes-education-integration: backlog
+  11-6-multi-lumi-setup-expanded-keyboard-range: backlog
+  epic-11-retrospective: optional
+
+  # Epic 12: Sound Engine Expansion
+  epic-12: done
+  12-1-web-audio-api-polyphonic-synth-engine: done
+  12-2-sample-based-drum-synthesis: done
+  12-3-effects-chain-reverb-delay-filter: done
+  12-4-preset-sound-banks-electronic-acoustic-world: done
+  12-5-user-sample-upload-management: done
+  12-6-audio-export-recording-wav-mp3: done
+  epic-12-retrospective: optional
+
+  # Epic 13: Documentation Infrastructure
+  epic-13: done
+  13-1-component-documentation-system-storybook: done
+  13-2-api-documentation-typedoc: done
+  13-3-user-guide-tutorials: done
+  13-4-architecture-decision-records-adrs: done
+  13-5-video-tutorials-demos: done
+  epic-13-retrospective: optional
+
+  # Epic 14: Module Adapter System
+  epic-14: in-progress
+  14-1-module-interface-definition-type-system: done
+  14-2-isometric-sequencer-adapter-wled-grid-mapping: done
+  14-3-dj-visualizer-adapter-frequency-to-led: backlog
+  14-4-piano-roll-adapter-piano-to-led: backlog
+  14-5-guitar-fretboard-adapter-fretboard-to-led: backlog
+  14-6-adapter-registration-discovery-system: backlog
+  14-7-ledcompositor-refactor: done
+  epic-14-retrospective: optional
+
+  # Epic 15: Chord Melody Arranger
+  epic-15: in-progress
+  15-1-chord-progression-service-extraction: done
+  15-2-chord-melody-arranger-module-ui: done
+  15-3-melody-arranger-component: done
+  15-4-module-routing-system: done
+  15-5-globalmusic-context-integration: done
+  15-6-module-registry-integration-studio-loading: done
+  15-7-intelligent-melody-generator: ready-for-dev
+  15-8-pattern-recognition-suggestions: backlog
+  15-9-timeline-divider-multipage-sequencer: backlog
+  epic-15-retrospective: optional
+
+  # Epic 16: Unified Module UI Template
+  epic-16: in-progress
+  16-1-extract-module-ui-template-components: ready-for-dev
+  16-2-migrate-chord-melody-arranger-to-template: done
+  16-3-apply-template-to-remaining-modules: done
+  16-4-visual-rendering-amplification: backlog
+  16-5-guitar-ergonomics-tuning-support: backlog
+  16-6-settings-panel-educational-tooltips: backlog
+  epic-16-retrospective: optional
+
+  # Epic 17: Remote WLED State Sync
+  epic-17: in-progress
+  17-1-delta-based-drum-state-sync: done
+  17-2-client-side-color-derivation: done
+  17-3-full-pattern-sync-led-integration: ready-for-dev
+  epic-17-retrospective: optional
+
+  # Epic 18: Intelligent WLED Routing
+  epic-18: in-progress
+  18-0-low-friction-user-authentication-supabase-auth: done
+  18-1-wled-device-registry-supabase-backend: done
+  18-2-module-capability-declaration-system: done
+  18-3-visualization-routing-matrix: done
+  18-4-context-aware-routing-rules-engine: ready-for-dev
+  18-5-wled-manager-ui-unified-component: done
+  18-6-ledcompositor-integration-module-migration: ready-for-dev
+  18-7-multi-module-routing-testing-documentation: ready-for-dev
+  18-8-virtual-led-preview-integration: done
+  18-9-2d-grid-preview-enhancement: done
+  18-10-wled-implementation-consolidation: done
+  18-11-settings-migration-ui: ready-for-dev
+  epic-18-retrospective: optional
+
+  # Epic 19: Education DJ Visualizer Integration
+  epic-19: in-progress
+  19-1-live-audio-visualizer-embedded-mode: ready-for-dev
+  19-2-lesson-2-color-pitch-visualizer-integration: in-progress
+  19-3-performance-optimization-polish-lessons-2-4: ready-for-dev
+  19-4-lesson-4-melody-harmony-visualizer-integration: ready-for-dev
+  19-5-spectrum-mode-wled-visualization-1d-led-strips: done
+  19-6-spectrum-mode-wled-visualization-2d-led-matrices: ready-for-dev
+  epic-19-retrospective: optional
+
+  # Epic 20: Workshop-Ready Education Mode
+  epic-20: in-progress
+  20-1-workshop-config-auto-load: done
+  20-2-apc40-led-button-mapping-completion: backlog
+  20-3-offline-first-mode-verification: ready-for-dev
+  20-4-workshop-startup-integration-testing: backlog
+  20-5-collaborative-boomwhacker-performance-lesson: done
+  20-6-learning-narrative: done
+  epic-20-retrospective: optional
+
+  # Epic 22: WLED Direct Browser Communication
+  epic-22: done
+  22-1-investigate-wled-communication-protocols: done
+  22-2-implement-direct-http-json-api-communication: done
+  22-3-add-chrome-local-network-access-permission-ui-guidance: done
+  epic-22-retrospective: optional
