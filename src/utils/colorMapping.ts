@@ -64,7 +64,7 @@ export const getNoteColor = (note: number, mode: ColorMode): RGBColor => {
       // Piano (21-108) uses ~89% of spectrum, Guitar (40-88) uses yellow→blue-violet
       const clampedNote = Math.max(12, Math.min(120, note));
       const hue = ((clampedNote - 12) / 108) * 300; // 0° = red, 300° = violet
-      return hslToRgb(hue, 85, 55);
+      return hslToRgb(hue, 100, 50); // Maximum saturation and lightness for vibrant colors
     
     case 'chromatic': {
       // Custom chromatic color mapping with smooth blends
@@ -85,7 +85,7 @@ export const getNoteColor = (note: number, mode: ColorMode): RGBColor => {
       ];
       const chromaticNoteClass = note % 12;
       const chromaticHue = chromaticHues[chromaticNoteClass];
-      return hslToRgb(chromaticHue, 80, 60);
+      return hslToRgb(chromaticHue, 100, 50); // Maximum saturation and lightness for vibrant colors
     }
     
     case 'harmonic':
@@ -94,7 +94,7 @@ export const getNoteColor = (note: number, mode: ColorMode): RGBColor => {
       const noteClass = note % 12;
       const fifthsIndex = fifths.indexOf(noteClass);
       const harmonicHue = (fifthsIndex / 12) * 360;
-      return hslToRgb(harmonicHue, 70, 55);
+      return hslToRgb(harmonicHue, 100, 50); // Maximum saturation and lightness for vibrant colors
     
     default:
       return { r: 255, g: 255, b: 255 };
@@ -154,18 +154,18 @@ export const getFrequencyColor = (
         hue = frequency * 300; // 0° = red, 300° = violet
       }
 
-      return hslToRgb(hue, 85, 55);
+      return hslToRgb(hue, 100, 50); // Maximum saturation and lightness for vibrant colors
     }
 
     case 'chromatic':
       // For frequency data, treat as continuous spectrum
       const chromaticHue = frequency * 360;
-      return hslToRgb(chromaticHue, 70, 55);
+      return hslToRgb(chromaticHue, 100, 50); // Maximum saturation and lightness for vibrant colors
 
     case 'harmonic':
       // For frequency, use a warm-to-cool progression
       const harmonicHue = frequency * 240; // Blue to red range
-      return hslToRgb(harmonicHue, 65, 50);
+      return hslToRgb(harmonicHue, 100, 50); // Maximum saturation and lightness for vibrant colors
 
     default:
       return { r: 255, g: 255, b: 255 };

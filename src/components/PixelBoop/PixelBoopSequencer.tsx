@@ -311,6 +311,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
   // ============================================================================
 
   const audioUnlockedRef = useRef(false);
+  const htmlAudioUnlockRef = useRef(false);
 
   const initAudio = useCallback(async () => {
     if (!audioContextRef.current) {
@@ -319,6 +320,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
 
     const ctx = audioContextRef.current;
 
+    // Step 1: Resume AudioContext if suspended
     if (ctx.state === 'suspended') {
       try {
         await ctx.resume();
@@ -327,8 +329,25 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
       }
     }
 
-    // iOS Safari requires playing audio during user gesture to "unlock" the AudioContext
-    // Play a silent buffer to unlock audio playback
+    // Step 2: HTML5 audio unlock (fixes iOS silent switch issue)
+    // iOS Safari routes Web Audio API to "ringer channel" which respects silent switch.
+    // Playing HTML5 audio forces Web Audio onto "media channel" which ignores silent switch.
+    // See: https://bugs.webkit.org/show_bug.cgi?id=237322
+    if (!htmlAudioUnlockRef.current) {
+      try {
+        const audio = document.createElement('audio');
+        // Silent WAV file (base64 encoded, minimal size)
+        audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+        audio.load();
+        await audio.play();
+        htmlAudioUnlockRef.current = true;
+        console.log('[PixelBoop] HTML5 audio unlock complete - media channel activated');
+      } catch (e) {
+        console.warn('[PixelBoop] HTML5 audio unlock failed (may affect iOS with silent switch):', e);
+      }
+    }
+
+    // Step 3: Web Audio silent buffer unlock (standard iOS unlock pattern)
     if (!audioUnlockedRef.current && ctx.state === 'running') {
       try {
         const silentBuffer = ctx.createBuffer(1, 1, ctx.sampleRate);
@@ -337,9 +356,9 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
         source.connect(ctx.destination);
         source.start(0);
         audioUnlockedRef.current = true;
-        console.log('[PixelBoop] Audio context unlocked for iOS');
+        console.log('[PixelBoop] Web Audio unlock complete');
       } catch (e) {
-        console.warn('[PixelBoop] Failed to unlock audio:', e);
+        console.warn('[PixelBoop] Web Audio unlock failed:', e);
       }
     }
   }, []);

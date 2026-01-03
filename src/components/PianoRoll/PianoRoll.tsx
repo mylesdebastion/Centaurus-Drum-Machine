@@ -7,14 +7,14 @@ import { useMIDIInput } from '../../hooks/useMIDIInput';
 import { audioEngine } from '../../utils/audioEngine';
 import { createSoundEngine, SoundEngine, SoundEngineType, soundEngineNames } from '../../utils/soundEngines';
 import { getNoteColor, type ColorMode } from '../../utils/colorMapping';
-import { PIANO_CONSTANTS, LED_STRIP, getNoteNameWithOctave } from './constants';
+import { getNoteNameWithOctave } from './constants';
 import { CHORD_PROGRESSIONS } from '../GuitarFretboard/chordProgressions';
 import { getMIDINoteFromFret } from '../GuitarFretboard/constants';
 import { lumiController } from '../../utils/lumiController';
 import { midiOutputManager } from '../../utils/midiOutputManager';
+import WLEDVirtualPreview from '../WLED/WLEDVirtualPreview';
 import { useModuleContext } from '../../hooks/useModuleContext';
 import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
-import { ledCompositor } from '../../services/LEDCompositor';
 import { midiEventBus } from '../../utils/midiEventBus';
 import { ModuleRoutingService } from '../../services/moduleRoutingService';
 import type { NoteEvent } from '../../types/moduleRouting';
@@ -78,8 +78,17 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   // Local-only state (not part of global context)
   const [visibleOctaves, setVisibleOctaves] = useState(4);
   const [startOctave, setStartOctave] = useState(3);
-  const [wledEnabled, setWledEnabled] = useState(false);
-  const [wledIP, setWledIP] = useState('192.168.8.106');
+  const [wledEnabled, setWledEnabled] = useState(true); // Default ON
+  const [wledIP, setWledIP] = useState('192.168.8.37');
+  const [wledLEDCount, setWledLEDCount] = useState(42);
+  const [wledStartNote, setWledStartNote] = useState(48); // C3 (MIDI 48) - centers strip around middle C
+  const [wledPreviewColors, setWledPreviewColors] = useState<string[]>([]);
+  const [lastNoteActivity, setLastNoteActivity] = useState<number>(Date.now());
+  const [idleFadeProgress, setIdleFadeProgress] = useState<number>(0); // 0 = no fade, 1 = full fade
+  const [wledDataLEDsEnabled, setWledDataLEDsEnabled] = useState(true); // Use first 5 LEDs for data (default ON)
+  const [bpmPulseOn, setBpmPulseOn] = useState(false); // BPM pulse state for LED 0
+  const [currentBeat, setCurrentBeat] = useState(0); // Track current beat position in 4/4 time (0 = downbeat, 1/2/3 = subsequent beats)
+  const [wledBridgeConnected, setWledBridgeConnected] = useState(false); // Track bridge connection status
   const [lumiEnabled, setLumiEnabled] = useState(false);
   const [midiOutputDevices, setMidiOutputDevices] = useState<any[]>([]);
   const [selectedOutputId, setSelectedOutputId] = useState<string | null>(null);
@@ -103,6 +112,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   const soundEngineRef = useRef<SoundEngine | null>(null);
   const noteReleaseTimeoutsRef = useRef<Set<NodeJS.Timeout>>(new Set());
   const previousLumiNotesRef = useRef<Set<number>>(new Set());
+  const wsRef = useRef<WebSocket | null>(null); // WLED websocket reference
 
   // State update helpers (Epic 14 - Module Adapter Pattern)
   // Updates local state if standalone, global state if embedded
@@ -185,12 +195,15 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   const playCurrentChord = useCallback(() => {
     if (!soundEngineRef.current) return;
 
-    const chordNotes = Array.from(getChordMIDINotes());
+    const chordNotesArray = Array.from(getChordMIDINotes());
+
+    // Track chord notes for WLED visualization
+    setChordNotes(new Set(chordNotesArray));
 
     // Send MIDI to visualizer (Studio inter-module communication)
     const sourceManager = (window as any).frequencySourceManager;
     if (sourceManager) {
-      chordNotes.forEach((midiNote) => {
+      chordNotesArray.forEach((midiNote) => {
         const noteClass = midiNote % 12;
         const noteColor = getNoteColor(noteClass, colorMode);
         sourceManager.addMidiNote(midiNote, 89, noteColor); // velocity ~70% (89/127)
@@ -198,7 +211,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     }
 
     // Emit MIDI events to event bus for cross-module communication (Epic 14)
-    chordNotes.forEach((midiNote) => {
+    chordNotesArray.forEach((midiNote) => {
       const noteForColor = colorMode === 'spectrum' ? midiNote : (midiNote % 12);
       const noteColor = getNoteColor(noteForColor, colorMode);
       midiEventBus.emitNoteOn({
@@ -211,7 +224,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     });
 
     // Trigger chord attack with error handling
-    chordNotes.forEach((midiNote) => {
+    chordNotesArray.forEach((midiNote) => {
       const frequency = 440 * Math.pow(2, (midiNote - 69) / 12);
       try {
         if (soundEngineRef.current?.triggerAttack) {
@@ -228,7 +241,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     // Release notes after 1 second
     const releaseTimeout = setTimeout(() => {
       if (soundEngineRef.current?.triggerRelease) {
-        chordNotes.forEach((midiNote) => {
+        chordNotesArray.forEach((midiNote) => {
           const frequency = 440 * Math.pow(2, (midiNote - 69) / 12);
           try {
             soundEngineRef.current?.triggerRelease?.(frequency);
@@ -239,9 +252,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
         });
       }
       // Emit note-off events
-      chordNotes.forEach((midiNote) => {
+      chordNotesArray.forEach((midiNote) => {
         midiEventBus.emitNoteOff(midiNote, 'piano-roll');
       });
+      // Clear chord notes from WLED visualization
+      setChordNotes(new Set());
       // Remove this timeout from tracking set
       noteReleaseTimeoutsRef.current.delete(releaseTimeout);
     }, 1000);
@@ -386,6 +401,19 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
           console.warn('[PianoVisualizer] Sound engine error on note on:', error);
         }
       }
+
+      // Emit MIDI event to event bus for cross-module communication
+      // (Same as handleKeyClick - ensures MIDI keyboard triggers full event chain)
+      const noteForColor = colorMode === 'spectrum' ? note : (note % 12);
+      const noteColor = getNoteColor(noteForColor, colorMode);
+
+      midiEventBus.emitNoteOn({
+        note: note,
+        velocity: velocity,
+        timestamp: performance.now(),
+        source: 'piano-roll',
+        color: noteColor
+      });
     },
     onNoteOff: (note) => {
       // Trigger release for sustained notes
@@ -399,8 +427,18 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
       }
       // Keep audioEngine for backwards compatibility
       audioEngine.triggerPianoNoteOff(note);
+
+      // Emit note-off event to event bus
+      // (Same as handleKeyRelease - ensures MIDI keyboard triggers full event chain)
+      midiEventBus.emitNoteOff(note, 'piano-roll');
     },
   });
+
+  // Track Piano Roll's own mouse/keyboard clicks for LED visualization
+  const [selfClickedNotes, setSelfClickedNotes] = useState<Set<number>>(new Set());
+
+  // Track chord progression notes for LED visualization
+  const [chordNotes, setChordNotes] = useState<Set<number>>(new Set());
 
   // Cross-module MIDI listening (Epic 14 - Inter-Module Communication)
   // Listen to MIDI notes from other modules (Guitar, Drums) via MIDI event bus
@@ -475,12 +513,72 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     };
   }, [instanceId, routingService]);
 
-  // Merge local MIDI input with cross-module MIDI notes
+  // Merge local MIDI input, self-clicked notes, chord notes, and cross-module MIDI notes
   const activeNotes = useMemo(() => {
     const merged = new Set<number>(localActiveNotes);
+    selfClickedNotes.forEach(note => merged.add(note));
+    chordNotes.forEach(note => merged.add(note));
     crossModuleNotes.forEach(note => merged.add(note));
     return merged;
-  }, [localActiveNotes, crossModuleNotes]);
+  }, [localActiveNotes, selfClickedNotes, chordNotes, crossModuleNotes]);
+
+  // Reset idle timer when notes are played
+  useEffect(() => {
+    if (activeNotes.size > 0) {
+      setLastNoteActivity(Date.now());
+      setIdleFadeProgress(0); // Instantly hide background when playing
+    }
+  }, [activeNotes]);
+
+  // Idle detection and fade-in animation
+  useEffect(() => {
+    if (!wledEnabled) return;
+
+    const IDLE_DELAY_MS = 10000; // 10 seconds
+    const FADE_DURATION_MS = 2000; // 2 second fade-in
+
+    const animationLoop = () => {
+      const timeSinceActivity = Date.now() - lastNoteActivity;
+
+      if (timeSinceActivity < IDLE_DELAY_MS) {
+        // Still active - ensure fade is 0
+        setIdleFadeProgress(0);
+      } else {
+        // Idle - calculate fade progress
+        const fadeElapsed = timeSinceActivity - IDLE_DELAY_MS;
+        const progress = Math.min(1, fadeElapsed / FADE_DURATION_MS);
+        setIdleFadeProgress(progress);
+      }
+    };
+
+    // Run animation at 30 FPS
+    const interval = setInterval(animationLoop, 1000 / 30);
+    return () => clearInterval(interval);
+  }, [wledEnabled, lastNoteActivity]);
+
+  // BPM pulse animation with 4/4 time tracking
+  useEffect(() => {
+    if (!wledEnabled || !wledDataLEDsEnabled) return;
+
+    // Get tempo from global context (fallback to 120 BPM if standalone)
+    const tempo = isStandalone ? 120 : globalMusic.tempo;
+    const beatIntervalMs = (60 / tempo) * 1000; // Convert BPM to milliseconds per beat
+    const pulseDurationMs = 100; // Flash duration (100ms)
+
+    const beatInterval = setInterval(() => {
+      // Trigger pulse FIRST (uses current beat value)
+      setBpmPulseOn(true);
+
+      // Turn off after pulse duration
+      setTimeout(() => setBpmPulseOn(false), pulseDurationMs);
+
+      // Update beat position AFTER pulse (0 → 1 → 2 → 3 → 0...)
+      // This ensures first flash is on beat 0 (downbeat)
+      setCurrentBeat((prev) => (prev + 1) % 4);
+    }, beatIntervalMs);
+
+    return () => clearInterval(beatInterval);
+  }, [wledEnabled, wledDataLEDsEnabled, isStandalone, globalMusic.tempo]);
 
   // Initialize audio engine on mount
   useEffect(() => {
@@ -491,6 +589,13 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
    * Handle key click (mouse/touch)
    */
   const handleKeyClick = useCallback(async (midiNote: number) => {
+    // Track clicked note for LED visualization
+    setSelfClickedNotes(prev => {
+      const next = new Set(prev);
+      next.add(midiNote);
+      return next;
+    });
+
     // Ensure audio is initialized on first user interaction
     await initializeAudio();
     if (soundEngineRef.current) {
@@ -533,6 +638,13 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
    * Handle key release (mouse/touch)
    */
   const handleKeyRelease = useCallback((midiNote: number) => {
+    // Remove note from LED visualization tracking
+    setSelfClickedNotes(prev => {
+      const next = new Set(prev);
+      next.delete(midiNote);
+      return next;
+    });
+
     // Release sustained notes
     if (soundEngineRef.current?.triggerRelease) {
       const frequency = midiToFrequency(midiNote);
@@ -550,31 +662,104 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   }, [midiToFrequency]);
 
   /**
+   * Get color for a scale degree (1st, 3rd, 5th, 7th)
+   * Handles scales with fewer than 7 notes by wrapping around
+   */
+  const getScaleDegreeColor = useCallback((degreeIndex: number): { r: number; g: number; b: number } => {
+    const scaleNotes = getCurrentScale(); // e.g., [0, 2, 4, 5, 7, 9, 11] for C Major
+
+    // Handle scales with fewer than 7 notes (pentatonic, blues, etc.)
+    // Wrap around if degree doesn't exist
+    const noteClass = scaleNotes[degreeIndex % scaleNotes.length];
+
+    // Spectrum mode needs MIDI note, not note class
+    // Use middle C (60) + note class offset for consistent colors
+    if (colorMode === 'spectrum') {
+      const midiNote = 60 + noteClass; // C4 + offset
+      return getNoteColor(midiNote, colorMode);
+    }
+
+    return getNoteColor(noteClass, colorMode);
+  }, [getCurrentScale, colorMode]);
+
+  /**
    * Generate WLED LED strip data
+   * 1:1 mapping - each LED represents one semitone starting from wledStartNote
    */
   const generateLEDData = useCallback((): { r: number; g: number; b: number }[] => {
     const ledData: { r: number; g: number; b: number }[] = [];
     const currentScaleNotes = getCurrentScale();
 
-    for (let ledIndex = 0; ledIndex < LED_STRIP.TOTAL_LEDS; ledIndex++) {
-      // Map LED index to MIDI note
-      const keyIndex = Math.floor((ledIndex / LED_STRIP.TOTAL_LEDS) * PIANO_CONSTANTS.TOTAL_KEYS);
-      const midiNote = keyIndex + PIANO_CONSTANTS.FIRST_MIDI_NOTE;
+    // Data LEDs mode: First 5 LEDs show BPM pulse + scale degrees
+    if (wledDataLEDsEnabled) {
+      // LED 0: Keep dark for now (reserved for future use)
+      ledData.push({ r: 0, g: 0, b: 0 });
+
+      // LEDs 1-4: Scale degrees with pulse pattern (4/4 time)
+      // Beat 0 (downbeat): ALL 4 LEDs flash
+      // Beat 1: Only LED 2 flashes
+      // Beat 2: Only LED 3 flashes
+      // Beat 3: Only LED 4 flashes
+      const degreeIndices = [0, 2, 4, 6]; // Map to 1st, 3rd, 5th, 7th degrees
+      for (let i = 0; i < 4; i++) {
+        const degreeColor = getScaleDegreeColor(degreeIndices[i]);
+
+        // Determine if this LED should flash on the current beat
+        let shouldFlash = false;
+        if (bpmPulseOn) {
+          if (currentBeat === 0) {
+            // Beat 0 (downbeat): All 4 LEDs flash
+            shouldFlash = true;
+          } else if (i === currentBeat) {
+            // Beats 1-3: Only the corresponding LED flashes (LED 2 on beat 1, LED 3 on beat 2, LED 4 on beat 3)
+            shouldFlash = true;
+          }
+        }
+
+        if (shouldFlash) {
+          ledData.push(degreeColor); // Full brightness flash
+        } else {
+          // Dimmed background color when not pulsing (20% brightness)
+          ledData.push({
+            r: Math.round(degreeColor.r * 0.2),
+            g: Math.round(degreeColor.g * 0.2),
+            b: Math.round(degreeColor.b * 0.2),
+          });
+        }
+      }
+    }
+
+    // Calculate how many LEDs are left for note data
+    const dataLEDOffset = wledDataLEDsEnabled ? 5 : 0;
+    const noteLEDCount = wledLEDCount - dataLEDOffset;
+
+    // Generate note data for remaining LEDs
+    for (let ledIndex = 0; ledIndex < noteLEDCount; ledIndex++) {
+      // 1:1 mapping: LED 0 (or 5) = wledStartNote, LED 1 (or 6) = wledStartNote + 1, etc.
+      const midiNote = wledStartNote + ledIndex;
 
       // Get color for this note
       const noteClass = midiNote % 12; // Note class: 0=C, 1=C#, 2=D, etc.
       const color = getNoteColor(noteClass, colorMode);
 
-      // 3-tier brightness system:
-      // - Triggered: 1.0 (full brightness)
-      // - In-key (not triggered): 0.65 (bright)
-      // - Out-of-key: 0.2 (dim but colored)
-      let brightness = 0.2; // Default: out-of-key (dim but colored)
+      // Dynamic brightness system with idle fade-in
+      // - Active note: 1.0 (full brightness, always visible)
+      // - Background (idle fade): 0 → 0.65 (in-key) or 0 → 0.2 (out-of-key) over 2s
+      // - Background (active): 0 (hidden)
+      let brightness = 0; // Default: OFF
+
       const isActive = activeNotes.has(midiNote);
       if (isActive) {
-        brightness = 1.0; // Triggered
-      } else if (currentScaleNotes.includes(noteClass)) {
-        brightness = 0.65; // In-key but not triggered
+        // Triggered note - always full brightness
+        brightness = 1.0;
+      } else {
+        // Background LED - apply idle fade
+        if (idleFadeProgress > 0) {
+          // Fade in background based on scale membership
+          const targetBrightness = currentScaleNotes.includes(noteClass) ? 0.65 : 0.2;
+          brightness = targetBrightness * idleFadeProgress;
+        }
+        // else: brightness stays 0 (off)
       }
 
       ledData.push({
@@ -585,42 +770,151 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     }
 
     return ledData;
-  }, [activeNotes, colorMode, getCurrentScale]);
+  }, [activeNotes, colorMode, getCurrentScale, wledLEDCount, wledStartNote, idleFadeProgress, wledDataLEDsEnabled, bpmPulseOn, currentBeat, selectedRoot]);
 
   /**
-   * Send LED data to LED Compositor (Epic 14, Story 14.7)
-   * Replaces direct WLED output with compositor submission
+   * Establish WLED WebSocket bridge connection
+   * Uses same approach as DJ Visualizer (LEDMatrixManager)
+   */
+  useEffect(() => {
+    if (!wledEnabled) {
+      setWledBridgeConnected(false);
+      return;
+    }
+
+    const connectBridge = async () => {
+      // Check if global bridge exists and is open
+      if ((window as any).wledBridge && (window as any).wledBridge.readyState === WebSocket.OPEN) {
+        console.log('[PianoVisualizer] Using existing WLED WebSocket bridge');
+        wsRef.current = (window as any).wledBridge;
+        setWledBridgeConnected(true);
+        return;
+      }
+
+      // Smart host detection for seamless desktop/mobile support
+      const hosts: string[] = [];
+
+      // 1. Try last successful host from localStorage (fastest for returning users)
+      const lastSuccessfulHost = localStorage.getItem('wledBridgeHost');
+      if (lastSuccessfulHost) {
+        hosts.push(lastSuccessfulHost);
+      }
+
+      // 2. Try localhost (works for desktop browsers)
+      if (!hosts.includes('localhost')) {
+        hosts.push('localhost');
+      }
+
+      // 3. Try window.location.hostname (works for mobile accessing dev server on network)
+      const pageHost = window.location.hostname;
+      if (pageHost !== 'localhost' && pageHost !== '127.0.0.1' && !hosts.includes(pageHost)) {
+        hosts.push(pageHost);
+      }
+
+      // Try to connect to bridge on multiple ports and hosts
+      const ports = [8080, 21325, 21326, 21327, 21328, 21329];
+
+      for (const host of hosts) {
+        for (const port of ports) {
+          try {
+            await tryConnect(host, port);
+            console.log(`[PianoVisualizer] Connected to WLED WebSocket bridge at ${host}:${port}`);
+            localStorage.setItem('wledBridgeHost', host);
+            return;
+          } catch (error) {
+            // Silently try next host:port combination
+          }
+        }
+      }
+
+      console.error('[PianoVisualizer] Could not connect to WLED WebSocket bridge');
+      console.log('[PianoVisualizer] Make sure bridge is running: node scripts/wled-websocket-bridge.cjs');
+      setWledBridgeConnected(false);
+    };
+
+    const tryConnect = (host: string, port: number): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        // Auto-detect protocol: use wss:// on HTTPS pages, ws:// on HTTP pages
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${host}:${port}`);
+        let connected = false;
+
+        const timeout = setTimeout(() => {
+          if (!connected) {
+            ws.close();
+            reject(new Error(`Connection timeout on ${host}:${port}`));
+          }
+        }, 1000);
+
+        ws.onopen = () => {
+          connected = true;
+          clearTimeout(timeout);
+          (window as any).wledBridge = ws;
+          wsRef.current = ws;
+          setWledBridgeConnected(true);
+          resolve();
+        };
+
+        ws.onerror = () => {
+          clearTimeout(timeout);
+          reject(new Error(`Connection failed on ${host}:${port}`));
+        };
+
+        ws.onclose = () => {
+          console.log('[PianoVisualizer] WebSocket bridge disconnected');
+          if (wsRef.current === ws) {
+            wsRef.current = null;
+            setWledBridgeConnected(false);
+          }
+        };
+      });
+    };
+
+    connectBridge();
+
+    // Don't close the global bridge on unmount - other components might use it
+    return () => {
+      // Just clear our ref, don't close the global bridge
+      wsRef.current = null;
+    };
+  }, [wledEnabled]);
+
+  /**
+   * Send LED data to WLED via WebSocket bridge
+   * Uses same approach as DJ Visualizer (LEDMatrixManager)
    */
   useEffect(() => {
     if (!wledEnabled) return;
 
-    const sendToCompositor = () => {
+    const sendToWLED = () => {
       try {
+        // Generate LED data
         const ledData = generateLEDData();
 
-        // Convert {r, g, b}[] to Uint8ClampedArray [R, G, B, R, G, B, ...]
-        const pixelData = new Uint8ClampedArray(ledData.length * 3);
-        ledData.forEach((color, index) => {
-          pixelData[index * 3 + 0] = color.r;
-          pixelData[index * 3 + 1] = color.g;
-          pixelData[index * 3 + 2] = color.b;
+        // Convert RGB to hex for preview (always update preview, even if websocket disconnected)
+        const hexColors = ledData.map(({ r, g, b }) => {
+          const rHex = r.toString(16).padStart(2, '0');
+          const gHex = g.toString(16).padStart(2, '0');
+          const bHex = b.toString(16).padStart(2, '0');
+          return `#${rHex}${gHex}${bHex}`;
         });
+        setWledPreviewColors(hexColors); // Update preview
 
-        // Submit frame to LED Compositor
-        ledCompositor.submitFrame({
-          moduleId: 'piano-roll',
-          deviceId: `wled-${wledIP.replace(/\./g, '-')}`, // Convert IP to device ID
-          timestamp: performance.now(),
-          pixelData,
-          visualizationMode: 'note-per-led', // 88-key piano = note-per-led addressing
-        });
+        // Send via WebSocket only if connected
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          const message = {
+            ipAddress: wledIP,
+            ledData: ledData
+          };
+          wsRef.current.send(JSON.stringify(message));
+        }
       } catch (error) {
-        console.error('[PianoVisualizer] Error submitting to LED Compositor:', error);
+        console.error('[PianoVisualizer] Error sending to WLED:', error);
       }
     };
 
-    // Send at 30 FPS (compositor handles rate limiting internally)
-    const interval = setInterval(sendToCompositor, 1000 / 30);
+    // Send at 30 FPS
+    const interval = setInterval(sendToWLED, 1000 / 30);
     return () => clearInterval(interval);
   }, [wledEnabled, wledIP, generateLEDData]);
 
@@ -1016,11 +1310,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
               />
             </div>
 
-            {/* Active Notes Display */}
-            {activeNotes.size > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-700">
-                <div className="flex flex-wrap gap-2">
-                  {Array.from(activeNotes)
+            {/* Active Notes Display - Fixed height to prevent layout shift */}
+            <div className="mt-4 pt-4 border-t border-gray-700">
+              <div className="flex flex-wrap gap-2 min-h-[2rem]">
+                {activeNotes.size > 0 ? (
+                  Array.from(activeNotes)
                     .sort((a, b) => a - b)
                     .map((note) => (
                       <div
@@ -1029,10 +1323,12 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                       >
                         {getNoteNameWithOctave(note)}
                       </div>
-                    ))}
-                </div>
+                    ))
+                ) : (
+                  <div className="text-xs text-gray-500 py-1">Play a note to see it here</div>
+                )}
               </div>
-            )}
+            </div>
           </div>
 
           {/* Settings Panels */}
@@ -1088,7 +1384,18 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
               {/* WLED Output Settings */}
               <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-gray-300">WLED Output (144 LEDs)</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-medium text-gray-300">WLED Output</h3>
+                    {wledEnabled && (
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        wledBridgeConnected
+                          ? 'bg-green-900/50 text-green-300'
+                          : 'bg-orange-900/50 text-orange-300'
+                      }`}>
+                        {wledBridgeConnected ? '● Connected' : '○ Connecting...'}
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="checkbox"
                     id="wled-enabled"
@@ -1099,13 +1406,73 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 </div>
 
                 {wledEnabled && (
-                  <input
-                    type="text"
-                    value={wledIP}
-                    onChange={(e) => setWledIP(e.target.value)}
-                    placeholder="WLED IP (e.g., 192.168.8.106)"
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 mb-2"
-                  />
+                  <>
+                    <input
+                      type="text"
+                      value={wledIP}
+                      onChange={(e) => setWledIP(e.target.value)}
+                      placeholder="WLED IP (e.g., 192.168.8.37)"
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 mb-2"
+                    />
+                    <input
+                      type="number"
+                      min="1"
+                      max="256"
+                      value={wledLEDCount}
+                      onChange={(e) => setWledLEDCount(parseInt(e.target.value) || 42)}
+                      placeholder="LED Count (e.g., 42)"
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 mb-2"
+                    />
+                    <select
+                      value={wledStartNote}
+                      onChange={(e) => setWledStartNote(parseInt(e.target.value))}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 mb-3"
+                    >
+                      <option value={24}>Start at C1 (Low)</option>
+                      <option value={36}>Start at C2</option>
+                      <option value={48}>Start at C3 (Default)</option>
+                      <option value={60}>Start at C4 (Middle C)</option>
+                      <option value={72}>Start at C5 (High)</option>
+                    </select>
+                    {/* Data LEDs toggle */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <input
+                        type="checkbox"
+                        id="wled-data-leds"
+                        checked={wledDataLEDsEnabled}
+                        onChange={(e) => setWledDataLEDsEnabled(e.target.checked)}
+                        className="w-4 h-4 text-primary-600 bg-gray-700 border-gray-600 rounded focus:ring-primary-500"
+                      />
+                      <label htmlFor="wled-data-leds" className="text-sm text-gray-400">
+                        Data LEDs (LED 0: BPM pulse, LEDs 1-4: Key)
+                      </label>
+                    </div>
+                    {/* Virtual LED Preview */}
+                    <div className="mt-3">
+                      <p className="text-xs text-gray-400 mb-2">Virtual Preview:</p>
+                      <WLEDVirtualPreview
+                        device={{
+                          id: `wled-${wledIP.replace(/\./g, '-')}`,
+                          name: 'Piano Roll WLED',
+                          ip: wledIP,
+                          port: 80,
+                          ledCount: wledLEDCount,
+                          enabled: true,
+                          brightness: 255,
+                          deviceType: 'strip',
+                          reverseDirection: false,
+                          connectionStatus: 'connected',
+                          autoReconnect: false,
+                          dataFlowStatus: 'sending',
+                          fps: 30,
+                          solo: false,
+                          mute: false
+                        }}
+                        ledColors={wledPreviewColors}
+                        showLivePreview={false}
+                      />
+                    </div>
+                  </>
                 )}
                 <p className="text-xs text-gray-500">
                   Sends real-time color data to WLED LED strip controller
