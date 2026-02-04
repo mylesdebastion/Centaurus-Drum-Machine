@@ -25,6 +25,7 @@ import { AuthTest } from './components/AuthTest';
 import { LaunchpadProExperiment } from './components/LaunchpadProExperiment';
 import { AnnouncementBanner } from './components/AnnouncementBanner';
 import { PixelBoopSequencer } from './components/PixelBoop';
+import { PixelBoopViewer } from './components/PixelBoop/PixelBoopViewer';
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
@@ -473,6 +474,12 @@ function App() {
             <PixelBoopSequencer
               onBack={handleExitPixelBoop}
             />
+          }
+        />
+        <Route
+          path="/pixelboop/:roomCode"
+          element={
+            <PixelBoopViewer />
           }
         />
       </Routes>
