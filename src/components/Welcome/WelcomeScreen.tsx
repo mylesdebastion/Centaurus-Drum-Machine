@@ -153,6 +153,58 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               </div>
             </div>
 
+            {/* PixelBoop Sequencer */}
+            {onPixelBoop && (
+              <div className="bg-gradient-to-br from-cyan-900/50 to-teal-900/50 p-6 rounded-xl border-2 border-cyan-500/30 shadow-lg">
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <Grid3x3 className="w-12 h-12 text-cyan-400" />
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-white">PixelBoop</h3>
+                    <span className="text-xs bg-cyan-600/30 text-cyan-300 px-2 py-1 rounded">Remote Jam</span>
+                  </div>
+                  <p className="text-sm text-gray-300 mb-2">
+                    Gesture-based pixel sequencer with remote sync via room codes
+                  </p>
+                  <div className="w-full space-y-2">
+                    <button
+                      onClick={onPixelBoop}
+                      className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-semibold px-4 py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Play className="w-4 h-4" />
+                      Launch PixelBoop
+                    </button>
+                    {!showPixelboopInput ? (
+                      <button
+                        onClick={() => setShowPixelboopInput(true)}
+                        className="w-full bg-cyan-700/50 hover:bg-cyan-700 text-cyan-200 font-semibold px-4 py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Users className="w-4 h-4" />
+                        View Remote Jam
+                      </button>
+                    ) : (
+                      <form onSubmit={handlePixelboopJoin} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={pixelboopCode}
+                          onChange={(e) => setPixelboopCode(e.target.value)}
+                          placeholder="Room code"
+                          className="flex-1 px-3 py-3 bg-cyan-950/50 border border-cyan-500/30 rounded-lg text-white text-sm placeholder-cyan-300/50 focus:border-cyan-400 focus:outline-none"
+                          autoFocus
+                        />
+                        <button
+                          type="submit"
+                          className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold px-4 py-3 rounded-lg transition-colors"
+                          disabled={!pixelboopCode.trim()}
+                        >
+                          View
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 3D Sequencer */}
             <button
               onClick={onIsometricMode}
@@ -310,58 +362,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                   <Play className="w-4 h-4" />
                 </div>
               </button>
-            )}
-
-            {/* PixelBoop Sequencer */}
-            {onPixelBoop && (
-              <div className="bg-gradient-to-br from-cyan-900/50 to-teal-900/50 p-6 rounded-xl border-2 border-cyan-500/30 shadow-lg">
-                <div className="flex flex-col items-center gap-3 text-center">
-                  <Grid3x3 className="w-12 h-12 text-cyan-400" />
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-bold text-white">PixelBoop</h3>
-                    <span className="text-xs bg-cyan-600/30 text-cyan-300 px-2 py-1 rounded">Remote Jam</span>
-                  </div>
-                  <p className="text-sm text-gray-300 mb-2">
-                    Gesture-based pixel sequencer with remote sync via room codes
-                  </p>
-                  <div className="w-full space-y-2">
-                    <button
-                      onClick={onPixelBoop}
-                      className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-semibold px-4 py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Play className="w-4 h-4" />
-                      Launch PixelBoop
-                    </button>
-                    {!showPixelboopInput ? (
-                      <button
-                        onClick={() => setShowPixelboopInput(true)}
-                        className="w-full bg-cyan-700/50 hover:bg-cyan-700 text-cyan-200 font-semibold px-4 py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
-                      >
-                        <Users className="w-4 h-4" />
-                        View Remote Jam
-                      </button>
-                    ) : (
-                      <form onSubmit={handlePixelboopJoin} className="flex gap-2">
-                        <input
-                          type="text"
-                          value={pixelboopCode}
-                          onChange={(e) => setPixelboopCode(e.target.value)}
-                          placeholder="Room code"
-                          className="flex-1 px-3 py-3 bg-cyan-950/50 border border-cyan-500/30 rounded-lg text-white text-sm placeholder-cyan-300/50 focus:border-cyan-400 focus:outline-none"
-                          autoFocus
-                        />
-                        <button
-                          type="submit"
-                          className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold px-4 py-3 rounded-lg transition-colors"
-                          disabled={!pixelboopCode.trim()}
-                        >
-                          View
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                </div>
-              </div>
             )}
 
             {/* MIDI Input Test */}
