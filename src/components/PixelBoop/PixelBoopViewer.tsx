@@ -4,7 +4,7 @@
  * Read-only mode that syncs with iOS host via Supabase Realtime
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PixelBoopSequencer } from './PixelBoopSequencer';
 import { ArrowLeft, Wifi, WifiOff, Users } from 'lucide-react';
@@ -13,7 +13,7 @@ export function PixelBoopViewer() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
   const [isConnected, setIsConnected] = useState(false);
-  const [participantCount, setParticipantCount] = useState(0);
+  const [participantCount] = useState(0);
 
   // Validate room code format
   if (!roomCode || !/^[A-Z0-9]{6}$/.test(roomCode)) {
