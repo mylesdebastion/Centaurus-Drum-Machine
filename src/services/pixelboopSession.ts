@@ -183,7 +183,7 @@ class PixelBoopSessionService {
   /**
    * Join an existing PixelBoop jam session
    *
-   * @param roomCode - 6-character room code
+   * @param roomCode - 4-6 character room code
    * @param userName - Display name for the guest
    * @param deviceType - Device type ('ios', 'web', 'android')
    * @throws {Error} If join fails or room code is invalid
@@ -195,9 +195,9 @@ class PixelBoopSessionService {
    * ```
    */
   async joinSession(roomCode: string, userName: string, deviceType: 'ios' | 'web' | 'android'): Promise<void> {
-    // Validate room code format (6 alphanumeric characters)
-    if (!roomCode || !/^[A-Z0-9]{6}$/.test(roomCode)) {
-      throw new Error('Invalid room code format. Must be 6 alphanumeric characters.');
+    // Validate room code format (4-6 alphanumeric characters, uppercase)
+    if (!roomCode || !/^[A-Z0-9]{4,6}$/.test(roomCode)) {
+      throw new Error('Invalid room code format. Must be 4-6 alphanumeric characters.');
     }
 
     // Leave existing session if any

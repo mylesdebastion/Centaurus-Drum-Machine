@@ -11,7 +11,15 @@
       "Bash(git cherry-pick:*)",
       "Bash(git stash:*)",
       "Bash(npm install)",
-      "Bash(sort:*)"
+      "Bash(sort:*)",
+      "Bash(brew install:*)",
+      "Bash(supabase --version:*)",
+      "Bash(supabase login:*)",
+      "Bash(env:*)",
+      "Bash(supabase init:*)",
+      "Bash(supabase link:*)",
+      "Bash(vercel env:*)",
+      "Bash(vercel link:*)"
     ],
     "deny": [],
     "ask": []
