@@ -8,7 +8,7 @@ import {
   X,
   ArrowUp,
   ArrowDown,
-  Settings,
+  // Settings, // Temporarily disabled
   Play,
   Pause,
 } from 'lucide-react';
@@ -324,7 +324,7 @@ export const GlobalMusicHeader: React.FC = () => {
   const music = useGlobalMusic();
   const { isMobile, isTablet } = useResponsive();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isHardwareModalOpen, setIsHardwareModalOpen] = useState(false);
+  // const [isHardwareModalOpen, setIsHardwareModalOpen] = useState(false); // Temporarily disabled
 
   // Transport toggle handler (Epic 14, Story 14.2)
   const handleTogglePlay = useCallback(() => {
@@ -393,7 +393,8 @@ export const GlobalMusicHeader: React.FC = () => {
                   isCompact={isTablet}
                 />
 
-                <button
+                {/* Temporarily disabled hardware settings button */}
+                {/* <button
                   onClick={() => setIsHardwareModalOpen(true)}
                   className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-all relative group"
                   title="Hardware Settings (MIDI/WLED)"
@@ -403,7 +404,7 @@ export const GlobalMusicHeader: React.FC = () => {
                   {music.hardware.midi.connected && (
                     <div className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full" />
                   )}
-                </button>
+                </button> */}
 
                 {!isTablet && (
                   <div className="relative">

@@ -3,7 +3,7 @@ import { ArrowLeft, Play, Pause, RotateCcw, Shuffle, Music, Zap, Lightbulb, Volu
 import { SingleLaneVisualizer } from '../../utils/SingleLaneVisualizer';
 import { LEDStripManager } from '../LEDStripManager/LEDStripManager';
 import { APC40ButtonEvent } from '../../utils/APC40Controller';
-import { useHardwareContext } from '@/hardware';
+// import { useHardwareContext } from '@/hardware'; // Temporarily disabled
 import { HardwareControllerSelector } from '../Hardware/HardwareControllerSelector';
 import { createSoundEngine, SoundEngine, SoundEngineType, soundEngineNames } from '../../utils/soundEngines';
 import { useModuleContext } from '../../hooks/useModuleContext';
