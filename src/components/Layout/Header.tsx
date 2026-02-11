@@ -1,6 +1,7 @@
 import React from 'react';
 import { Music, Settings, Users, Wifi, WifiOff } from 'lucide-react';
-import { HardwareStatusIndicator } from '../../hardware/ui/HardwareStatusIndicator';
+// Temporarily disabled to fix flash cards error
+// import { HardwareStatusIndicator } from '../../hardware/ui/HardwareStatusIndicator';
 
 interface HeaderProps {
   sessionCode?: string;
@@ -47,13 +48,14 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Hardware Status */}
-          <div className="relative">
+          {/* Temporarily disabled to fix flash cards error */}
+          {/* <div className="relative">
             <HardwareStatusIndicator
               showDeviceInfo={true}
               showCompatibilityInfo={true}
               className="hidden sm:block"
             />
-          </div>
+          </div> */}
 
           <div className="flex items-center gap-1 sm:gap-2">
             <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />

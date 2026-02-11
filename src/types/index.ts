@@ -104,16 +104,17 @@ export interface NavTab {
 }
 
 // Re-export hardware types for convenient access
-export type {
-  ConnectionStatus,
-  HardwareEventType,
-  ControllerCapabilities,
-  HardwareEvent,
-  HardwareController,
-  SequencerState,
-  ControllerState,
-  HardwareContextType,
-} from '../hardware';
+// Temporarily disabled to fix flash cards error
+// export type {
+//   ConnectionStatus,
+//   HardwareEventType,
+//   ControllerCapabilities,
+//   HardwareEvent,
+//   HardwareController,
+//   SequencerState,
+//   ControllerState,
+//   HardwareContextType,
+// } from '../hardware';
 
 // Module adapter types (Epic 14 - Module Adapter Pattern)
 export type {
