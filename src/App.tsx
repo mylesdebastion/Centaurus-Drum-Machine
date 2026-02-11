@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { GlobalMusicProvider } from './contexts/GlobalMusicContext';
-import { HardwareManager } from './hardware';
+// Temporarily disable HardwareManager to fix flash cards
+// import { HardwareManager } from './hardware';
 import { audioEngine, TransportState } from './utils/audioEngine';
 import { WelcomeScreen } from './components/Welcome/WelcomeScreen';
 import { JamSession } from './components/JamSession/JamSession';
@@ -300,7 +301,8 @@ function App() {
   return (
     <>
     <GlobalMusicProvider>
-      <HardwareManager>
+      {/* Temporarily disabled HardwareManager to fix flash cards */}
+      {/* <HardwareManager> */}
         {/* Username Modal */}
         <UsernameModal
           isOpen={showUsernameModal}
@@ -501,7 +503,7 @@ function App() {
           }
         />
       </Routes>
-      </HardwareManager>
+      {/* </HardwareManager> */}
     </GlobalMusicProvider>
 
     {/* Announcement Banner */}

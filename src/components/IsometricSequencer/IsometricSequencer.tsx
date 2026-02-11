@@ -206,11 +206,13 @@ export const IsometricSequencer: React.FC<IsometricSequencerProps> = ({ onBack, 
   // Hardware controller settings state
   const [showHardwareSelector, setShowHardwareSelector] = useState(false);
 
-  // Hardware Manager integration (Story 8.0)
-  const { controllers } = useHardwareContext();
-  const activeController = controllers.find(c => c.connectionStatus === 'connected');
-  const apc40Controller = activeController; // For backward compatibility with existing code
-  const apc40Connected = activeController?.connectionStatus === 'connected';
+  // Hardware Manager integration (Story 8.0) - TEMPORARILY DISABLED
+  // const { controllers } = useHardwareContext();
+  // const activeController = controllers.find(c => c.connectionStatus === 'connected');
+  // const apc40Controller = activeController; // For backward compatibility with existing code
+  // const apc40Connected = activeController?.connectionStatus === 'connected';
+  const apc40Controller = null;
+  const apc40Connected = false;
   const [apc40Rotated, setAPC40Rotated] = useState(false);
 
   // Sound engine state
