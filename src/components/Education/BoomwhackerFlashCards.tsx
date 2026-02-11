@@ -1,12 +1,31 @@
 import React, { useState, useEffect } from 'react';
+import { BoomwhackerFlashCardsMobile } from './BoomwhackerFlashCardsMobile';
 
 interface BoomwhackerFlashCardsProps {
   onBack: () => void;
 }
 
 export const BoomwhackerFlashCards: React.FC<BoomwhackerFlashCardsProps> = ({ onBack }) => {
+  const [isMobile, setIsMobile] = useState(false);
   const [currentCard, setCurrentCard] = useState(0);
   const totalCards = 7;
+
+  // Detect mobile/small screens
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Use mobile version for small screens
+  if (isMobile) {
+    return <BoomwhackerFlashCardsMobile onBack={onBack} />;
+  }
+
+  // Desktop version below
 
   // Keyboard navigation
   useEffect(() => {
