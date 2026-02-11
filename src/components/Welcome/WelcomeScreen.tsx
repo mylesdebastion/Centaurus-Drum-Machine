@@ -6,6 +6,7 @@ interface WelcomeScreenProps {
   onJoinJam: (code: string) => void;
   onStartJamLegacy?: () => void;
   onEducationMode: () => void;
+  onFlashCards?: () => void;
   onIsometricMode: () => void;
   onDJVisualizer: () => void;
   onWLEDExperiment: () => void;
@@ -27,6 +28,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onJoinJam,
   onStartJamLegacy,
   onEducationMode,
+  onFlashCards,
   onIsometricMode,
   onDJVisualizer,
   onWLEDExperiment,
@@ -294,6 +296,26 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 </div>
               </div>
             </button>
+
+            {/* Boomwhacker Flash Cards */}
+            {onFlashCards && (
+              <button
+                onClick={onFlashCards}
+                className="group bg-gradient-to-br from-emerald-900/50 to-teal-900/50 hover:from-emerald-800/60 hover:to-teal-800/60 p-6 rounded-xl border-2 border-emerald-500/30 hover:border-emerald-400 transition-all transform hover:scale-105 shadow-lg hover:shadow-emerald-500/20"
+              >
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <Grid3x3 className="w-12 h-12 text-emerald-400 group-hover:text-emerald-300 transition-colors" />
+                  <h3 className="text-lg font-bold text-white">Flash Cards</h3>
+                  <p className="text-sm text-gray-300">
+                    Boomwhacker lesson cards for grades 3-5
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-xs text-emerald-300">
+                    <Grid3x3 className="w-4 h-4" />
+                    <span>View Cards</span>
+                  </div>
+                </div>
+              </button>
+            )}
           </div>
         </div>
 

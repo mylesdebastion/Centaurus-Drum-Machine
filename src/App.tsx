@@ -7,6 +7,7 @@ import { WelcomeScreen } from './components/Welcome/WelcomeScreen';
 import { JamSession } from './components/JamSession/JamSession';
 import { JamSessionLegacy } from './components/JamSessionLegacy/JamSessionLegacy';
 import { EducationMode } from './components/Education/EducationMode';
+import { BoomwhackerFlashCards } from './components/Education/BoomwhackerFlashCards';
 import { IsometricSequencer } from './components/IsometricSequencer/IsometricSequencer';
 import { LiveAudioVisualizer } from './components/LiveAudioVisualizer/LiveAudioVisualizer';
 import { WLEDDirectTest } from './components/WLEDExperiment/WLEDDirectTest';
@@ -180,6 +181,14 @@ function App() {
     navigate('/');
   };
 
+  const handleFlashCards = () => {
+    navigate('/flashcards');
+  };
+
+  const handleExitFlashCards = () => {
+    navigate('/');
+  };
+
   const handleExitIsometric = () => {
     navigate('/');
   };
@@ -308,6 +317,7 @@ function App() {
               onJoinJam={handleJoinJam}
               onStartJamLegacy={handleStartJamLegacy}
               onEducationMode={handleEducationMode}
+              onFlashCards={handleFlashCards}
               onIsometricMode={handleIsometricMode}
               onDJVisualizer={handleDJVisualizer}
               onWLEDExperiment={handleWLEDExperiment}
@@ -348,6 +358,14 @@ function App() {
           element={
             <EducationMode
               onExitEducation={handleExitEducation}
+            />
+          }
+        />
+        <Route
+          path="/flashcards"
+          element={
+            <BoomwhackerFlashCards
+              onBack={handleExitFlashCards}
             />
           }
         />
