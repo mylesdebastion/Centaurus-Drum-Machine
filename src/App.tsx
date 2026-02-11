@@ -66,8 +66,8 @@ function App() {
       if (window.$crisp) {
         clearInterval(checkCrisp);
 
-        // Hide on Education Mode, show on all other routes
-        if (location.pathname === '/education') {
+        // Hide on Education Mode and Flash Cards, show on all other routes
+        if (location.pathname === '/education' || location.pathname === '/flashcards') {
           window.$crisp.push(['do', 'chat:hide']);
         } else {
           window.$crisp.push(['do', 'chat:show']);
