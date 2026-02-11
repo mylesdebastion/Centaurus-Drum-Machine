@@ -6,6 +6,7 @@ interface WelcomeScreenProps {
   onJoinJam: (code: string) => void;
   onStartJamLegacy?: () => void;
   onEducationMode: () => void;
+  onFlashCards?: () => void;
   onIsometricMode: () => void;
   onDJVisualizer: () => void;
   onWLEDExperiment: () => void;
@@ -27,6 +28,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onJoinJam,
   onStartJamLegacy,
   onEducationMode,
+  onFlashCards,
   onIsometricMode,
   onDJVisualizer,
   onWLEDExperiment,
@@ -44,11 +46,20 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 }) => {
   const [joinCode, setJoinCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
+  const [pixelboopCode, setPixelboopCode] = useState('');
+  const [showPixelboopInput, setShowPixelboopInput] = useState(false);
 
   const handleJoinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (joinCode.trim()) {
       onJoinJam(joinCode.trim().toUpperCase());
+    }
+  };
+
+  const handlePixelboopJoin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pixelboopCode.trim()) {
+      window.location.href = `/pixelboop/${pixelboopCode.trim().toUpperCase()}`;
     }
   };
 
@@ -144,6 +155,58 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               </div>
             </div>
 
+            {/* PixelBoop Sequencer */}
+            {onPixelBoop && (
+              <div className="bg-gradient-to-br from-cyan-900/50 to-teal-900/50 p-6 rounded-xl border-2 border-cyan-500/30 shadow-lg">
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <Grid3x3 className="w-12 h-12 text-cyan-400" />
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-white">PixelBoop</h3>
+                    <span className="text-xs bg-cyan-600/30 text-cyan-300 px-2 py-1 rounded">Remote Jam</span>
+                  </div>
+                  <p className="text-sm text-gray-300 mb-2">
+                    Gesture-based pixel sequencer with remote sync via room codes
+                  </p>
+                  <div className="w-full space-y-2">
+                    <button
+                      onClick={onPixelBoop}
+                      className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-semibold px-4 py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Play className="w-4 h-4" />
+                      Launch PixelBoop
+                    </button>
+                    {!showPixelboopInput ? (
+                      <button
+                        onClick={() => setShowPixelboopInput(true)}
+                        className="w-full bg-cyan-700/50 hover:bg-cyan-700 text-cyan-200 font-semibold px-4 py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Users className="w-4 h-4" />
+                        View Remote Jam
+                      </button>
+                    ) : (
+                      <form onSubmit={handlePixelboopJoin} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={pixelboopCode}
+                          onChange={(e) => setPixelboopCode(e.target.value)}
+                          placeholder="Room code"
+                          className="flex-1 px-3 py-3 bg-cyan-950/50 border border-cyan-500/30 rounded-lg text-white text-sm placeholder-cyan-300/50 focus:border-cyan-400 focus:outline-none"
+                          autoFocus
+                        />
+                        <button
+                          type="submit"
+                          className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold px-4 py-3 rounded-lg transition-colors"
+                          disabled={!pixelboopCode.trim()}
+                        >
+                          View
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 3D Sequencer */}
             <button
               onClick={onIsometricMode}
@@ -233,6 +296,26 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 </div>
               </div>
             </button>
+
+            {/* Boomwhacker Flash Cards */}
+            {onFlashCards && (
+              <button
+                onClick={onFlashCards}
+                className="group bg-gradient-to-br from-emerald-900/50 to-teal-900/50 hover:from-emerald-800/60 hover:to-teal-800/60 p-6 rounded-xl border-2 border-emerald-500/30 hover:border-emerald-400 transition-all transform hover:scale-105 shadow-lg hover:shadow-emerald-500/20"
+              >
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <Grid3x3 className="w-12 h-12 text-emerald-400 group-hover:text-emerald-300 transition-colors" />
+                  <h3 className="text-lg font-bold text-white">Flash Cards</h3>
+                  <p className="text-sm text-gray-300">
+                    Boomwhacker lesson cards for grades 3-5
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-xs text-emerald-300">
+                    <Grid3x3 className="w-4 h-4" />
+                    <span>View Cards</span>
+                  </div>
+                </div>
+              </button>
+            )}
           </div>
         </div>
 
@@ -298,27 +381,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 </p>
                 <div className="flex items-center gap-2 text-sm text-primary-400 group-hover:text-primary-300">
                   <span>Launch Legacy</span>
-                  <Play className="w-4 h-4" />
-                </div>
-              </button>
-            )}
-
-            {/* PixelBoop Sequencer */}
-            {onPixelBoop && (
-              <button
-                onClick={onPixelBoop}
-                className="group bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition-colors text-left"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <Grid3x3 className="w-6 h-6 text-cyan-400" />
-                  <h3 className="font-semibold text-white">PixelBoop</h3>
-                  <span className="text-xs bg-cyan-600/30 text-cyan-300 px-2 py-1 rounded">New</span>
-                </div>
-                <p className="text-sm text-gray-400 mb-4">
-                  Gesture-based pixel sequencer with 4 tracks and touch gestures
-                </p>
-                <div className="flex items-center gap-2 text-sm text-cyan-400 group-hover:text-cyan-300">
-                  <span>Launch PixelBoop</span>
                   <Play className="w-4 h-4" />
                 </div>
               </button>

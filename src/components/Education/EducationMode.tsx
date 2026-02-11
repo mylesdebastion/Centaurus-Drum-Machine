@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useEffect } from 'react';
-import { BookOpen, Play, Pause, Check, ArrowRight, RotateCcw, Star } from 'lucide-react';
+import { BookOpen, Play, Pause, Check, ArrowRight, RotateCcw, Star, Grid3x3 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import * as Tone from 'tone';
 import { EducationLesson, VisualizerSettings, MIDINote } from '../../types';
 import { audioEngine } from '../../utils/audioEngine';
@@ -15,6 +16,7 @@ interface EducationModeProps {
 }
 
 export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation }) => {
+  const navigate = useNavigate();
   const [selectedLesson, setSelectedLesson] = useState<EducationLesson | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [userPattern, setUserPattern] = useState<boolean[]>(new Array(16).fill(false));
@@ -670,6 +672,24 @@ export const EducationMode: React.FC<EducationModeProps> = ({ onExitEducation })
                 </div>
               </div>
             ))}
+
+            {/* Flash Cards Button */}
+            <div
+              className="bg-gradient-to-br from-emerald-500/20 to-teal-500/20 backdrop-blur-sm rounded-xl p-4 sm:p-6 border-2 border-emerald-400/50 hover:border-emerald-300 hover:from-emerald-500/30 hover:to-teal-500/30 transition-all cursor-pointer touch-target"
+              onClick={() => navigate('/flashcards')}
+            >
+              <div className="flex flex-col items-center justify-center h-full text-center gap-3">
+                <Grid3x3 className="w-10 h-10 sm:w-12 sm:h-12 text-emerald-300" />
+                <h3 className="text-lg sm:text-xl font-bold text-white">Flash Cards</h3>
+                <p className="text-white/70 text-sm sm:text-base">
+                  Boomwhacker lesson cards for teachers (grades 3-5)
+                </p>
+                <div className="flex items-center gap-2 text-sm text-emerald-300 mt-2">
+                  <Grid3x3 className="w-4 h-4" />
+                  <span>View Cards</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

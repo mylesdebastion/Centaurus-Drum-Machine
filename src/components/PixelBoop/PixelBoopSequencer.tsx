@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Maximize2, Minimize2, X, ArrowLeft } from 'lucide-react';
 import { ViewTemplate } from '../Layout/ViewTemplate';
+import { pixelboopSessionService } from '@/services/pixelboopSession';
+import type { PatternEditDelta } from '@/types/pixelboopSession';
 
 // ============================================================================
 // TYPES
@@ -8,6 +10,9 @@ import { ViewTemplate } from '../Layout/ViewTemplate';
 
 interface PixelBoopSequencerProps {
   onBack: () => void;
+  viewerMode?: boolean;           // Read-only mode for web viewer
+  roomCode?: string;              // Connect to remote session
+  onSessionReady?: () => void;    // Callback when sync established
 }
 
 type TrackType = 'melody' | 'chords' | 'bass' | 'rhythm';
@@ -244,7 +249,7 @@ const midiToFreq = (midi: number): number => 440 * Math.pow(2, (midi - 69) / 12)
 // MAIN COMPONENT
 // ============================================================================
 
-export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }) => {
+export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, viewerMode = false, roomCode, onSessionReady }) => {
   // Track state
   const [tracks, setTracks] = useState<Tracks>({
     melody: emptyTrack(),
@@ -588,9 +593,30 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
 
   const togglePlay = useCallback(() => {
     initAudio();
-    setIsPlaying(p => !p);
+    setIsPlaying(p => {
+      const newState = !p;
+      // Broadcast playback state if in session
+      if (roomCode && !viewerMode) {
+        pixelboopSessionService.broadcastPlaybackState({
+          isPlaying: newState,
+          currentStep
+        });
+      }
+      return newState;
+    });
     showTooltip('togglePlay');
-  }, [initAudio, showTooltip]);
+  }, [initAudio, showTooltip, roomCode, viewerMode, currentStep]);
+
+  const changeTempo = useCallback((delta: number) => {
+    setBpm(b => {
+      const newBpm = Math.max(60, Math.min(200, b + delta));
+      // Broadcast tempo if in session
+      if (roomCode && !viewerMode) {
+        pixelboopSessionService.broadcastTempo({ bpm: newBpm });
+      }
+      return newBpm;
+    });
+  }, [roomCode, viewerMode]);
 
   // ============================================================================
   // KEYBOARD SHORTCUTS
@@ -610,15 +636,15 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
         clearAll();
       } else if (e.code === 'ArrowUp') {
         e.preventDefault();
-        setBpm(b => Math.min(200, b + 5));
+        changeTempo(5);
       } else if (e.code === 'ArrowDown') {
         e.preventDefault();
-        setBpm(b => Math.max(60, b - 5));
+        changeTempo(-5);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo, clearAll, togglePlay]);
+  }, [undo, redo, clearAll, togglePlay, changeTempo]);
 
   // ============================================================================
   // SCALE & CHORD HELPERS
@@ -799,14 +825,29 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
       const newTrack = prev[track].map(r => [...r]);
       notes.forEach(({ note, step, velocity = 1 }) => {
         if (note >= 0 && note < 12 && step >= 0 && step < 32) {
-          newTrack[note][step] = velocity > 2 ? 3 : (velocity > 1 ? 2 : 1);
+          const normalizedVelocity = velocity > 2 ? 3 : (velocity > 1 ? 2 : 1);
+          newTrack[note][step] = normalizedVelocity;
+          
+          // Broadcast pattern edit if in session
+          if (roomCode && !viewerMode) {
+            const trackIndex = TRACK_ORDER.indexOf(track);
+            const delta: PatternEditDelta = {
+              track: trackIndex,
+              step,
+              note,
+              velocity: normalizedVelocity * 42, // Scale 1-3 to MIDI velocity range
+              duration: 0.5,
+              timestamp: Date.now()
+            };
+            pixelboopSessionService.broadcastPatternEdit(delta);
+          }
         }
       });
       newTracks[track] = newTrack;
       saveHistory(newTracks);
       return newTracks;
     });
-  }, [saveHistory]);
+  }, [saveHistory, roomCode, viewerMode]);
 
   // ============================================================================
   // TRACK/NOTE HELPERS
@@ -830,12 +871,37 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
   };
 
   const toggleMute = (track: TrackType) => {
-    if (soloed === track) setSoloed(null);
-    else setMuted(m => ({ ...m, [track]: !m[track] }));
+    if (soloed === track) {
+      setSoloed(null);
+      if (roomCode && !viewerMode) {
+        const trackIndex = TRACK_ORDER.indexOf(track);
+        pixelboopSessionService.broadcastTrackState({ track: trackIndex, muted: false, solo: false });
+      }
+    } else {
+      setMuted(m => {
+        const newMuted = !m[track];
+        if (roomCode && !viewerMode) {
+          const trackIndex = TRACK_ORDER.indexOf(track);
+          pixelboopSessionService.broadcastTrackState({ track: trackIndex, muted: newMuted, solo: false });
+        }
+        return { ...m, [track]: newMuted };
+      });
+    }
   };
 
   const toggleSolo = (track: TrackType) => {
-    setSoloed(s => s === track ? null : track);
+    setSoloed(s => {
+      const newSolo = s === track ? null : track;
+      if (roomCode && !viewerMode) {
+        const trackIndex = TRACK_ORDER.indexOf(track);
+        pixelboopSessionService.broadcastTrackState({ 
+          track: trackIndex, 
+          muted: false, 
+          solo: newSolo === track 
+        });
+      }
+      return newSolo;
+    });
   };
 
   // ============================================================================
@@ -1711,6 +1777,88 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack }
   useEffect(() => {
     if (isPlaying) playStep(currentStep);
   }, [currentStep, isPlaying, playStep]);
+
+  // ============================================================================
+  // REMOTE SESSION SYNC
+  // ============================================================================
+
+  useEffect(() => {
+    if (!roomCode) return;
+
+    let isSubscribed = true;
+
+    const connectToSession = async () => {
+      try {
+        // Join session as web viewer
+        await pixelboopSessionService.joinSession(roomCode, 'Web Viewer', 'web');
+        
+        if (!isSubscribed) return;
+
+        console.log('[PixelBoop] Connected to session:', roomCode);
+        onSessionReady?.();
+
+        // Subscribe to pattern edits
+        const unsubPattern = pixelboopSessionService.onPatternEdit((delta) => {
+          if (viewerMode) {
+            // Apply remote pattern edits in viewer mode
+            setTracks(prev => {
+              const newTracks = { ...prev };
+              const trackKey = TRACK_ORDER[delta.track];
+              if (trackKey && delta.note !== undefined) {
+                const newTrack = prev[trackKey].map(r => [...r]);
+                if (delta.note === null) {
+                  // Clear step
+                  newTrack.forEach(row => { row[delta.step] = 0; });
+                } else {
+                  // Set note
+                  newTrack[delta.note][delta.step] = delta.velocity > 0 ? 1 : 0;
+                }
+                newTracks[trackKey] = newTrack;
+              }
+              return newTracks;
+            });
+          }
+        });
+
+        // Subscribe to playback state
+        const unsubPlayback = pixelboopSessionService.onPlaybackState((state) => {
+          setIsPlaying(state.isPlaying);
+          setCurrentStep(state.currentStep);
+        });
+
+        // Subscribe to tempo changes
+        const unsubTempo = pixelboopSessionService.onTempoChange((tempo) => {
+          setBpm(tempo.bpm);
+        });
+
+        // Subscribe to track state changes
+        const unsubTrack = pixelboopSessionService.onTrackState((state) => {
+          const trackKey = TRACK_ORDER[state.track];
+          if (trackKey) {
+            if (state.solo) {
+              setSoloed(trackKey);
+            } else {
+              setMuted(m => ({ ...m, [trackKey]: state.muted }));
+            }
+          }
+        });
+
+        // Cleanup on unmount
+        return () => {
+          isSubscribed = false;
+          unsubPattern();
+          unsubPlayback();
+          unsubTempo();
+          unsubTrack();
+          pixelboopSessionService.leaveSession();
+        };
+      } catch (error) {
+        console.error('[PixelBoop] Failed to connect to session:', error);
+      }
+    };
+
+    connectToSession();
+  }, [roomCode, viewerMode, onSessionReady]);
 
   // ============================================================================
   // RENDER

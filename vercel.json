@@ -19,5 +19,11 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/keep-supabase-alive",
+      "schedule": "0 2 * * *"
+    }
   ]
 }
