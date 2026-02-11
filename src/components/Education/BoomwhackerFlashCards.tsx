@@ -20,31 +20,52 @@ export const BoomwhackerFlashCards: React.FC<BoomwhackerFlashCardsProps> = ({ on
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [currentCard]);
 
-  // Touch swipe navigation
+  // Touch swipe and tap navigation
   useEffect(() => {
     let touchStartX = 0;
+    let touchStartY = 0;
     let touchEndX = 0;
+    let touchEndY = 0;
 
     const handleTouchStart = (e: TouchEvent) => {
       touchStartX = e.changedTouches[0].screenX;
+      touchStartY = e.changedTouches[0].screenY;
     };
 
     const handleTouchEnd = (e: TouchEvent) => {
       touchEndX = e.changedTouches[0].screenX;
-      handleSwipe();
+      touchEndY = e.changedTouches[0].screenY;
+      handleSwipeOrTap();
     };
 
-    const handleSwipe = () => {
-      if (touchEndX < touchStartX - 50) {
-        nextCard(); // Swipe left = next
-      }
-      if (touchEndX > touchStartX + 50) {
-        previousCard(); // Swipe right = previous
+    const handleSwipeOrTap = () => {
+      const swipeDistanceX = touchEndX - touchStartX;
+      const swipeDistanceY = Math.abs(touchEndY - touchStartY);
+      
+      // If vertical movement is small, treat as horizontal swipe/tap
+      if (swipeDistanceY < 100) {
+        // Swipe left = next
+        if (swipeDistanceX < -50) {
+          nextCard();
+        }
+        // Swipe right = previous
+        else if (swipeDistanceX > 50) {
+          previousCard();
+        }
+        // Tap zones: left 1/3 = previous, right 1/3 = next
+        else if (Math.abs(swipeDistanceX) < 10) {
+          const screenWidth = window.innerWidth;
+          if (touchEndX < screenWidth / 3) {
+            previousCard(); // Tap left side
+          } else if (touchEndX > (screenWidth * 2) / 3) {
+            nextCard(); // Tap right side
+          }
+        }
       }
     };
 
-    document.addEventListener('touchstart', handleTouchStart);
-    document.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd, { passive: true });
 
     return () => {
       document.removeEventListener('touchstart', handleTouchStart);
@@ -67,28 +88,36 @@ export const BoomwhackerFlashCards: React.FC<BoomwhackerFlashCardsProps> = ({ on
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white flex flex-col relative">
+      {/* Tap Zone Indicators */}
+      <div className="absolute top-1/2 left-4 transform -translate-y-1/2 text-white/30 text-4xl z-10 pointer-events-none">
+        {currentCard > 0 && '‹'}
+      </div>
+      <div className="absolute top-1/2 right-4 transform -translate-y-1/2 text-white/30 text-4xl z-10 pointer-events-none">
+        {currentCard < totalCards - 1 && '›'}
+      </div>
+      
       {/* Main Content */}
-      <div className="flex-1 p-5 pb-24 overflow-y-auto">
+      <div className="flex-1 p-3 sm:p-5 pb-20 overflow-y-auto">
         {/* Card Counter */}
-        <div className="text-center text-lg mb-3 opacity-80">
+        <div className="text-center text-base sm:text-lg mb-2 opacity-80">
           Card {currentCard + 1} of {totalCards}
         </div>
 
         {/* Card 0: Pre-Lesson */}
         {currentCard === 0 && (
-          <div className="bg-white/15 backdrop-blur-sm rounded-xl p-8 shadow-2xl border-2 border-white/20 animate-fadeIn">
-            <h1 className="text-4xl sm:text-5xl font-bold mb-6 text-center drop-shadow-lg">
+          <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4 sm:p-6 md:p-8 shadow-2xl border-2 border-white/20 animate-fadeIn max-w-5xl mx-auto">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6 text-center drop-shadow-lg">
               🎯 BEFORE YOU START
             </h1>
-            <h2 className="text-3xl font-bold mb-6 border-b-2 border-white/30 pb-3">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 border-b-2 border-white/30 pb-2 sm:pb-3">
               The 3 Rules of Boomwhacker Success
             </h2>
             
-            <div className="space-y-6">
-              <div className="bg-black/30 rounded-lg p-5">
-                <h3 className="text-2xl font-bold text-yellow-400 mb-3">1. 👀 EYES ON THE SCREEN</h3>
-                <ul className="space-y-2 text-xl ml-4">
+            <div className="space-y-3 sm:space-y-6">
+              <div className="bg-black/30 rounded-lg p-3 sm:p-5">
+                <h3 className="text-xl sm:text-2xl font-bold text-yellow-400 mb-2 sm:mb-3">1. 👀 EYES ON THE SCREEN</h3>
+                <ul className="space-y-1 sm:space-y-2 text-lg sm:text-xl ml-4">
                   <li>• Your color will light up when it's YOUR turn</li>
                   <li>• If your color isn't glowing = WAIT</li>
                 </ul>
