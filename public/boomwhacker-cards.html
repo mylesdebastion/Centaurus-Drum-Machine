@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Boomwhacker Flash Cards</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            touch-action: pan-y;
+        }
+        
+        .container {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            max-width: 100%;
+            overflow-y: auto;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            display: none;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        .card.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        h2 {
+            font-size: 2em;
+            margin-bottom: 15px;
+            border-bottom: 3px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 10px;
+        }
+        
+        h3 {
+            font-size: 1.5em;
+            margin: 20px 0 10px 0;
+            color: #ffd700;
+        }
+        
+        p, li {
+            font-size: 1.3em;
+            line-height: 1.6;
+            margin: 10px 0;
+        }
+        
+        ul {
+            list-style: none;
+            margin-left: 0;
+        }
+        
+        li {
+            margin: 15px 0;
+            padding-left: 10px;
+        }
+        
+        .emoji {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+        
+        .nav-buttons {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            border-top: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        button {
+            flex: 1;
+            padding: 20px;
+            font-size: 1.3em;
+            font-weight: bold;
+            border: none;
+            border-radius: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s, opacity 0.2s;
+            touch-action: manipulation;
+        }
+        
+        button:active {
+            transform: scale(0.95);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .card-counter {
+            text-align: center;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            opacity: 0.8;
+        }
+        
+        .box {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+        
+        .team-sunrise {
+            background: linear-gradient(90deg, #ff4444, #ffaa44, #ffff44);
+            color: #000;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .team-ocean {
+            background: linear-gradient(90deg, #aaff44, #44ff44, #44aaff);
+            color: #000;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .checklist {
+            font-size: 1.4em;
+        }
+        
+        .success-item {
+            padding: 10px;
+            margin: 10px 0;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Card 0: Pre-Lesson -->
+        <div class="card active" data-card="0">
+            <div class="card-counter">Card 1 of 7</div>
+            <h1>🎯 BEFORE YOU START</h1>
+            <h2>The 3 Rules of Boomwhacker Success</h2>
+            
+            <h3>1. 👀 EYES ON THE SCREEN</h3>
+            <ul>
+                <li>Your color will light up when it's YOUR turn</li>
+                <li>If your color isn't glowing = WAIT</li>
+            </ul>
+            
+            <h3>2. 👂 LISTEN FOR THE COUNT</h3>
+            <ul>
+                <li>Count in your head: 1, 2, 3, 4...</li>
+                <li>Gentle flashes = get ready!</li>
+            </ul>
+            
+            <h3>3. 🛑 FREEZE WHEN MUSIC STOPS</h3>
+            <ul>
+                <li>Boomwhacker stays still</li>
+                <li>No playing between patterns</li>
+            </ul>
+        </div>
+
+        <!-- Card 1: Step 1 -->
+        <div class="card" data-card="1">
+            <div class="card-counter">Card 2 of 7</div>
+            <h1>📍 STEP 1</h1>
+            <h2>Keep the Steady Beat</h2>
+            
+            <div class="box">
+                <h3>Your Job</h3>
+                <p style="font-size: 1.5em;">🔴 <strong>Everyone has RED (C)</strong></p>
+                <p style="font-size: 1.5em;">Hit your boomwhacker on <strong>EVERY beat</strong></p>
+            </div>
+            
+            <h3>Watch For</h3>
+            <ul>
+                <li>Gentle flashes = count-in starting</li>
+                <li>Screen shows: 1, 2, 3, 4, START!</li>
+                <li>Red pixels moving toward you</li>
+            </ul>
+            
+            <h3>Remember</h3>
+            <ul>
+                <li>✅ Hit when red pixel reaches the end</li>
+                <li>❌ Don't play between rounds</li>
+                <li>🛑 Freeze when music stops</li>
+            </ul>
+        </div>
+
+        <!-- Card 2: Step 2 -->
+        <div class="card" data-card="2">
+            <div class="card-counter">Card 3 of 7</div>
+            <h1>📍 STEP 2</h1>
+            <h2>Team Sunrise vs Team Ocean</h2>
+            
+            <div class="team-sunrise">
+                🌅 TEAM SUNRISE (Warm Colors)<br>
+                Red (C) • Orange (D) • Yellow (E)
+            </div>
+            
+            <div class="team-ocean">
+                🌊 TEAM OCEAN (Cool Colors)<br>
+                Yellow-Green (F) • Green (G) • Blue (A)
+            </div>
+            
+            <div class="box">
+                <h3>The Pattern</h3>
+                <ol style="font-size: 1.4em; margin-left: 30px;">
+                    <li>Sunrise plays together (beat 1)</li>
+                    <li><strong>WAIT</strong> (beat 2)</li>
+                    <li>Ocean plays together (beat 3)</li>
+                    <li><strong>WAIT</strong> (beat 4)</li>
+                    <li>REPEAT!</li>
+                </ol>
+            </div>
+            
+            <h3>Remember</h3>
+            <ul>
+                <li>Call and response = taking turns</li>
+                <li>If it's not your team = boomwhacker stays QUIET</li>
+                <li>Watch the screen to know whose turn!</li>
+            </ul>
+        </div>
+
+        <!-- Card 3: Step 3 -->
+        <div class="card" data-card="3">
+            <div class="card-counter">Card 4 of 7</div>
+            <h1>📍 STEP 3</h1>
+            <h2>Play Only YOUR Note</h2>
+            
+            <div class="box">
+                <h3>Your Color, Your Turn</h3>
+                <p>Each person has <strong>ONE</strong> color</p>
+                <p>Only play when <strong>YOUR</strong> color lights up</p>
+            </div>
+            
+            <h3>The Challenge</h3>
+            <p style="font-size: 1.4em;">⭐ <strong>Empty beats matter!</strong></p>
+            <ul>
+                <li>Some beats = your color glows → PLAY</li>
+                <li>Some beats = NO glow → STAY QUIET</li>
+                <li>Count the beats even when you don't play</li>
+            </ul>
+            
+            <h3>Watch For</h3>
+            <ul>
+                <li>Your specific color on screen</li>
+                <li>Timeline showing when each note happens</li>
+                <li>Playhead (moving line) showing "now"</li>
+            </ul>
+        </div>
+
+        <!-- Card 4: Step 4 -->
+        <div class="card" data-card="4">
+            <div class="card-counter">Card 5 of 7</div>
+            <h1>📍 STEP 4</h1>
+            <h2>Advanced Rhythm</h2>
+            <h3 style="text-align: center;">(Twinkle Pattern)</h3>
+            
+            <div class="box">
+                <h3>What's New</h3>
+                <p style="font-size: 1.4em;"><strong>Double notes</strong> + <strong>Rests</strong></p>
+                <p>Some colors play TWICE in a row</p>
+                <p>Some beats are SILENT for everyone</p>
+            </div>
+            
+            <h3>Extra Challenges</h3>
+            <ul>
+                <li><strong>Double hits:</strong> C-C, A-A (two notes in a row)</li>
+                <li><strong>Staying together:</strong> Match the tempo</li>
+                <li><strong>Not rushing:</strong> Keep the steady beat</li>
+                <li><strong>Stopping cleanly:</strong> Freeze when music stops</li>
+            </ul>
+            
+            <h3>Remember</h3>
+            <ul>
+                <li>Watch the screen, not your friends</li>
+                <li>Your light = your turn</li>
+                <li>No light = count silently</li>
+                <li>4 flashes = get ready to start</li>
+            </ul>
+        </div>
+
+        <!-- Card 5: Troubleshooting -->
+        <div class="card" data-card="5">
+            <div class="card-counter">Card 6 of 7</div>
+            <h1>🚨 TROUBLESHOOTING</h1>
+            <h2>If you're struggling:</h2>
+            
+            <div class="box">
+                <h3>Can't focus?</h3>
+                <p>→ Cover your boomwhacker with one hand between rounds</p>
+            </div>
+            
+            <div class="box">
+                <h3>Playing too early?</h3>
+                <p>→ Watch the pixel reach the END before you hit</p>
+            </div>
+            
+            <div class="box">
+                <h3>Missing your note?</h3>
+                <p>→ Count "1, 2, 3, 4" in your head to stay on track</p>
+            </div>
+            
+            <div class="box">
+                <h3>Getting distracted?</h3>
+                <p>→ Look ONLY at the screen, not at other students</p>
+            </div>
+            
+            <div class="box">
+                <h3>Forgot the pattern?</h3>
+                <p>→ The screen shows you! Your color glows when it's your turn</p>
+            </div>
+        </div>
+
+        <!-- Card 6: Success Checklist -->
+        <div class="card" data-card="6">
+            <div class="card-counter">Card 7 of 7</div>
+            <h1>✅ SUCCESS!</h1>
+            <h2>You did great if you:</h2>
+            
+            <div class="success-item">☑️ Watched the screen the whole time</div>
+            <div class="success-item">☑️ Only played when YOUR color lit up</div>
+            <div class="success-item">☑️ Stayed quiet during empty beats</div>
+            <div class="success-item">☑️ Stopped when the music stopped</div>
+            <div class="success-item">☑️ Kept the steady beat (didn't rush!)</div>
+            
+            <div class="box" style="margin-top: 30px; text-align: center;">
+                <h2 style="border: none;">🎉 Remember</h2>
+                <p style="font-size: 1.5em;">Music is a team sport!</p>
+                <p style="font-size: 1.3em;">Listening and waiting are just as important as playing!</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="nav-buttons">
+        <button id="prevBtn" onclick="previousCard()">◀ Previous</button>
+        <button id="nextBtn" onclick="nextCard()">Next ▶</button>
+    </div>
+
+    <script>
+        let currentCard = 0;
+        const totalCards = 7;
+
+        function showCard(index) {
+            document.querySelectorAll('.card').forEach(card => {
+                card.classList.remove('active');
+            });
+            document.querySelector(`[data-card="${index}"]`).classList.add('active');
+            
+            // Update button states
+            document.getElementById('prevBtn').disabled = (index === 0);
+            document.getElementById('nextBtn').disabled = (index === totalCards - 1);
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+        }
+
+        function nextCard() {
+            if (currentCard < totalCards - 1) {
+                currentCard++;
+                showCard(currentCard);
+            }
+        }
+
+        function previousCard() {
+            if (currentCard > 0) {
+                currentCard--;
+                showCard(currentCard);
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') nextCard();
+            if (e.key === 'ArrowLeft') previousCard();
+        });
+
+        // Touch swipe navigation
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+
+        document.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        });
+
+        function handleSwipe() {
+            if (touchEndX < touchStartX - 50) {
+                nextCard(); // Swipe left = next
+            }
+            if (touchEndX > touchStartX + 50) {
+                previousCard(); // Swipe right = previous
+            }
+        }
+
+        // Initialize
+        showCard(0);
+    </script>
+</body>
+</html>
