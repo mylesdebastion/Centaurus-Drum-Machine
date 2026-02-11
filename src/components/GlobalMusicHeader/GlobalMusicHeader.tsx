@@ -15,8 +15,9 @@ import {
 import { useGlobalMusic } from '../../contexts/GlobalMusicContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import { ScaleSelector } from '../Music/ScaleSelector';
-import { HardwareStatusIndicator } from '../../hardware/ui/HardwareStatusIndicator';
-import { HardwareSettingsModal } from './HardwareSettingsModal';
+// Temporarily disabled to fix flash cards error
+// import { HardwareStatusIndicator } from '../../hardware/ui/HardwareStatusIndicator';
+// import { HardwareSettingsModal } from './HardwareSettingsModal';
 import { audioEngine } from '../../utils/audioEngine';
 import { ColorMode } from '../../utils/colorMapping';
 
@@ -346,10 +347,11 @@ export const GlobalMusicHeader: React.FC = () => {
   return (
     <>
       {/* Hardware Settings Modal */}
-      <HardwareSettingsModal
+      {/* Temporarily disabled to fix flash cards error */}
+      {/* <HardwareSettingsModal
         isOpen={isHardwareModalOpen}
         onClose={() => setIsHardwareModalOpen(false)}
-      />
+      /> */}
 
       {/* Main Header Bar */}
       <header className="sticky top-0 z-40 bg-gray-800 border-b border-gray-700 shadow-lg">
@@ -405,11 +407,12 @@ export const GlobalMusicHeader: React.FC = () => {
 
                 {!isTablet && (
                   <div className="relative">
-                    <HardwareStatusIndicator
+                    {/* Temporarily disabled to fix flash cards error */}
+                    {/* <HardwareStatusIndicator
                       showDeviceInfo={true}
                       showCompatibilityInfo={true}
                       className=""
-                    />
+                    /> */}
                   </div>
                 )}
               </div>
