@@ -430,15 +430,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   );
   
   // Set toggle controller (for column 4 tap gesture) - only used in v3+
-  const setToggle = useSetToggle(
-    // onSetChange callback
-    (track: TrackType, newSet: number) => {
-      console.log('[PixelBoop] Set toggled:', track, newSet);
-      // Show tooltip with set indicator
-      const displayName = track.charAt(0).toUpperCase() + track.slice(1);
-      showTooltip(`${displayName.toUpperCase()}: ${'●'.repeat(newSet)}`);
-    }
-  );
+  const setToggle = useSetToggle();
   
   // Version check helpers
   const isV1Baseline = pixelboopVersion === 'v1-baseline';

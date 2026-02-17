@@ -34,6 +34,8 @@ export interface SetToggleState {
   currentSets: SetState;
   toggleSet: (track: TrackType) => void;
   rowToSlot: (localRow: number, track: TrackType) => number;
+  slotToRow: (slot: number, track: TrackType) => number | null;
+  isSlotVisible: (slot: number, track: TrackType) => boolean;
   getSetIndicator: (track: TrackType) => string;
 }
 
@@ -74,8 +76,6 @@ const SET_COUNTS: Record<TrackType, number> = {
  * - Set 3: rows 0-3 → slots 2, 5, 8, 11
  */
 function mapRowToSlot(localRow: number, track: TrackType, set: number): number {
-  const height = TRACK_HEIGHTS[track];
-  
   if (track === 'rhythm') {
     // Rhythm: direct mapping (no sets)
     return localRow;
@@ -118,7 +118,9 @@ function getIndicatorForSet(track: TrackType, set: number): string {
 // HOOK
 // ============================================================================
 
-export function useSetToggle(): SetToggleState {
+export function useSetToggle(
+  onSetChange?: (track: TrackType, newSet: number) => void
+): SetToggleState {
   const [currentSets, setCurrentSets] = useState<SetState>({
     melody: 1,
     chords: 1,
@@ -137,17 +139,43 @@ export function useSetToggle(): SetToggleState {
       
       console.log(`[SetToggle] ${track}: set ${prev[track]} → ${nextSet}`);
       
+      // Call callback if provided
+      if (onSetChange) {
+        onSetChange(track, nextSet);
+      }
+      
       return {
         ...prev,
         [track]: nextSet
       };
     });
-  }, []);
+  }, [onSetChange]);
   
   const rowToSlot = useCallback((localRow: number, track: TrackType): number => {
     const set = currentSets[track];
     return mapRowToSlot(localRow, track, set);
   }, [currentSets]);
+  
+  const slotToRow = useCallback((slot: number, track: TrackType): number | null => {
+    const set = currentSets[track];
+    const height = TRACK_HEIGHTS[track];
+    
+    if (track === 'rhythm') {
+      return slot < height ? slot : null;
+    }
+    
+    // Check if this slot is mapped to any row in the current set
+    for (let row = 0; row < height; row++) {
+      if (mapRowToSlot(row, track, set) === slot) {
+        return row;
+      }
+    }
+    return null;
+  }, [currentSets]);
+  
+  const isSlotVisible = useCallback((slot: number, track: TrackType): boolean => {
+    return slotToRow(slot, track) !== null;
+  }, [slotToRow]);
   
   const getSetIndicator = useCallback((track: TrackType): string => {
     const set = currentSets[track];
@@ -158,6 +186,8 @@ export function useSetToggle(): SetToggleState {
     currentSets,
     toggleSet,
     rowToSlot,
+    slotToRow,
+    isSlotVisible,
     getSetIndicator
   };
 }
