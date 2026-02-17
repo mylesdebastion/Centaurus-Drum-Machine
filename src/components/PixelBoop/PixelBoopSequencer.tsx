@@ -7,6 +7,7 @@ import { useIntervalMode } from '@/hooks/useIntervalMode';
 import { useIntervalModeSelection, type TrackType as IntervalTrackType } from '@/hooks/useIntervalModeSelection';
 import { useSetToggle } from '@/hooks/useSetToggle';
 import type { IntervalModeType } from '@/lib/intervalMode';
+import { audioEngine } from '@/lib/audioEngine';
 
 // ============================================================================
 // TYPES
@@ -345,7 +346,8 @@ const blendWithWhite = (hexColor: string, amount = 0.7): string => {
   return `rgb(${r}, ${g}, ${b})`;
 };
 
-const midiToFreq = (midi: number): number => 440 * Math.pow(2, (midi - 69) / 12);
+// Note: midiToFreq is no longer needed - audioEngine accepts MIDI note numbers directly
+// const midiToFreq = (midi: number): number => 440 * Math.pow(2, (midi - 69) / 12);
 
 // ============================================================================
 // MAIN COMPONENT
@@ -483,7 +485,6 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   const [lastSwipeDirection, setLastSwipeDirection] = useState<string | null>(null);
 
   // Refs
-  const audioContextRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
@@ -495,26 +496,18 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   // AUDIO INITIALIZATION
   // ============================================================================
 
-  const audioUnlockedRef = useRef(false);
   const htmlAudioUnlockRef = useRef(false);
 
   const initAudio = useCallback(async () => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    // Initialize the new audio engine
+    try {
+      await audioEngine.init();
+      console.log('[PixelBoop] Audio engine initialized');
+    } catch (e) {
+      console.error('[PixelBoop] Failed to initialize audio engine:', e);
     }
 
-    const ctx = audioContextRef.current;
-
-    // Step 1: Resume AudioContext if suspended
-    if (ctx.state === 'suspended') {
-      try {
-        await ctx.resume();
-      } catch (e) {
-        console.warn('[PixelBoop] Failed to resume AudioContext:', e);
-      }
-    }
-
-    // Step 2: HTML5 audio unlock (fixes iOS silent switch issue)
+    // HTML5 audio unlock (fixes iOS silent switch issue)
     // iOS Safari routes Web Audio API to "ringer channel" which respects silent switch.
     // Playing HTML5 audio forces Web Audio onto "media channel" which ignores silent switch.
     // See: https://bugs.webkit.org/show_bug.cgi?id=237322
@@ -529,21 +522,6 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         console.log('[PixelBoop] HTML5 audio unlock complete - media channel activated');
       } catch (e) {
         console.warn('[PixelBoop] HTML5 audio unlock failed (may affect iOS with silent switch):', e);
-      }
-    }
-
-    // Step 3: Web Audio silent buffer unlock (standard iOS unlock pattern)
-    if (!audioUnlockedRef.current && ctx.state === 'running') {
-      try {
-        const silentBuffer = ctx.createBuffer(1, 1, ctx.sampleRate);
-        const source = ctx.createBufferSource();
-        source.buffer = silentBuffer;
-        source.connect(ctx.destination);
-        source.start(0);
-        audioUnlockedRef.current = true;
-        console.log('[PixelBoop] Web Audio unlock complete');
-      } catch (e) {
-        console.warn('[PixelBoop] Web Audio unlock failed:', e);
       }
     }
   }, []);
@@ -1717,27 +1695,6 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         return;  // Don't process other actions
       }
     }
-    
-    // V3+: Column 4 tap gesture for set toggling (TODO: enable in v3)
-    // Currently disabled - will be enabled when pixelboopVersion === 'v3-set-toggling'
-    const isV3OrHigher = false;  // TODO: Update when v3 is ready
-    if (isV3OrHigher && pixel.col === 4) {
-      // Determine which track this row belongs to
-      let track: TrackType | null = null;
-      
-      if (pixel.row >= 2 && pixel.row <= 7) {
-        track = 'melody';
-      } else if (pixel.row >= 8 && pixel.row <= 13) {
-        track = 'chords';
-      } else if (pixel.row >= 14 && pixel.row <= 17) {
-        track = 'bass';
-      }
-      
-      if (track) {
-        setToggle.toggleSet(track);
-        return;  // Don't process other actions
-      }
-    }
 
     const grid = getPixelGrid();
     const action = grid[pixel.row][pixel.col].action;
@@ -1851,277 +1808,41 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   // ============================================================================
 
   const playDrum = useCallback((drumType: string, velocity = 1) => {
-    const ctx = audioContextRef.current;
-    // Bail if no context or if still suspended (initAudio should be called first on user gesture)
-    if (!ctx || ctx.state !== 'running') {
+    // Map drum name to drum type index
+    const drumIndex = Object.values(DRUM_NAMES).indexOf(drumType);
+    if (drumIndex === -1) {
+      console.warn('[PixelBoop] Unknown drum type:', drumType);
       return;
     }
-
-    const now = ctx.currentTime;
-    const vol = 0.15 * velocity;
-
-    switch (drumType) {
-      case 'kick':
-      case 'kick2': {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.setValueAtTime(drumType === 'kick' ? 150 : 120, now);
-        osc.frequency.exponentialRampToValueAtTime(30, now + 0.1);
-        gain.gain.setValueAtTime(vol * 1.5, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-        osc.start(now);
-        osc.stop(now + 0.3);
-        break;
-      }
-      case 'lowTom': {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.setValueAtTime(100, now);
-        osc.frequency.exponentialRampToValueAtTime(60, now + 0.15);
-        gain.gain.setValueAtTime(vol, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-        osc.start(now);
-        osc.stop(now + 0.25);
-        break;
-      }
-      case 'snare':
-      case 'snare2': {
-        const bufferSize = ctx.sampleRate * 0.15;
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = Math.random() * 2 - 1;
-        }
-        const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
-
-        const noiseFilter = ctx.createBiquadFilter();
-        noiseFilter.type = 'highpass';
-        noiseFilter.frequency.value = drumType === 'snare' ? 1000 : 1500;
-
-        const noiseGain = ctx.createGain();
-        noise.connect(noiseFilter);
-        noiseFilter.connect(noiseGain);
-        noiseGain.connect(ctx.destination);
-        noiseGain.gain.setValueAtTime(vol * 0.8, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-        noise.start(now);
-
-        const osc = ctx.createOscillator();
-        const oscGain = ctx.createGain();
-        osc.connect(oscGain);
-        oscGain.connect(ctx.destination);
-        osc.frequency.setValueAtTime(drumType === 'snare' ? 180 : 200, now);
-        oscGain.gain.setValueAtTime(vol * 0.5, now);
-        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-        osc.start(now);
-        osc.stop(now + 0.1);
-        break;
-      }
-      case 'rimshot': {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.setValueAtTime(800, now);
-        gain.gain.setValueAtTime(vol * 0.5, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-        osc.start(now);
-        osc.stop(now + 0.05);
-        break;
-      }
-      case 'clap': {
-        for (let b = 0; b < 3; b++) {
-          const bufferSize = ctx.sampleRate * 0.02;
-          const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-          const data = buffer.getChannelData(0);
-          for (let i = 0; i < bufferSize; i++) {
-            data[i] = Math.random() * 2 - 1;
-          }
-          const noise = ctx.createBufferSource();
-          noise.buffer = buffer;
-
-          const filter = ctx.createBiquadFilter();
-          filter.type = 'bandpass';
-          filter.frequency.value = 1200;
-          filter.Q.value = 1;
-
-          const gain = ctx.createGain();
-          noise.connect(filter);
-          filter.connect(gain);
-          gain.connect(ctx.destination);
-          gain.gain.setValueAtTime(vol * 0.6, now + b * 0.015);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + b * 0.015 + 0.1);
-          noise.start(now + b * 0.015);
-        }
-        break;
-      }
-      case 'closedHat': {
-        const bufferSize = ctx.sampleRate * 0.05;
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = Math.random() * 2 - 1;
-        }
-        const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
-
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'highpass';
-        filter.frequency.value = 7000;
-
-        const gain = ctx.createGain();
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
-        gain.gain.setValueAtTime(vol * 0.4, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-        noise.start(now);
-        break;
-      }
-      case 'openHat': {
-        const bufferSize = ctx.sampleRate * 0.3;
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = Math.random() * 2 - 1;
-        }
-        const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
-
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'highpass';
-        filter.frequency.value = 6000;
-
-        const gain = ctx.createGain();
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
-        gain.gain.setValueAtTime(vol * 0.35, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-        noise.start(now);
-        break;
-      }
-      case 'crash': {
-        const bufferSize = ctx.sampleRate * 0.6;
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = Math.random() * 2 - 1;
-        }
-        const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
-
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'highpass';
-        filter.frequency.value = 4000;
-
-        const gain = ctx.createGain();
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
-        gain.gain.setValueAtTime(vol * 0.5, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-        noise.start(now);
-        break;
-      }
-      case 'ride': {
-        const osc = ctx.createOscillator();
-        const osc2 = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc2.type = 'sine';
-        osc.connect(gain);
-        osc2.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = 350;
-        osc2.frequency.value = 620;
-        gain.gain.setValueAtTime(vol * 0.25, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-        osc.start(now);
-        osc2.start(now);
-        osc.stop(now + 0.4);
-        osc2.stop(now + 0.4);
-        break;
-      }
-      case 'cowbell': {
-        const osc = ctx.createOscillator();
-        const osc2 = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'square';
-        osc2.type = 'square';
-        osc.connect(gain);
-        osc2.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = 560;
-        osc2.frequency.value = 845;
-        gain.gain.setValueAtTime(vol * 0.25, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-        osc.start(now);
-        osc2.start(now);
-        osc.stop(now + 0.15);
-        osc2.stop(now + 0.15);
-        break;
-      }
-      default:
-        break;
-    }
+    
+    // Normalize velocity to 0-127 range (assuming input is 0-1)
+    const normalizedVelocity = Math.round(velocity * 127);
+    audioEngine.triggerDrum(drumIndex, normalizedVelocity);
   }, []);
 
-  const playNote = useCallback((frequency: number, duration: number, trackType: TrackType, velocity = 1) => {
-    const ctx = audioContextRef.current;
-    // Bail if no context or if still suspended (initAudio should be called first on user gesture)
-    if (!ctx || ctx.state !== 'running') {
-      return;
-    }
-
-    const now = ctx.currentTime;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
-
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(ctx.destination);
-
-    const isSustained = duration > 0.2;
-    const attackTime = isSustained ? 0.02 : 0.01;
-    const releaseTime = Math.min(duration * 0.3, 0.15);
-    const sustainLevel = 0.08 * velocity;
-
+  const playNote = useCallback((pitch: number, _duration: number, trackType: TrackType, velocity = 1) => {
+    // Map track type to track index
+    let trackIndex: number;
     switch (trackType) {
       case 'melody':
-        osc.type = 'sine';
-        filter.frequency.value = 2000;
+        trackIndex = 0;
         break;
       case 'chords':
-        osc.type = 'triangle';
-        filter.frequency.value = 1500;
+        trackIndex = 1;
         break;
       case 'bass':
-        osc.type = 'sawtooth';
-        filter.type = 'lowpass';
-        filter.frequency.value = 400;
+        trackIndex = 2;
         break;
       default:
-        osc.type = 'triangle';
+        trackIndex = 0;
     }
-
-    osc.frequency.value = frequency;
-
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(sustainLevel, now + attackTime);
-    gain.gain.setValueAtTime(sustainLevel, now + duration - releaseTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-    osc.start(now);
-    osc.stop(now + duration + 0.01);
+    
+    // Normalize velocity to 0-127 range (assuming input is 0-1)
+    const normalizedVelocity = Math.round(velocity * 127);
+    audioEngine.triggerNote(pitch, normalizedVelocity, trackIndex);
+    
+    // TODO: Implement note release after _duration
+    // The audioEngine currently doesn't support timed releases, so notes will use the synth's natural envelope
   }, []);
 
   const playStep = useCallback((step: number) => {
@@ -2210,12 +1931,12 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
                 pitch = baseNotes[track] + slot;  // Fallback to chromatic
               }
               
-              playNote(midiToFreq(pitch), duration, track, velocity);
+              playNote(pitch, duration, track, velocity);
             } catch (err) {
               console.error('[PixelBoop] Error calculating pitch:', err, 'track:', track, 'slot:', slot);
               // Fallback to chromatic if interval mode fails
               pitch = baseNotes[track] + slot;
-              playNote(midiToFreq(pitch), duration, track, velocity);
+              playNote(pitch, duration, track, velocity);
             }
           }
         }
