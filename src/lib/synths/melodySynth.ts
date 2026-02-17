@@ -1,11 +1,13 @@
 /**
  * melodySynth.ts
  * 
- * Melody synthesizer with 6 presets ported from iOS AudioKit implementation
+ * Melody synthesizer with 6 presets using Tone.js
  * Presets: Gliss Lead, Bell, Flute, Square Lead, PWM, Sync Lead
  * 
- * Port of pixelboop/Audio/MelodySynth.swift
+ * Ported from iOS AudioKit implementation, now using Tone.js for better sound quality
  */
+
+import * as Tone from 'tone';
 
 export enum MelodyPreset {
   GlissLead = 0,
@@ -16,100 +18,145 @@ export enum MelodyPreset {
   SyncLead = 5,
 }
 
-interface PresetConfig {
-  displayName: string;
-  shortName: string;
-  waveform: OscillatorType | 'fm';
-  envelope: {
-    attack: number;
-    decay: number;
-    sustain: number;
-    release: number;
-  };
-  fmParams?: {
-    modRatio: number;
-    modIndex: number;
-  };
-}
-
-const PRESET_CONFIGS: Record<MelodyPreset, PresetConfig> = {
-  [MelodyPreset.GlissLead]: {
-    displayName: 'Gliss Lead',
-    shortName: 'GLISS',
-    waveform: 'sine',
-    envelope: { attack: 0.02, decay: 0.3, sustain: 0.7, release: 0.2 },
-  },
-  [MelodyPreset.Bell]: {
-    displayName: 'Bell',
-    shortName: 'BELL',
-    waveform: 'fm',
-    envelope: { attack: 0.001, decay: 1.5, sustain: 0.0, release: 0.8 },
-    fmParams: { modRatio: 7.0, modIndex: 3.5 },
-  },
-  [MelodyPreset.Flute]: {
-    displayName: 'Flute',
-    shortName: 'FLUTE',
-    waveform: 'sine',
-    envelope: { attack: 0.15, decay: 0.2, sustain: 0.8, release: 0.25 },
-  },
-  [MelodyPreset.SquareLead]: {
-    displayName: 'Square Lead',
-    shortName: 'SQUARE',
-    waveform: 'square',
-    envelope: { attack: 0.01, decay: 0.15, sustain: 0.85, release: 0.15 },
-  },
-  [MelodyPreset.PWM]: {
-    displayName: 'PWM',
-    shortName: 'PWM',
-    waveform: 'sawtooth',
-    envelope: { attack: 0.03, decay: 0.2, sustain: 0.75, release: 0.2 },
-  },
-  [MelodyPreset.SyncLead]: {
-    displayName: 'Sync Lead',
-    shortName: 'SYNC',
-    waveform: 'fm',
-    envelope: { attack: 0.005, decay: 0.1, sustain: 0.9, release: 0.12 },
-    fmParams: { modRatio: 3.0, modIndex: 2.0 },
-  },
-};
-
-interface Voice {
-  oscillator: OscillatorNode | null;
-  modulator: OscillatorNode | null;
-  modulatorGain: GainNode | null;
-  gainNode: GainNode;
-  noteNumber: number | null;
-  releaseTimeout: number | null;
-}
-
 export class MelodySynth {
-  private audioContext: AudioContext;
-  private voices: Voice[] = [];
-  private readonly voiceCount = 6;
+  // Use PolySynth for polyphonic presets
+  private glissLead: Tone.PolySynth<Tone.Synth>;
+  private bell: Tone.PolySynth<Tone.FMSynth>;
+  private flute: Tone.PolySynth<Tone.Synth>;
+  private squareLead: Tone.PolySynth<Tone.Synth>;
+  private pwm: Tone.PolySynth<Tone.Synth>;
+  private syncLead: Tone.PolySynth<Tone.FMSynth>;
+
+  // Effects chain for musical depth
+  private reverb: Tone.Reverb;
+  private delay: Tone.FeedbackDelay;
+  private masterGain: Tone.Gain;
+
   private currentPreset: MelodyPreset = MelodyPreset.GlissLead;
-  private masterGain: GainNode;
   private volume = 0.5;
+  private activeNotes: Map<number, string> = new Map(); // noteNumber -> synth type
 
-  constructor(audioContext: AudioContext) {
-    this.audioContext = audioContext;
-    this.masterGain = audioContext.createGain();
-    this.masterGain.gain.value = this.volume;
+  constructor() {
+    // Master gain for overall volume
+    this.masterGain = new Tone.Gain(this.volume);
 
-    // Initialize voice pool
-    for (let i = 0; i < this.voiceCount; i++) {
-      const gainNode = audioContext.createGain();
-      gainNode.gain.value = 0;
-      gainNode.connect(this.masterGain);
+    // Effects chain: reverb for space
+    this.reverb = new Tone.Reverb({
+      decay: 1.5,
+      preDelay: 0.01,
+      wet: 0.25,
+    });
+    this.reverb.connect(this.masterGain);
 
-      this.voices.push({
-        oscillator: null,
-        modulator: null,
-        modulatorGain: null,
-        gainNode,
-        noteNumber: null,
-        releaseTimeout: null,
-      });
-    }
+    // Subtle delay for depth
+    this.delay = new Tone.FeedbackDelay({
+      delayTime: '8n',
+      feedback: 0.2,
+      wet: 0.15,
+    });
+    this.delay.connect(this.reverb);
+
+    // === GLISS LEAD: Smooth sine with portamento feel ===
+    this.glissLead = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'sine' },
+      envelope: {
+        attack: 0.02,
+        decay: 0.3,
+        sustain: 0.7,
+        release: 0.2,
+      },
+    });
+    this.glissLead.maxPolyphony = 6;
+    this.glissLead.volume.value = -8;
+    this.glissLead.connect(this.delay);
+
+    // === BELL: FM synthesis with metallic harmonics ===
+    this.bell = new Tone.PolySynth(Tone.FMSynth, {
+      harmonicity: 7,
+      modulationIndex: 3.5,
+      oscillator: { type: 'sine' },
+      modulation: { type: 'sine' },
+      envelope: {
+        attack: 0.001,
+        decay: 1.5,
+        sustain: 0.0,
+        release: 0.8,
+      },
+      modulationEnvelope: {
+        attack: 0.001,
+        decay: 0.8,
+        sustain: 0.1,
+        release: 0.5,
+      },
+    });
+    this.bell.maxPolyphony = 6;
+    this.bell.volume.value = -10;
+    this.bell.connect(this.reverb); // More reverb for bell
+
+    // === FLUTE: Breathy sine with slow attack ===
+    this.flute = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'sine' },
+      envelope: {
+        attack: 0.15,
+        decay: 0.2,
+        sustain: 0.8,
+        release: 0.25,
+      },
+    });
+    this.flute.maxPolyphony = 6;
+    this.flute.volume.value = -8;
+    this.flute.connect(this.delay);
+
+    // === SQUARE LEAD: Classic 8-bit style ===
+    this.squareLead = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'square' },
+      envelope: {
+        attack: 0.01,
+        decay: 0.15,
+        sustain: 0.85,
+        release: 0.15,
+      },
+    });
+    this.squareLead.maxPolyphony = 6;
+    this.squareLead.volume.value = -12; // Squares are loud
+    this.squareLead.connect(this.delay);
+
+    // === PWM: Fat detuned sawtooth (simulating PWM) ===
+    this.pwm = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'fatsawtooth', spread: 30, count: 3 },
+      envelope: {
+        attack: 0.03,
+        decay: 0.2,
+        sustain: 0.75,
+        release: 0.2,
+      },
+    });
+    this.pwm.maxPolyphony = 6;
+    this.pwm.volume.value = -10;
+    this.pwm.connect(this.delay);
+
+    // === SYNC LEAD: Aggressive FM with fast attack ===
+    this.syncLead = new Tone.PolySynth(Tone.FMSynth, {
+      harmonicity: 3,
+      modulationIndex: 2,
+      oscillator: { type: 'sine' },
+      modulation: { type: 'square' },
+      envelope: {
+        attack: 0.005,
+        decay: 0.1,
+        sustain: 0.9,
+        release: 0.12,
+      },
+      modulationEnvelope: {
+        attack: 0.002,
+        decay: 0.1,
+        sustain: 0.5,
+        release: 0.1,
+      },
+    });
+    this.syncLead.maxPolyphony = 6;
+    this.syncLead.volume.value = -8;
+    this.syncLead.connect(this.delay);
   }
 
   connect(destination: AudioNode): void {
@@ -122,151 +169,99 @@ export class MelodySynth {
 
   setVolume(volume: number): void {
     this.volume = Math.max(0, Math.min(1.5, volume));
-    this.masterGain.gain.value = this.volume;
+    this.masterGain.gain.value = volume;
   }
 
   play(noteNumber: number, velocity: number): void {
-    const voice = this.findFreeVoice();
-    if (!voice) return;
+    const freq = Tone.Frequency(noteNumber, 'midi').toFrequency();
+    const velNorm = velocity / 127;
+    const now = Tone.now();
 
-    const config = PRESET_CONFIGS[this.currentPreset];
-    const frequency = this.midiToFrequency(noteNumber);
-    const amplitude = (velocity / 127) * 0.5;
+    // Stop any existing note at this pitch (for re-trigger)
+    this.stop(noteNumber);
 
-    // Clear any pending release
-    if (voice.releaseTimeout !== null) {
-      clearTimeout(voice.releaseTimeout);
-      voice.releaseTimeout = null;
+    // Track which synth is playing this note
+    const presetNames = ['gliss', 'bell', 'flute', 'square', 'pwm', 'sync'];
+    this.activeNotes.set(noteNumber, presetNames[this.currentPreset]);
+
+    switch (this.currentPreset) {
+      case MelodyPreset.GlissLead:
+        this.glissLead.triggerAttack(freq, now, velNorm);
+        break;
+
+      case MelodyPreset.Bell:
+        this.bell.triggerAttack(freq, now, velNorm);
+        break;
+
+      case MelodyPreset.Flute:
+        this.flute.triggerAttack(freq, now, velNorm);
+        break;
+
+      case MelodyPreset.SquareLead:
+        this.squareLead.triggerAttack(freq, now, velNorm);
+        break;
+
+      case MelodyPreset.PWM:
+        this.pwm.triggerAttack(freq, now, velNorm);
+        break;
+
+      case MelodyPreset.SyncLead:
+        this.syncLead.triggerAttack(freq, now, velNorm);
+        break;
     }
-
-    // Stop previous oscillators if any
-    this.cleanupVoice(voice);
-
-    voice.noteNumber = noteNumber;
-
-    const now = this.audioContext.currentTime;
-    const { attack, decay, sustain } = config.envelope;
-
-    if (config.waveform === 'fm' && config.fmParams) {
-      // FM synthesis for Bell and Sync Lead
-      const carrier = this.audioContext.createOscillator();
-      const modulator = this.audioContext.createOscillator();
-      const modulatorGain = this.audioContext.createGain();
-
-      carrier.type = 'sine';
-      carrier.frequency.value = frequency;
-
-      modulator.type = 'sine';
-      modulator.frequency.value = frequency * config.fmParams.modRatio;
-      
-      // Modulation index scaled by velocity
-      const modIndex = config.fmParams.modIndex * (velocity / 127);
-      modulatorGain.gain.value = frequency * modIndex;
-
-      modulator.connect(modulatorGain);
-      modulatorGain.connect(carrier.frequency);
-      carrier.connect(voice.gainNode);
-
-      voice.oscillator = carrier;
-      voice.modulator = modulator;
-      voice.modulatorGain = modulatorGain;
-
-      carrier.start(now);
-      modulator.start(now);
-    } else {
-      // Standard oscillator synthesis
-      const osc = this.audioContext.createOscillator();
-      osc.type = config.waveform as OscillatorType;
-      osc.frequency.value = frequency;
-      osc.connect(voice.gainNode);
-
-      voice.oscillator = osc;
-      osc.start(now);
-    }
-
-    // ADSR envelope using exponential approximation
-    voice.gainNode.gain.cancelScheduledValues(now);
-    voice.gainNode.gain.setValueAtTime(0, now);
-    voice.gainNode.gain.linearRampToValueAtTime(amplitude, now + attack);
-    voice.gainNode.gain.setTargetAtTime(
-      sustain * amplitude,
-      now + attack,
-      decay / 3
-    );
   }
 
   stop(noteNumber: number): void {
-    const voice = this.voices.find((v) => v.noteNumber === noteNumber);
-    if (!voice || !voice.oscillator) return;
+    const synthType = this.activeNotes.get(noteNumber);
+    if (!synthType) return;
 
-    const config = PRESET_CONFIGS[this.currentPreset];
-    const releaseTime = config.envelope.release;
-    const now = this.audioContext.currentTime;
+    const freq = Tone.Frequency(noteNumber, 'midi').toFrequency();
+    const now = Tone.now();
 
-    // Release envelope
-    voice.gainNode.gain.cancelScheduledValues(now);
-    voice.gainNode.gain.setValueAtTime(voice.gainNode.gain.value, now);
-    voice.gainNode.gain.setTargetAtTime(0, now, releaseTime / 3);
+    switch (synthType) {
+      case 'gliss':
+        this.glissLead.triggerRelease(freq, now);
+        break;
+      case 'bell':
+        this.bell.triggerRelease(freq, now);
+        break;
+      case 'flute':
+        this.flute.triggerRelease(freq, now);
+        break;
+      case 'square':
+        this.squareLead.triggerRelease(freq, now);
+        break;
+      case 'pwm':
+        this.pwm.triggerRelease(freq, now);
+        break;
+      case 'sync':
+        this.syncLead.triggerRelease(freq, now);
+        break;
+    }
 
-    // Schedule cleanup after release
-    voice.releaseTimeout = window.setTimeout(() => {
-      this.cleanupVoice(voice);
-    }, releaseTime * 1000 * 5); // 5x release time for full decay
+    this.activeNotes.delete(noteNumber);
   }
 
   stopAll(): void {
-    this.voices.forEach((voice) => {
-      if (voice.noteNumber !== null) {
-        this.cleanupVoice(voice);
-      }
-    });
+    const now = Tone.now();
+    this.glissLead.releaseAll(now);
+    this.bell.releaseAll(now);
+    this.flute.releaseAll(now);
+    this.squareLead.releaseAll(now);
+    this.pwm.releaseAll(now);
+    this.syncLead.releaseAll(now);
+    this.activeNotes.clear();
   }
 
-  private findFreeVoice(): Voice | null {
-    // First, find a completely free voice
-    const free = this.voices.find((v) => v.noteNumber === null);
-    if (free) return free;
-
-    // Otherwise, steal the first voice
-    return this.voices[0];
-  }
-
-  private cleanupVoice(voice: Voice): void {
-    if (voice.oscillator) {
-      try {
-        voice.oscillator.stop();
-        voice.oscillator.disconnect();
-      } catch (e) {
-        // Already stopped
-      }
-      voice.oscillator = null;
-    }
-
-    if (voice.modulator) {
-      try {
-        voice.modulator.stop();
-        voice.modulator.disconnect();
-      } catch (e) {
-        // Already stopped
-      }
-      voice.modulator = null;
-    }
-
-    if (voice.modulatorGain) {
-      voice.modulatorGain.disconnect();
-      voice.modulatorGain = null;
-    }
-
-    voice.noteNumber = null;
-    voice.gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
-
-    if (voice.releaseTimeout !== null) {
-      clearTimeout(voice.releaseTimeout);
-      voice.releaseTimeout = null;
-    }
-  }
-
-  private midiToFrequency(noteNumber: number): number {
-    return 440 * Math.pow(2, (noteNumber - 69) / 12);
+  dispose(): void {
+    this.glissLead.dispose();
+    this.bell.dispose();
+    this.flute.dispose();
+    this.squareLead.dispose();
+    this.pwm.dispose();
+    this.syncLead.dispose();
+    this.reverb.dispose();
+    this.delay.dispose();
+    this.masterGain.dispose();
   }
 }

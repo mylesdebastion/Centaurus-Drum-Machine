@@ -1,13 +1,15 @@
 /**
  * drums.ts
  * 
- * Drum synthesizer ported from iOS AudioKit SimpleDrums implementation
- * Kick: Sine pitch sweep 150Hz→55Hz + triangle click
- * Snare: Triangle 200Hz + bandpass noise 4500Hz
- * Hihat: Highpass noise 7000Hz
+ * Drum synthesizer using Tone.js for high-quality drum sounds
+ * - Kick: MembraneSynth with pitch sweep
+ * - Snare: NoiseSynth + MembraneSynth layered
+ * - Hihats: NoiseSynth with highpass filter
  * 
- * Port of pixelboop/Services/AudioKitService.swift (SimpleDrums class)
+ * Ported from iOS AudioKit SimpleDrums implementation
  */
+
+import * as Tone from 'tone';
 
 export enum DrumType {
   Kick = 0,
@@ -25,20 +27,177 @@ export enum DrumType {
 }
 
 export class DrumSynth {
-  private audioContext: AudioContext;
-  private masterGain: GainNode;
+  // Kick drum - deep membrane synth
+  private kick: Tone.MembraneSynth;
+  
+  // Snare components - noise + tone layered
+  private snareNoise: Tone.NoiseSynth;
+  private snareTone: Tone.MembraneSynth;
+  
+  // Hihat - filtered noise
+  private closedHat: Tone.NoiseSynth;
+  private openHat: Tone.NoiseSynth;
+  
+  // Clap - layered noise bursts
+  private clap: Tone.NoiseSynth;
+  
+  // Cowbell - metallic FM
+  private cowbell: Tone.MetalSynth;
+  
+  // Cymbal for crash/ride
+  private cymbal: Tone.NoiseSynth;
+
+  private masterGain: Tone.Gain;
   private volume = 1.0;
 
-  // Shared noise buffer for snare and hihats
-  private noiseBuffer: AudioBuffer;
+  constructor() {
+    // Master gain for overall volume
+    this.masterGain = new Tone.Gain(this.volume);
 
-  constructor(audioContext: AudioContext) {
-    this.audioContext = audioContext;
-    this.masterGain = audioContext.createGain();
-    this.masterGain.gain.value = this.volume;
+    // === KICK: Deep, punchy membrane synth ===
+    this.kick = new Tone.MembraneSynth({
+      pitchDecay: 0.05,
+      octaves: 6,
+      oscillator: { type: 'sine' },
+      envelope: {
+        attack: 0.001,
+        decay: 0.4,
+        sustain: 0,
+        release: 0.4,
+      },
+    });
+    this.kick.volume.value = -4;
+    this.kick.connect(this.masterGain);
 
-    // Create white noise buffer
-    this.noiseBuffer = this.createNoiseBuffer();
+    // === SNARE NOISE: Crispy top end ===
+    const snareFilter = new Tone.Filter({
+      frequency: 4500,
+      type: 'bandpass',
+      Q: 1,
+    });
+    snareFilter.connect(this.masterGain);
+
+    this.snareNoise = new Tone.NoiseSynth({
+      noise: { type: 'white' },
+      envelope: {
+        attack: 0.001,
+        decay: 0.12,
+        sustain: 0,
+        release: 0.05,
+      },
+    });
+    this.snareNoise.volume.value = -8;
+    this.snareNoise.connect(snareFilter);
+
+    // === SNARE TONE: Body/punch ===
+    this.snareTone = new Tone.MembraneSynth({
+      pitchDecay: 0.02,
+      octaves: 3,
+      oscillator: { type: 'sine' },
+      envelope: {
+        attack: 0.001,
+        decay: 0.1,
+        sustain: 0,
+        release: 0.1,
+      },
+    });
+    this.snareTone.volume.value = -10;
+    this.snareTone.connect(this.masterGain);
+
+    // === CLOSED HIHAT: Tight filtered noise ===
+    const closedHatFilter = new Tone.Filter({
+      frequency: 7000,
+      type: 'highpass',
+      Q: 1,
+    });
+    closedHatFilter.connect(this.masterGain);
+
+    this.closedHat = new Tone.NoiseSynth({
+      noise: { type: 'white' },
+      envelope: {
+        attack: 0.001,
+        decay: 0.06,
+        sustain: 0,
+        release: 0.02,
+      },
+    });
+    this.closedHat.volume.value = -10;
+    this.closedHat.connect(closedHatFilter);
+
+    // === OPEN HIHAT: Longer decay ===
+    const openHatFilter = new Tone.Filter({
+      frequency: 6000,
+      type: 'highpass',
+      Q: 0.5,
+    });
+    openHatFilter.connect(this.masterGain);
+
+    this.openHat = new Tone.NoiseSynth({
+      noise: { type: 'white' },
+      envelope: {
+        attack: 0.001,
+        decay: 0.3,
+        sustain: 0.05,
+        release: 0.15,
+      },
+    });
+    this.openHat.volume.value = -12;
+    this.openHat.connect(openHatFilter);
+
+    // === CLAP: Burst of filtered noise ===
+    const clapFilter = new Tone.Filter({
+      frequency: 1500,
+      type: 'bandpass',
+      Q: 0.5,
+    });
+    clapFilter.connect(this.masterGain);
+
+    this.clap = new Tone.NoiseSynth({
+      noise: { type: 'pink' },
+      envelope: {
+        attack: 0.001,
+        decay: 0.2,
+        sustain: 0,
+        release: 0.1,
+      },
+    });
+    this.clap.volume.value = -8;
+    this.clap.connect(clapFilter);
+
+    // === COWBELL: Metallic FM synth ===
+    this.cowbell = new Tone.MetalSynth({
+      envelope: {
+        attack: 0.001,
+        decay: 0.1,
+        release: 0.05,
+      },
+      harmonicity: 5.1,
+      modulationIndex: 32,
+      resonance: 4000,
+      octaves: 1,
+    });
+    this.cowbell.volume.value = -16;
+    this.cowbell.connect(this.masterGain);
+
+    // === CYMBAL: Long noise for crash/ride ===
+    const cymbalFilter = new Tone.Filter({
+      frequency: 5000,
+      type: 'highpass',
+      Q: 0.3,
+    });
+    cymbalFilter.connect(this.masterGain);
+
+    this.cymbal = new Tone.NoiseSynth({
+      noise: { type: 'white' },
+      envelope: {
+        attack: 0.001,
+        decay: 1.5,
+        sustain: 0.1,
+        release: 0.5,
+      },
+    });
+    this.cymbal.volume.value = -14;
+    this.cymbal.connect(cymbalFilter);
   }
 
   connect(destination: AudioNode): void {
@@ -47,154 +206,117 @@ export class DrumSynth {
 
   setVolume(volume: number): void {
     this.volume = Math.max(0, Math.min(1.5, volume));
-    this.masterGain.gain.value = this.volume;
+    this.masterGain.gain.value = volume;
   }
 
   trigger(drumType: DrumType, velocity: number): void {
-    const now = this.audioContext.currentTime;
+    const now = Tone.now();
+    const velNorm = velocity / 127;
 
-    // Map drum types to synthesis methods
-    if (drumType <= DrumType.LowTom) {
-      this.triggerKick(now, velocity);
-    } else if (drumType >= DrumType.Snare && drumType <= DrumType.Clap) {
-      this.triggerSnare(now, velocity);
-    } else {
-      // Hihats, crash, ride, cowbell
-      const isOpen = drumType === DrumType.OpenHat;
-      this.triggerHihat(now, velocity, isOpen);
+    switch (drumType) {
+      case DrumType.Kick:
+      case DrumType.Kick2:
+        this.triggerKick(now, velNorm, drumType === DrumType.Kick2);
+        break;
+
+      case DrumType.LowTom:
+        this.triggerTom(now, velNorm);
+        break;
+
+      case DrumType.Snare:
+      case DrumType.Snare2:
+        this.triggerSnare(now, velNorm);
+        break;
+
+      case DrumType.Rimshot:
+        this.triggerRimshot(now, velNorm);
+        break;
+
+      case DrumType.Clap:
+        this.triggerClap(now, velNorm);
+        break;
+
+      case DrumType.ClosedHat:
+        this.triggerClosedHat(now, velNorm);
+        break;
+
+      case DrumType.OpenHat:
+        this.triggerOpenHat(now, velNorm);
+        break;
+
+      case DrumType.Crash:
+        this.triggerCrash(now, velNorm);
+        break;
+
+      case DrumType.Ride:
+        this.triggerRide(now, velNorm);
+        break;
+
+      case DrumType.Cowbell:
+        this.triggerCowbell(now, velNorm);
+        break;
     }
   }
 
-  private triggerKick(time: number, velocity: number): void {
-    const velAmp = velocity / 127;
+  private triggerKick(time: number, velocity: number, alt: boolean = false): void {
+    // Alt kick is slightly higher pitched
+    const note = alt ? 'C2' : 'C1';
+    this.kick.triggerAttackRelease(note, '8n', time, velocity);
+  }
 
-    // === KICK BODY: Sine oscillator with pitch sweep ===
-    const kickOsc = this.audioContext.createOscillator();
-    const kickGain = this.audioContext.createGain();
-
-    kickOsc.type = 'sine';
-    kickOsc.frequency.setValueAtTime(150, time); // Start high
-    kickOsc.frequency.exponentialRampToValueAtTime(80, time + 0.01);
-    kickOsc.frequency.exponentialRampToValueAtTime(55, time + 0.03); // End low
-
-    kickOsc.connect(kickGain);
-    kickGain.connect(this.masterGain);
-
-    // Kick envelope: attack=0.001, decay=0.25
-    kickGain.gain.setValueAtTime(0, time);
-    kickGain.gain.linearRampToValueAtTime(0.7 * velAmp, time + 0.001);
-    kickGain.gain.setTargetAtTime(0, time + 0.001, 0.25 / 3);
-
-    kickOsc.start(time);
-    kickOsc.stop(time + 0.3);
-
-    // === KICK CLICK: Triangle oscillator for transient ===
-    const clickOsc = this.audioContext.createOscillator();
-    const clickGain = this.audioContext.createGain();
-
-    clickOsc.type = 'triangle';
-    clickOsc.frequency.value = 160;
-
-    clickOsc.connect(clickGain);
-    clickGain.connect(this.masterGain);
-
-    // Click envelope: attack=0.001, decay=0.03
-    clickGain.gain.setValueAtTime(0, time);
-    clickGain.gain.linearRampToValueAtTime(0.35 * velAmp, time + 0.001);
-    clickGain.gain.setTargetAtTime(0, time + 0.001, 0.03 / 3);
-
-    clickOsc.start(time);
-    clickOsc.stop(time + 0.05);
+  private triggerTom(time: number, velocity: number): void {
+    // Reuse kick with higher pitch for tom
+    this.kick.triggerAttackRelease('G2', '8n', time, velocity * 0.8);
   }
 
   private triggerSnare(time: number, velocity: number): void {
-    const velAmp = velocity / 127;
-
-    // === SNARE BODY: Triangle oscillator at 200Hz ===
-    const snareOsc = this.audioContext.createOscillator();
-    const snareGain = this.audioContext.createGain();
-
-    snareOsc.type = 'triangle';
-    snareOsc.frequency.value = 200;
-
-    snareOsc.connect(snareGain);
-    snareGain.connect(this.masterGain);
-
-    // Snare tone envelope: attack=0.001, decay=0.1
-    snareGain.gain.setValueAtTime(0, time);
-    snareGain.gain.linearRampToValueAtTime(0.55 * velAmp, time + 0.001);
-    snareGain.gain.setTargetAtTime(0, time + 0.001, 0.1 / 3);
-
-    snareOsc.start(time);
-    snareOsc.stop(time + 0.15);
-
-    // === SNARE WIRES: Bandpass filtered noise at 4500Hz ===
-    const noiseSource = this.audioContext.createBufferSource();
-    const noiseFilter = this.audioContext.createBiquadFilter();
-    const noiseGain = this.audioContext.createGain();
-
-    noiseSource.buffer = this.noiseBuffer;
-    noiseSource.loop = true;
-
-    noiseFilter.type = 'bandpass';
-    noiseFilter.frequency.value = 4500;
-    noiseFilter.Q.value = 1;
-
-    noiseSource.connect(noiseFilter);
-    noiseFilter.connect(noiseGain);
-    noiseGain.connect(this.masterGain);
-
-    // Noise envelope: attack=0.001, decay=0.07
-    noiseGain.gain.setValueAtTime(0, time);
-    noiseGain.gain.linearRampToValueAtTime(0.2 * velAmp, time + 0.001);
-    noiseGain.gain.setTargetAtTime(0, time + 0.001, 0.07 / 3);
-
-    noiseSource.start(time);
-    noiseSource.stop(time + 0.12);
+    // Layer noise + tone for full snare
+    this.snareNoise.triggerAttackRelease('16n', time, velocity);
+    this.snareTone.triggerAttackRelease('E3', '16n', time, velocity * 0.7);
   }
 
-  private triggerHihat(time: number, velocity: number, isOpen: boolean): void {
-    const velAmp = velocity / 127;
-    const duration = isOpen ? 0.2 : 0.06;
-
-    // === HIHAT: Highpass filtered noise at 7000Hz ===
-    const noiseSource = this.audioContext.createBufferSource();
-    const noiseFilter = this.audioContext.createBiquadFilter();
-    const noiseGain = this.audioContext.createGain();
-
-    noiseSource.buffer = this.noiseBuffer;
-    noiseSource.loop = true;
-
-    noiseFilter.type = 'highpass';
-    noiseFilter.frequency.value = 7000;
-    noiseFilter.Q.value = 1;
-
-    noiseSource.connect(noiseFilter);
-    noiseFilter.connect(noiseGain);
-    noiseGain.connect(this.masterGain);
-
-    // Hihat envelope: attack=0.001, decay=0.06 (closed) or 0.2 (open)
-    noiseGain.gain.setValueAtTime(0, time);
-    noiseGain.gain.linearRampToValueAtTime(0.4 * velAmp, time + 0.001);
-    noiseGain.gain.setTargetAtTime(0, time + 0.001, duration / 3);
-
-    noiseSource.start(time);
-    noiseSource.stop(time + duration + 0.05);
+  private triggerRimshot(time: number, velocity: number): void {
+    // High pitched short tone
+    this.snareTone.triggerAttackRelease('A4', '32n', time, velocity);
   }
 
-  private createNoiseBuffer(): AudioBuffer {
-    const bufferSize = this.audioContext.sampleRate * 2; // 2 seconds
-    const buffer = this.audioContext.createBuffer(
-      1,
-      bufferSize,
-      this.audioContext.sampleRate
-    );
-    const output = buffer.getChannelData(0);
+  private triggerClap(time: number, velocity: number): void {
+    // Multiple short bursts for clap character
+    this.clap.triggerAttackRelease('16n', time, velocity * 0.8);
+    this.clap.triggerAttackRelease('32n', time + 0.01, velocity * 0.6);
+    this.clap.triggerAttackRelease('32n', time + 0.02, velocity * 0.9);
+  }
 
-    for (let i = 0; i < bufferSize; i++) {
-      output[i] = Math.random() * 2 - 1;
-    }
+  private triggerClosedHat(time: number, velocity: number): void {
+    this.closedHat.triggerAttackRelease('32n', time, velocity);
+  }
 
-    return buffer;
+  private triggerOpenHat(time: number, velocity: number): void {
+    this.openHat.triggerAttackRelease('8n', time, velocity);
+  }
+
+  private triggerCrash(time: number, velocity: number): void {
+    this.cymbal.triggerAttackRelease('2n', time, velocity);
+  }
+
+  private triggerRide(time: number, velocity: number): void {
+    // Shorter cymbal for ride
+    this.cymbal.triggerAttackRelease('8n', time, velocity * 0.7);
+  }
+
+  private triggerCowbell(time: number, velocity: number): void {
+    this.cowbell.triggerAttackRelease('16n', time, velocity);
+  }
+
+  dispose(): void {
+    this.kick.dispose();
+    this.snareNoise.dispose();
+    this.snareTone.dispose();
+    this.closedHat.dispose();
+    this.openHat.dispose();
+    this.clap.dispose();
+    this.cowbell.dispose();
+    this.cymbal.dispose();
+    this.masterGain.dispose();
   }
 }

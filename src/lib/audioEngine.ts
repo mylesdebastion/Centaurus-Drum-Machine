@@ -1,8 +1,7 @@
 /**
  * audioEngine.ts
  * 
- * Main audio engine managing all synthesizers
- * Ported from iOS AudioKit implementation
+ * Main audio engine managing all synthesizers using Tone.js
  * 
  * Provides API for:
  * - Note triggering and release for melody/bass tracks
@@ -11,16 +10,17 @@
  * - Track volume control
  */
 
+import * as Tone from 'tone';
 import { MelodySynth, MelodyPreset } from './synths/melodySynth';
 import { BassSynth, BassPreset } from './synths/bassSynth';
 import { DrumSynth, DrumType } from './synths/drums';
 
 class AudioEngine {
-  private audioContext: AudioContext | null = null;
   private melodySynth: MelodySynth | null = null;
   private bassSynth: BassSynth | null = null;
   private drumSynth: DrumSynth | null = null;
-  private masterGain: GainNode | null = null;
+  private masterGain: Tone.Gain | null = null;
+  private limiter: Tone.Limiter | null = null;
   private isInitialized = false;
 
   /**
@@ -34,31 +34,29 @@ class AudioEngine {
     }
 
     try {
-      // Create AudioContext
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      // Start Tone.js audio context (required on user gesture)
+      await Tone.start();
+      console.log('AudioEngine: Tone.js started, context state:', Tone.context.state);
 
-      // Resume context if suspended (autoplay policy)
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
+      // Create master limiter to prevent clipping
+      this.limiter = new Tone.Limiter(-1).toDestination();
 
       // Create master gain
-      this.masterGain = this.audioContext.createGain();
-      this.masterGain.gain.value = 0.8;
-      this.masterGain.connect(this.audioContext.destination);
+      this.masterGain = new Tone.Gain(0.8);
+      this.masterGain.connect(this.limiter);
 
       // Initialize synths
-      this.melodySynth = new MelodySynth(this.audioContext);
-      this.bassSynth = new BassSynth(this.audioContext);
-      this.drumSynth = new DrumSynth(this.audioContext);
+      this.melodySynth = new MelodySynth();
+      this.bassSynth = new BassSynth();
+      this.drumSynth = new DrumSynth();
 
       // Connect synths to master
-      this.melodySynth.connect(this.masterGain);
-      this.bassSynth.connect(this.masterGain);
-      this.drumSynth.connect(this.masterGain);
+      this.melodySynth.connect(this.masterGain.input as unknown as AudioNode);
+      this.bassSynth.connect(this.masterGain.input as unknown as AudioNode);
+      this.drumSynth.connect(this.masterGain.input as unknown as AudioNode);
 
       this.isInitialized = true;
-      console.log('AudioEngine: Initialized successfully');
+      console.log('AudioEngine: Initialized successfully with Tone.js');
     } catch (error) {
       console.error('AudioEngine: Initialization failed', error);
       throw error;
@@ -72,14 +70,14 @@ class AudioEngine {
    * @param track - Track number (0=melody, 1=chords, 2=bass)
    */
   triggerNote(pitch: number, velocity: number, track: number): void {
-    if (!this.isInitialized || !this.audioContext) {
+    if (!this.isInitialized) {
       console.warn('AudioEngine: Not initialized');
       return;
     }
 
     // Resume context if needed (handles browser autoplay restrictions)
-    if (this.audioContext.state === 'suspended') {
-      this.audioContext.resume();
+    if (Tone.context.state === 'suspended') {
+      Tone.start();
     }
 
     switch (track) {
@@ -87,7 +85,6 @@ class AudioEngine {
         this.melodySynth?.play(pitch, velocity);
         break;
       case 1: // Chords (currently using melody synth)
-        // TODO: Add separate chord synth if needed
         this.melodySynth?.play(pitch, velocity);
         break;
       case 2: // Bass
@@ -127,14 +124,14 @@ class AudioEngine {
    * @param velocity - Velocity (0-127)
    */
   triggerDrum(drumType: number, velocity: number): void {
-    if (!this.isInitialized || !this.audioContext) {
+    if (!this.isInitialized) {
       console.warn('AudioEngine: Not initialized');
       return;
     }
 
     // Resume context if needed
-    if (this.audioContext.state === 'suspended') {
-      this.audioContext.resume();
+    if (Tone.context.state === 'suspended') {
+      Tone.start();
     }
 
     this.drumSynth?.trigger(drumType as DrumType, velocity);
@@ -228,20 +225,44 @@ class AudioEngine {
    * Get the current AudioContext state
    */
   getState(): AudioContextState | 'uninitialized' {
-    if (!this.audioContext) {
+    if (!this.isInitialized) {
       return 'uninitialized';
     }
-    return this.audioContext.state;
+    return Tone.context.state as AudioContextState;
   }
 
   /**
    * Resume the AudioContext (useful for handling autoplay restrictions)
    */
   async resume(): Promise<void> {
-    if (this.audioContext && this.audioContext.state === 'suspended') {
-      await this.audioContext.resume();
-      console.log('AudioEngine: Resumed AudioContext');
+    if (Tone.context.state === 'suspended') {
+      await Tone.start();
+      console.log('AudioEngine: Resumed Tone.js context');
     }
+  }
+
+  /**
+   * Dispose of all synths and clean up resources
+   */
+  dispose(): void {
+    if (!this.isInitialized) {
+      return;
+    }
+
+    this.melodySynth?.dispose();
+    this.bassSynth?.dispose();
+    this.drumSynth?.dispose();
+    this.masterGain?.dispose();
+    this.limiter?.dispose();
+
+    this.melodySynth = null;
+    this.bassSynth = null;
+    this.drumSynth = null;
+    this.masterGain = null;
+    this.limiter = null;
+    this.isInitialized = false;
+
+    console.log('AudioEngine: Disposed');
   }
 }
 
