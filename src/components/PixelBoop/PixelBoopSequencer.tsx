@@ -318,6 +318,16 @@ const TOOLTIPS: Record<string, TooltipDef> = {
   'BASS: ●': { text: 'BASS: SET 1', row: 15 },
   'BASS: ●●': { text: 'BASS: SET 2', row: 15 },
   'BASS: ●●●': { text: 'BASS: SET 3', row: 15 },
+  // Section tooltips
+  'section_1': { text: 'SECTION 1', row: 10 },
+  'section_2': { text: 'SECTION 2', row: 10 },
+  'section_3': { text: 'SECTION 3', row: 10 },
+  'section_4': { text: 'SECTION 4', row: 10 },
+  'section_5': { text: 'SECTION 5', row: 10 },
+  'section_6': { text: 'SECTION 6', row: 10 },
+  'section_7': { text: 'SECTION 7', row: 10 },
+  'section_8': { text: 'SECTION 8', row: 10 },
+  'section_play': { text: 'SECTION PLAY', row: 22 },
 };
 
 // ============================================================================
@@ -355,7 +365,7 @@ const blendWithWhite = (hexColor: string, amount = 0.7): string => {
 
 export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, viewerMode = false, roomCode, onSessionReady }) => {
   // Version selector state (must be first to use in other hooks)
-  const [pixelboopVersion, setPixelboopVersion] = useState<string>('v2-interval-modes');
+  const [pixelboopVersion, setPixelboopVersion] = useState<string>('v5-full-ios-port');
   
   // Track state
   const [tracks, setTracks] = useState<Tracks>({
@@ -372,6 +382,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   // Track muting/soloing
   const [muted, setMuted] = useState<MutedState>({ melody: false, chords: false, bass: false, rhythm: false });
   const [soloed, setSoloed] = useState<TrackType | null>(null);
+  const [activeSection, setActiveSection] = useState<number>(0); // 0-7 for 8 sections
 
   // Musical settings
   const [scale, setScale] = useState<ScaleType>('major');
@@ -1425,13 +1436,15 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         // Section columns 36-43: Section thumbnails for each track row
         for (let sec = 0; sec < 8; sec++) {
           const col = 36 + sec;
-          // For now, show section placeholder (will be enhanced with actual section data)
-          // Use track color with low alpha for section thumbnails
-          const sectionColor = `${TRACK_COLORS[track]}33`;
+          // Active section is brighter, inactive sections are dim
+          const isActive = sec === activeSection;
+          const sectionAlpha = isActive ? '88' : '33';
+          const sectionColor = `${TRACK_COLORS[track]}${sectionAlpha}`;
           grid[row][col] = {
             color: sectionColor,
             action: `section_${sec}_${track}_${localRow}`,
-            baseColor: TRACK_COLORS[track]
+            baseColor: TRACK_COLORS[track],
+            glow: isActive
           };
         }
       }
@@ -1617,6 +1630,24 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       // Show tooltip with current set
       const setNum = setToggle.currentSets[track];
       showTooltip(`${track}_set_${setNum}`);
+    } else if (action.startsWith('section_') && !action.includes('header') && !action.includes('indicator') && !action.includes('play') && !action.includes('clear')) {
+      // Section tap - switch active section
+      const parts = action.split('_');
+      const sectionIndex = parseInt(parts[1]);
+      if (!isNaN(sectionIndex) && sectionIndex >= 0 && sectionIndex < 8) {
+        setActiveSection(sectionIndex);
+        showTooltip(`section_${sectionIndex + 1}`);
+      }
+    } else if (action === 'section_play') {
+      // Toggle section play mode (future feature)
+      showTooltip('section_play');
+    } else if (action.startsWith('section_header_')) {
+      // Section header tap - also switch section
+      const sectionIndex = parseInt(action.split('_')[2]);
+      if (!isNaN(sectionIndex) && sectionIndex >= 0 && sectionIndex < 8) {
+        setActiveSection(sectionIndex);
+        showTooltip(`section_${sectionIndex + 1}`);
+      }
     }
   }, [undo, redo, clearAll, showTooltip, togglePlay, initAudio, setToggle]);
 
@@ -2159,7 +2190,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
             className="bg-gray-700 text-white text-xs rounded px-2 py-0.5 border border-gray-600 focus:border-blue-500 focus:outline-none"
             title={PIXELBOOP_VERSIONS[pixelboopVersion as keyof typeof PIXELBOOP_VERSIONS]?.description}
           >
-            {Object.entries(PIXELBOOP_VERSIONS).map(([key, version]) => (
+            {Object.entries(PIXELBOOP_VERSIONS).reverse().map(([key, version]) => (
               <option key={key} value={key}>
                 {version.name}
               </option>
