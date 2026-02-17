@@ -3,6 +3,11 @@ import { Maximize2, Minimize2, X, ArrowLeft } from 'lucide-react';
 import { ViewTemplate } from '../Layout/ViewTemplate';
 import { pixelboopSessionService } from '@/services/pixelboopSession';
 import type { PatternEditDelta } from '@/types/pixelboopSession';
+import { useIntervalMode } from '@/hooks/useIntervalMode';
+import { IntervalModeSelector } from './IntervalModeSelector';
+import { RootNoteControl } from './RootNoteControl';
+import { ScaleSelector } from './ScaleSelector';
+import type { IntervalModeType } from '@/lib/intervalMode';
 
 // ============================================================================
 // TYPES
@@ -271,6 +276,27 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   const [rootNote, setRootNote] = useState(0);
   const [bpm, setBpm] = useState(120);
   const [patternLength, setPatternLength] = useState(32);
+  
+  // Interval mode state (per-track)
+  const melodyInterval = useIntervalMode('thirds', rootNote, scale);
+  const chordsInterval = useIntervalMode('thirds', rootNote, scale);
+  const bassInterval = useIntervalMode('thirds', rootNote, scale);
+  
+  // Sync interval modes with root/scale changes
+  useEffect(() => {
+    melodyInterval.setRootNote(rootNote);
+    melodyInterval.setScale(scale);
+  }, [rootNote, scale, melodyInterval]);
+  
+  useEffect(() => {
+    chordsInterval.setRootNote(rootNote);
+    chordsInterval.setScale(scale);
+  }, [rootNote, scale, chordsInterval]);
+  
+  useEffect(() => {
+    bassInterval.setRootNote(rootNote);
+    bassInterval.setScale(scale);
+  }, [rootNote, scale, bassInterval]);
 
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -1715,6 +1741,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
 
   const playStep = useCallback((step: number) => {
     const baseNotes: Record<string, number> = { melody: 60, chords: 48, bass: 36 };
+    const trackHeights: Record<string, number> = { melody: 6, chords: 6, bass: 4, rhythm: 12 };
     const stepDuration = 60 / bpm / 4;
 
     TRACK_ORDER.forEach(track => {
@@ -1741,7 +1768,21 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
             }
 
             const duration = Math.max(0.15, stepDuration * sustainSteps * 0.95);
-            playNote(midiToFreq(baseNotes[track] + note), duration, track, velocity);
+            
+            // Calculate pitch using interval mode
+            let pitch: number;
+            if (track === 'melody') {
+              pitch = melodyInterval.getPitchForRow(note, trackHeights[track]);
+            } else if (track === 'chords') {
+              pitch = chordsInterval.getPitchForRow(note, trackHeights[track]);
+            } else if (track === 'bass') {
+              pitch = bassInterval.getPitchForRow(note, trackHeights[track]);
+            } else {
+              // Fallback to old chromatic method
+              pitch = baseNotes[track] + note;
+            }
+            
+            playNote(midiToFreq(pitch), duration, track, velocity);
           }
         }
       }
@@ -1749,7 +1790,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
 
     setPulseStep(step);
     setTimeout(() => setPulseStep(-1), 100);
-  }, [tracks, muted, soloed, playNote, playDrum, bpm, patternLength]);
+  }, [tracks, muted, soloed, playNote, playDrum, bpm, patternLength, melodyInterval, chordsInterval, bassInterval]);
 
   // ============================================================================
   // PLAYBACK LOOP
@@ -1872,11 +1913,14 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   const gridContent = (
     <>
       {/* Info bar */}
-      <div className={`flex items-center gap-2 mb-2 text-xs text-gray-400 flex-wrap justify-center ${isFullscreen ? 'mt-2' : ''}`}>
+      <div className={`flex items-center gap-3 mb-3 text-xs text-gray-400 flex-wrap justify-center ${isFullscreen ? 'mt-2' : ''}`}>
         <span style={{ color: NOTE_COLORS[rootNote] }}>{NOTE_NAMES[rootNote]}</span>
         <span className="text-orange-400">{scale}</span>
         <span className="text-red-400">{bpm}bpm</span>
         <span className="text-purple-400">{patternLength}st</span>
+        <span className="text-blue-300">M:{melodyInterval.displayName}</span>
+        <span className="text-cyan-300">C:{chordsInterval.displayName}</span>
+        <span className="text-teal-300">B:{bassInterval.displayName}</span>
         {isShaking && <span className="text-yellow-400 animate-pulse">~SHAKE~</span>}
 
         {/* Fullscreen toggle button */}
@@ -1892,6 +1936,76 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
           )}
         </button>
       </div>
+      
+      {/* Interval Mode Controls (collapsed by default, expandable) */}
+      {!isFullscreen && (
+        <div className="mb-3 w-full max-w-4xl px-4">
+          <details className="bg-gray-800/50 rounded-lg p-3">
+            <summary className="cursor-pointer text-sm text-gray-300 font-semibold mb-2">
+              🎹 Harmonic Controls (Interval Modes)
+            </summary>
+            <div className="mt-3 space-y-4">
+              {/* Melody Track */}
+              <div className="border-l-4 border-yellow-500/50 pl-3">
+                <h4 className="text-xs font-bold text-yellow-400 mb-2">MELODY TRACK</h4>
+                <div className="flex gap-4 flex-wrap">
+                  <div className="flex-1 min-w-[200px]">
+                    <IntervalModeSelector 
+                      currentMode={melodyInterval.intervalMode}
+                      onModeChange={(mode: IntervalModeType) => melodyInterval.setIntervalMode(mode)}
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Chords Track */}
+              <div className="border-l-4 border-cyan-500/50 pl-3">
+                <h4 className="text-xs font-bold text-cyan-400 mb-2">CHORDS TRACK</h4>
+                <div className="flex gap-4 flex-wrap">
+                  <div className="flex-1 min-w-[200px]">
+                    <IntervalModeSelector 
+                      currentMode={chordsInterval.intervalMode}
+                      onModeChange={(mode: IntervalModeType) => chordsInterval.setIntervalMode(mode)}
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Bass Track */}
+              <div className="border-l-4 border-teal-500/50 pl-3">
+                <h4 className="text-xs font-bold text-teal-400 mb-2">BASS TRACK</h4>
+                <div className="flex gap-4 flex-wrap">
+                  <div className="flex-1 min-w-[200px]">
+                    <IntervalModeSelector 
+                      currentMode={bassInterval.intervalMode}
+                      onModeChange={(mode: IntervalModeType) => bassInterval.setIntervalMode(mode)}
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Global Controls */}
+              <div className="border-t border-gray-700 pt-3 mt-3">
+                <h4 className="text-xs font-bold text-gray-300 mb-3">GLOBAL SETTINGS</h4>
+                <div className="flex gap-4 flex-wrap">
+                  <div className="flex-1 min-w-[200px]">
+                    <RootNoteControl 
+                      rootNote={rootNote}
+                      onRootNoteChange={setRootNote}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[200px]">
+                    <ScaleSelector 
+                      scale={scale}
+                      onScaleChange={setScale}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+      )}
 
       {/* Main grid */}
       <div
