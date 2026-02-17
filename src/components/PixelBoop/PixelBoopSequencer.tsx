@@ -85,6 +85,13 @@ interface SwipeStart {
   row: number;
 }
 
+// Section memory - stores snapshots of all track patterns + mute states (iOS parity)
+interface SectionData {
+  tracks: Tracks;
+  muted: MutedState;
+  hasData: boolean;  // true if section has been saved to (for visual feedback)
+}
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -345,6 +352,15 @@ const TOOLTIPS: Record<string, TooltipDef> = {
   'section_6': { text: 'SECTION 6', row: 10 },
   'section_7': { text: 'SECTION 7', row: 10 },
   'section_8': { text: 'SECTION 8', row: 10 },
+  // Section save tooltips (long-press)
+  'section_1_saved': { text: 'SAVED TO 1', row: 10 },
+  'section_2_saved': { text: 'SAVED TO 2', row: 10 },
+  'section_3_saved': { text: 'SAVED TO 3', row: 10 },
+  'section_4_saved': { text: 'SAVED TO 4', row: 10 },
+  'section_5_saved': { text: 'SAVED TO 5', row: 10 },
+  'section_6_saved': { text: 'SAVED TO 6', row: 10 },
+  'section_7_saved': { text: 'SAVED TO 7', row: 10 },
+  'section_8_saved': { text: 'SAVED TO 8', row: 10 },
   'section_play': { text: 'SECTION PLAY', row: 22 },
 };
 
@@ -353,6 +369,42 @@ const TOOLTIPS: Record<string, TooltipDef> = {
 // ============================================================================
 
 const emptyTrack = (): number[][] => Array(12).fill(null).map(() => Array(32).fill(0));
+
+// Deep clone tracks for section storage
+const cloneTracks = (tracks: Tracks): Tracks => ({
+  melody: tracks.melody.map(row => [...row]),
+  chords: tracks.chords.map(row => [...row]),
+  bass: tracks.bass.map(row => [...row]),
+  rhythm: tracks.rhythm.map(row => [...row]),
+});
+
+// Create an empty section
+const createEmptySection = (): SectionData => ({
+  tracks: {
+    melody: emptyTrack(),
+    chords: emptyTrack(),
+    bass: emptyTrack(),
+    rhythm: emptyTrack(),
+  },
+  muted: { melody: false, chords: false, bass: false, rhythm: false },
+  hasData: false,
+});
+
+// Create initial sections array (8 sections)
+const createInitialSections = (): SectionData[] => 
+  Array(8).fill(null).map(() => createEmptySection());
+
+// Check if tracks have any notes
+const tracksHaveData = (tracks: Tracks): boolean => {
+  for (const track of TRACK_ORDER) {
+    for (let n = 0; n < 12; n++) {
+      for (let s = 0; s < 32; s++) {
+        if (tracks[track][n][s] > 0) return true;
+      }
+    }
+  }
+  return false;
+};
 
 const blendWithWhite = (hexColor: string, amount = 0.7): string => {
   const hex = hexColor.replace('#', '');
@@ -401,6 +453,9 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   const [muted, setMuted] = useState<MutedState>({ melody: false, chords: false, bass: false, rhythm: false });
   const [soloed, setSoloed] = useState<TrackType | null>(null);
   const [activeSection, setActiveSection] = useState<number>(0); // 0-7 for 8 sections
+  
+  // Section memory - stores snapshots of all track patterns (iOS parity)
+  const [sections, setSections] = useState<SectionData[]>(createInitialSections);
 
   // Musical settings
   const [scale, setScale] = useState<ScaleType>('major');
@@ -522,6 +577,9 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   const touchStartRef = useRef<{ row: number; col: number; time: number } | null>(null);
   const shakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swipeStartRef = useRef<SwipeStart | null>(null);
+  
+  // Section long-press detection
+  const sectionLongPressRef = useRef<{ sectionIndex: number; timer: ReturnType<typeof setTimeout> } | null>(null);
 
   // ============================================================================
   // AUDIO INITIALIZATION
@@ -775,6 +833,68 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     setLastGestureType(fromShake ? 'shake' : 'clear');
     resetShake();
   }, [saveHistory, resetShake]);
+
+  // ============================================================================
+  // SECTION MEMORY (iOS PARITY)
+  // ============================================================================
+
+  // Save current track state to a section (long-press action)
+  const saveToSection = useCallback((sectionIndex: number) => {
+    if (sectionIndex < 0 || sectionIndex >= 8) return;
+    
+    setSections(prev => {
+      const newSections = [...prev];
+      newSections[sectionIndex] = {
+        tracks: cloneTracks(tracks),
+        muted: { ...muted },
+        hasData: tracksHaveData(tracks),
+      };
+      return newSections;
+    });
+    
+    showTooltip(`section_${sectionIndex + 1}_saved`);
+    console.log(`[PixelBoop] Saved pattern to section ${sectionIndex + 1}`);
+  }, [tracks, muted, showTooltip]);
+
+  // Load track state from a section (tap action)
+  const loadFromSection = useCallback((sectionIndex: number) => {
+    if (sectionIndex < 0 || sectionIndex >= 8) return;
+    
+    const section = sections[sectionIndex];
+    
+    // Always switch active section indicator
+    setActiveSection(sectionIndex);
+    
+    // Load pattern data if section has been saved to
+    if (section.hasData) {
+      setTracks(cloneTracks(section.tracks));
+      setMuted({ ...section.muted });
+      saveHistory(section.tracks);
+    }
+    
+    showTooltip(`section_${sectionIndex + 1}`);
+    console.log(`[PixelBoop] Loaded section ${sectionIndex + 1}${section.hasData ? ' (with data)' : ' (empty)'}`);
+  }, [sections, saveHistory, showTooltip]);
+
+  // Cancel any pending section long-press
+  const cancelSectionLongPress = useCallback(() => {
+    if (sectionLongPressRef.current) {
+      clearTimeout(sectionLongPressRef.current.timer);
+      sectionLongPressRef.current = null;
+    }
+  }, []);
+
+  // Start section long-press detection
+  const startSectionLongPress = useCallback((sectionIndex: number) => {
+    cancelSectionLongPress();
+    
+    const timer = setTimeout(() => {
+      saveToSection(sectionIndex);
+      sectionLongPressRef.current = null;
+    }, 500); // 500ms for long-press
+    
+    sectionLongPressRef.current = { sectionIndex, timer };
+  }, [cancelSectionLongPress, saveToSection]);
 
   // ============================================================================
   // PLAYBACK CONTROL
@@ -1500,8 +1620,16 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         for (let sec = 0; sec < 8; sec++) {
           const col = 36 + sec;
           // Active section is brighter, inactive sections are dim
+          // Sections with data show at higher alpha, empty sections are dimmer
           const isActive = sec === activeSection;
-          const sectionAlpha = isActive ? '88' : '33';
+          const hasData = sections[sec]?.hasData ?? false;
+          
+          // Alpha levels: active+data=cc, active=88, data=66, empty=22
+          let sectionAlpha = '22';
+          if (isActive && hasData) sectionAlpha = 'cc';
+          else if (isActive) sectionAlpha = '88';
+          else if (hasData) sectionAlpha = '66';
+          
           const sectionColor = `${TRACK_COLORS[track]}${sectionAlpha}`;
           grid[row][col] = {
             color: sectionColor,
@@ -1555,10 +1683,19 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     // Cols 36-43: Section indicators for row 22
     for (let sec = 0; sec < 8; sec++) {
       const col = 36 + sec;
+      const isActive = sec === activeSection;
+      const hasData = sections[sec]?.hasData ?? false;
+      
+      // Active section is bright, sections with data are medium, empty are dim
+      let indicatorColor = '#222';
+      if (isActive) indicatorColor = '#66ff66';
+      else if (hasData) indicatorColor = '#446644';
+      
       grid[22][col] = { 
-        color: '#333', 
+        color: indicatorColor, 
         action: `section_indicator_${sec}`, 
-        baseColor: '#555' 
+        baseColor: '#66ff66',
+        glow: isActive
       };
     }
 
@@ -1638,7 +1775,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     });
 
     return grid;
-  }, [tracks, currentStep, isPlaying, scale, rootNote, isInScale, gesturePreview, muted, soloed, showGhosts, pulseStep, bpm, patternLength, history, historyIndex, tooltipPixels, isShaking, shakeDirectionChanges, melodyInterval, chordsInterval, bassInterval, intervalModeSelection, isV1Baseline, isV2OrHigher, isV6DirectPort, activeSection, frameCounter, bpmPulseFade]);
+  }, [tracks, currentStep, isPlaying, scale, rootNote, isInScale, gesturePreview, muted, soloed, showGhosts, pulseStep, bpm, patternLength, history, historyIndex, tooltipPixels, isShaking, shakeDirectionChanges, melodyInterval, chordsInterval, bassInterval, intervalModeSelection, isV1Baseline, isV2OrHigher, isV6DirectPort, activeSection, sections, frameCounter, bpmPulseFade]);
 
   // ============================================================================
   // ACTION HANDLER
@@ -1693,26 +1830,26 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       // Show tooltip with current set
       const setNum = setToggle.currentSets[track];
       showTooltip(`${track}_set_${setNum}`);
-    } else if (action.startsWith('section_') && !action.includes('header') && !action.includes('indicator') && !action.includes('play') && !action.includes('clear')) {
-      // Section tap - switch active section
+    } else if (action.startsWith('section_') && !action.includes('header') && !action.includes('indicator') && !action.includes('play') && !action.includes('clear') && !action.includes('saved')) {
+      // Section tap - start long-press detection for save, short tap for load
       const parts = action.split('_');
       const sectionIndex = parseInt(parts[1]);
       if (!isNaN(sectionIndex) && sectionIndex >= 0 && sectionIndex < 8) {
-        setActiveSection(sectionIndex);
-        showTooltip(`section_${sectionIndex + 1}`);
+        // Start long-press timer for save action
+        startSectionLongPress(sectionIndex);
       }
     } else if (action === 'section_play') {
       // Toggle section play mode (future feature)
       showTooltip('section_play');
-    } else if (action.startsWith('section_header_')) {
-      // Section header tap - also switch section
-      const sectionIndex = parseInt(action.split('_')[2]);
+    } else if (action.startsWith('section_header_') || action.startsWith('section_indicator_')) {
+      // Section header/indicator tap - start long-press detection
+      const parts = action.split('_');
+      const sectionIndex = parseInt(parts[2]);
       if (!isNaN(sectionIndex) && sectionIndex >= 0 && sectionIndex < 8) {
-        setActiveSection(sectionIndex);
-        showTooltip(`section_${sectionIndex + 1}`);
+        startSectionLongPress(sectionIndex);
       }
     }
-  }, [undo, redo, clearAll, showTooltip, togglePlay, initAudio, setToggle]);
+  }, [undo, redo, clearAll, showTooltip, togglePlay, initAudio, setToggle, startSectionLongPress]);
 
   // ============================================================================
   // GESTURE HANDLERS
@@ -1904,6 +2041,15 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   }, [getPixelFromEvent, updateGesture]);
 
   const handleTouchEnd = useCallback(() => {
+    // Check for pending section long-press (short tap = load section)
+    if (sectionLongPressRef.current) {
+      const { sectionIndex } = sectionLongPressRef.current;
+      cancelSectionLongPress();
+      loadFromSection(sectionIndex);
+      touchStartRef.current = null;
+      return;
+    }
+    
     // V2+: End interval mode selection if active
     if (intervalModeSelection.activeTrack) {
       intervalModeSelection.endHold();
@@ -1911,7 +2057,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       endGesture();
     }
     touchStartRef.current = null;
-  }, [endGesture, intervalModeSelection]);
+  }, [endGesture, intervalModeSelection, cancelSectionLongPress, loadFromSection]);
 
   // Mouse handlers
   const handleMouseDown = useCallback((row: number, col: number) => {
@@ -1961,13 +2107,21 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   }, [gesture, updateGesture]);
 
   const handleMouseUp = useCallback(() => {
+    // Check for pending section long-press (short tap = load section)
+    if (sectionLongPressRef.current) {
+      const { sectionIndex } = sectionLongPressRef.current;
+      cancelSectionLongPress();
+      loadFromSection(sectionIndex);
+      return;
+    }
+    
     // V2+: End interval mode selection if active
     if (intervalModeSelection.activeTrack) {
       intervalModeSelection.endHold();
     } else {
       endGesture();
     }
-  }, [endGesture, intervalModeSelection]);
+  }, [endGesture, intervalModeSelection, cancelSectionLongPress, loadFromSection]);
 
   useEffect(() => {
     window.addEventListener('mouseup', handleMouseUp);
