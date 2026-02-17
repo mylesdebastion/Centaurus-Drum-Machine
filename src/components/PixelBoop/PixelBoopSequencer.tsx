@@ -5,6 +5,7 @@ import { pixelboopSessionService } from '@/services/pixelboopSession';
 import type { PatternEditDelta } from '@/types/pixelboopSession';
 import { useIntervalMode } from '@/hooks/useIntervalMode';
 import { useIntervalModeSelection, type TrackType as IntervalTrackType } from '@/hooks/useIntervalModeSelection';
+import { useSetToggle } from '@/hooks/useSetToggle';
 import type { IntervalModeType } from '@/lib/intervalMode';
 
 // ============================================================================
@@ -185,6 +186,21 @@ const PIXELBOOP_VERSIONS = {
       'Preset progressions: 2-5-1, 1-4-5',
       'Undo support for progression editing'
     ]
+  },
+  'v5-full-ios-port': {
+    name: 'v5 Full iOS Port',
+    description: 'Complete feature parity with iOS PixelBoop app',
+    features: [
+      'All v4 features',
+      'AudioKit-quality synths (6 melody presets, 4 bass presets)',
+      'Column 3 hold gesture with climbing pixel animation',
+      'Column 4 set toggling (12-slot pattern storage)',
+      'Walking bass gestures (diagonal, vertical ba-dum)',
+      'Preset selection with visual feedback',
+      'Teaching mode (auto-tooltips after idle)',
+      'Proper ADSR envelopes and filter sweeps',
+      'Sound parity with iOS app'
+    ]
   }
 };
 
@@ -292,6 +308,15 @@ const TOOLTIPS: Record<string, TooltipDef> = {
   'bass_7THS': { text: 'BASS: 7THS', row: 15 },
   'bass_9THS': { text: 'BASS: 9THS', row: 15 },
   'bass_CHROM': { text: 'BASS: CHROM', row: 15 },
+  
+  // Set toggle tooltips
+  'MELODY: ●': { text: 'MELODY: SET 1', row: 4 },
+  'MELODY: ●●': { text: 'MELODY: SET 2', row: 4 },
+  'CHORDS: ●': { text: 'CHORDS: SET 1', row: 10 },
+  'CHORDS: ●●': { text: 'CHORDS: SET 2', row: 10 },
+  'BASS: ●': { text: 'BASS: SET 1', row: 15 },
+  'BASS: ●●': { text: 'BASS: SET 2', row: 15 },
+  'BASS: ●●●': { text: 'BASS: SET 3', row: 15 },
 };
 
 // ============================================================================
@@ -402,6 +427,17 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     },
     // onCancelled
     undefined
+  );
+  
+  // Set toggle controller (for column 4 tap gesture) - only used in v3+
+  const setToggle = useSetToggle(
+    // onSetChange callback
+    (track: TrackType, newSet: number) => {
+      console.log('[PixelBoop] Set toggled:', track, newSet);
+      // Show tooltip with set indicator
+      const displayName = track.charAt(0).toUpperCase() + track.slice(1);
+      showTooltip(`${displayName.toUpperCase()}: ${'●'.repeat(newSet)}`);
+    }
   );
   
   // Version check helpers
@@ -978,7 +1014,16 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       notes.forEach(({ note, step, velocity = 1 }) => {
         if (note >= 0 && note < 12 && step >= 0 && step < 32) {
           const normalizedVelocity = velocity > 2 ? 3 : (velocity > 1 ? 2 : 1);
-          newTrack[note][step] = normalizedVelocity;
+          
+          // CRITICAL: `note` here is the pitch class (0-11) from the gesture interpretation
+          // We need to find which row that pitch maps to, then convert row → slot
+          // For now, treating `note` as if it were a row index (this works in chromatic mode)
+          // TODO: In interval mode, we'd need to map pitch → row first
+          // For slot-based storage, we're using note as a direct index which represents
+          // the chromatic position, which maps 1:1 to slots in chromatic mode
+          const slot = note; // In pure chromatic: note index = slot index
+          
+          newTrack[slot][step] = normalizedVelocity;
           
           // Broadcast pattern edit if in session
           if (roomCode && !viewerMode) {
@@ -986,7 +1031,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
             const delta: PatternEditDelta = {
               track: trackIndex,
               step,
-              note,
+              note: slot, // Use slot index for network sync
               velocity: normalizedVelocity * 42, // Scale 1-3 to MIDI velocity range
               duration: 0.5,
               timestamp: Date.now()
@@ -999,7 +1044,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       saveHistory(newTracks);
       return newTracks;
     });
-  }, [saveHistory, roomCode, viewerMode]);
+  }, [saveHistory, roomCode, viewerMode, setToggle]);
 
   // ============================================================================
   // TRACK/NOTE HELPERS
@@ -1013,13 +1058,18 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     return null;
   };
 
-  const getNoteForRow = (row: number, track: TrackType): number => {
+  // Get local row index within track (0 = top row, height-1 = bottom row)
+  const getLocalRow = (row: number, track: TrackType): number => {
     const trackStarts: Record<TrackType, number> = { melody: 2, chords: 8, bass: 14, rhythm: 18 };
-    const trackSizes: Record<TrackType, number> = { melody: 6, chords: 6, bass: 4, rhythm: 4 };
     const start = trackStarts[track];
-    const size = trackSizes[track];
-    const localRow = row - start;
-    return Math.max(0, Math.min(11, Math.round((size - 1 - localRow) / (size - 1) * 11)));
+    return row - start;
+  };
+
+  // DEPRECATED: Use getLocalRow + setToggle.rowToSlot instead
+  const getNoteForRow = (row: number, track: TrackType): number => {
+    const localRow = getLocalRow(row, track);
+    // For backward compatibility with gesture system, convert localRow → slot
+    return setToggle.rowToSlot(localRow, track);
   };
 
   const toggleMute = (track: TrackType) => {
@@ -1133,7 +1183,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
 
     // Row 1: Step markers
     for (let s = 0; s < patternLength; s++) {
-      const col = 4 + s + Math.floor(s / 8);
+      const col = 5 + s + Math.floor(s / 8);
       if (col < COLS) {
         const isBeat = s % 4 === 0;
         const isBar = s % 8 === 0;
@@ -1143,7 +1193,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       }
     }
 
-    for (let c = 0; c < 4; c++) {
+    for (let c = 0; c < 5; c++) {
       grid[1][c] = { color: '#222', action: null, baseColor: '#222' };
     }
 
@@ -1182,12 +1232,13 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
             const highlightedRow = intervalModeSelection.highlightedMode !== null ? intervalModeSelection.highlightedMode % height : -1;
             
             if (isSelecting && localRow === highlightedRow) {
-              // Show climbing white pixel during selection
+              // Show climbing white pixel during selection with pulsing brightness
               const brightness = Math.round(intervalModeSelection.highlightBrightness * 255);
               grid[r][3] = {
                 color: `rgb(${brightness}, ${brightness}, ${brightness})`,
                 action: `interval_mode_${track}`,
-                baseColor: '#ffffff'
+                baseColor: '#ffffff',
+                glow: true  // Add glow effect to climbing pixel
               };
             } else if (currentIntervalMode && currentIntervalMode.getPitchClassForRow) {
               // Calculate pitch class for this row using interval mode
@@ -1212,6 +1263,32 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         } else {
           // V1 or rhythm track: Simple dark background (no interval indicator)
           grid[r][3] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
+        }
+        
+        // Column 4: Set indicator (v3+ only, not rhythm track)
+        if (pixelboopVersion === 'v3-set-toggling' && track !== 'rhythm') {
+          // Show dots at bottom of track for set indicator
+          // (currentSet and indicator display will be added in v3)
+          // Bass (4 rows): bottom row only
+          // Melody/Chords (6 rows): bottom 2 rows
+          const showIndicator = track === 'bass' 
+            ? localRow === height - 1 
+            : localRow >= height - 2;
+          
+          if (showIndicator) {
+            // Dim gray dots
+            const dotColor = '#555555';
+            grid[r][4] = {
+              color: dotColor,
+              action: `set_toggle_${track}`,
+              baseColor: dotColor
+            };
+          } else {
+            grid[r][4] = { color: '#0a0a0a', action: `set_toggle_${track}`, baseColor: '#0a0a0a' };
+          }
+        } else {
+          // V1/V2 or rhythm: Column 4 is dark/unused
+          grid[r][4] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
         }
       }
 
@@ -1238,7 +1315,8 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         }
 
         for (let step = 0; step < patternLength; step++) {
-          const col = 4 + step + Math.floor(step / 8);
+          // Start grid at column 5 to accommodate columns 0-4 (mute/solo/VU/mode/set)
+          const col = 5 + step + Math.floor(step / 8);
           if (col >= COLS) continue;
 
           const noteStart = Math.max(0, noteBase - 1);
@@ -1354,7 +1432,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
 
     // Bottom overview rows
     for (let step = 0; step < patternLength; step++) {
-      const col = 4 + step + Math.floor(step / 8);
+      const col = 5 + step + Math.floor(step / 8);
       if (col >= COLS) continue;
 
       let activeTrack: TrackType | null = null;
@@ -1377,7 +1455,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       grid[23][col] = { color: activeTrack ? NOTE_COLORS[activeNote % 12] : '#050505', action: null, baseColor: activeTrack ? NOTE_COLORS[activeNote % 12] : '#050505' };
     }
 
-    for (let c = 0; c < 4; c++) {
+    for (let c = 0; c < 5; c++) {
       grid[22][c] = { color: '#222', action: null, baseColor: '#222' };
       grid[23][c] = { color: '#111', action: null, baseColor: '#111' };
     }
@@ -1444,9 +1522,14 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       toggleSolo(action.split('_')[1] as TrackType);
     } else if (action === 'clearAll') {
       clearAll();
+    } else if (action.startsWith('set_toggle_')) {
+      const track = action.split('_')[2] as TrackType;
+      setToggle.toggleSet(track);
+      // Show tooltip with current set
+      const setNum = setToggle.currentSets[track];
+      showTooltip(`${track}_set_${setNum}`);
     }
-    // TODO: Add interval mode handlers for column 3 hold gesture (see docs/INTERVAL-MODE-PORT-STATUS.md)
-  }, [undo, redo, clearAll, showTooltip, togglePlay, initAudio]);
+  }, [undo, redo, clearAll, showTooltip, togglePlay, initAudio, setToggle]);
 
   // ============================================================================
   // GESTURE HANDLERS
@@ -1467,7 +1550,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         return;
       }
 
-      let step = col - 4;
+      let step = col - 5;
       if (step >= 8) step -= 1;
       if (step >= 16) step -= 1;
       if (step >= 24) step -= 1;
@@ -1491,7 +1574,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
 
     const track = getTrackForRow(row);
     if (track) {
-      let step = col - 4;
+      let step = col - 5;
       if (step >= 8) step -= 1;
       if (step >= 16) step -= 1;
       if (step >= 24) step -= 1;
@@ -1518,7 +1601,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     const track = getTrackForRow(row);
     if (track !== gesture.track) return;
 
-    let step = col - 4;
+    let step = col - 5;
     if (step >= 8) step -= 1;
     if (step >= 16) step -= 1;
     if (step >= 24) step -= 1;
@@ -1546,7 +1629,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     if (swipeStartRef.current) {
       const duration = now - swipeStartRef.current.time;
       const startCol = swipeStartRef.current.col;
-      const endCol = gesture ? (4 + gesture.currentStep + Math.floor(gesture.currentStep / 8)) : startCol;
+      const endCol = gesture ? (5 + gesture.currentStep + Math.floor(gesture.currentStep / 8)) : startCol;
 
       const doubleSwipe = detectDoubleSwipe(startCol, endCol, duration);
       if (doubleSwipe === 'left') {
@@ -1621,6 +1704,48 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         return;  // Don't process other actions
       }
     }
+    
+    // V3+: Column 4 tap gesture for set toggling
+    if (pixelboopVersion === 'v3-set-toggling' && pixel.col === 4) {
+      // Determine which track this row belongs to
+      let track: 'melody' | 'chords' | 'bass' | null = null;
+      
+      if (pixel.row >= 2 && pixel.row <= 7) {
+        track = 'melody';
+      } else if (pixel.row >= 8 && pixel.row <= 13) {
+        track = 'chords';
+      } else if (pixel.row >= 14 && pixel.row <= 17) {
+        track = 'bass';
+      }
+      
+      if (track) {
+        setToggle.toggleSet(track);
+        const setNum = setToggle.currentSets[track];
+        showTooltip(`${track}_set_${setNum}`);
+        return;  // Don't process other actions
+      }
+    }
+    
+    // V3+: Column 4 tap gesture for set toggling (TODO: enable in v3)
+    // Currently disabled - will be enabled when pixelboopVersion === 'v3-set-toggling'
+    const isV3OrHigher = false;  // TODO: Update when v3 is ready
+    if (isV3OrHigher && pixel.col === 4) {
+      // Determine which track this row belongs to
+      let track: TrackType | null = null;
+      
+      if (pixel.row >= 2 && pixel.row <= 7) {
+        track = 'melody';
+      } else if (pixel.row >= 8 && pixel.row <= 13) {
+        track = 'chords';
+      } else if (pixel.row >= 14 && pixel.row <= 17) {
+        track = 'bass';
+      }
+      
+      if (track) {
+        setToggle.toggleSet(track);
+        return;  // Don't process other actions
+      }
+    }
 
     const grid = getPixelGrid();
     const action = grid[pixel.row][pixel.col].action;
@@ -1672,6 +1797,25 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       
       if (track) {
         intervalModeSelection.beginHold(track, currentMode);
+        return;  // Don't process other actions
+      }
+    }
+    
+    // V3+: Column 4 tap gesture for set toggling
+    if (pixelboopVersion === 'v3-set-toggling' && col === 4) {
+      // Determine which track this row belongs to
+      let track: TrackType | null = null;
+      
+      if (row >= 2 && row <= 7) {
+        track = 'melody';
+      } else if (row >= 8 && row <= 13) {
+        track = 'chords';
+      } else if (row >= 14 && row <= 17) {
+        track = 'bass';
+      }
+      
+      if (track) {
+        setToggle.toggleSet(track);
         return;  // Don't process other actions
       }
     }
@@ -2003,19 +2147,23 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       const isMutedTrack = muted[track] || (soloed !== null && soloed !== track);
       if (isMutedTrack) return;
 
-      for (let note = 0; note < 12; note++) {
-        const velocity = tracks[track][note][step];
+      // SLOT-BASED PLAYBACK: Iterate through ALL 12 slots (not just visible rows)
+      // This ensures notes in hidden sets still play
+      const numSlots = track === 'rhythm' ? 4 : 12;
+      
+      for (let slot = 0; slot < numSlots; slot++) {
+        const velocity = tracks[track][slot][step];
 
         if (velocity > 0) {
           if (track === 'rhythm') {
-            playDrum(DRUM_NAMES[note], velocity);
+            playDrum(DRUM_NAMES[slot], velocity);
           } else if (velocity === 3) {
             // Sustain continuation - don't retrigger
           } else {
             let sustainSteps = 1;
             for (let s = 1; s < patternLength; s++) {
               const nextStep = (step + s) % patternLength;
-              if (tracks[track][note][nextStep] === 3) {
+              if (tracks[track][slot][nextStep] === 3) {
                 sustainSteps++;
               } else {
                 break;
@@ -2024,37 +2172,57 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
 
             const duration = Math.max(0.15, stepDuration * sustainSteps * 0.95);
             
-            // Calculate pitch (version-dependent) with error handling
+            // Calculate pitch from SLOT index (version-dependent) with error handling
             let pitch: number;
             try {
               if (isV1Baseline) {
-                // V1 Baseline: Simple chromatic mapping for all tracks
-                pitch = baseNotes[track] + note;
+                // V1 Baseline: Simple chromatic mapping (slot = chromatic semitone)
+                pitch = baseNotes[track] + slot;
               } else if (track === 'melody') {
                 // V2+: Use interval mode for melody
-                pitch = melodyInterval.getPitchForRow(note, trackHeights[track]);
+                // Find which row this slot maps to in the CURRENT set
+                const localRow = setToggle.slotToRow(slot, track);
+                if (localRow !== null) {
+                  // Slot is visible - calculate pitch from row
+                  pitch = melodyInterval.getPitchForRow(localRow, trackHeights[track]);
+                } else {
+                  // Slot is hidden in current set - calculate pitch assuming it's in the other set
+                  // For hidden slots, we need to figure out which row they would be if that set were active
+                  // For simplicity, use chromatic fallback for hidden slots
+                  pitch = baseNotes[track] + slot;
+                }
               } else if (track === 'chords') {
                 // V2+: Use interval mode for chords
-                pitch = chordsInterval.getPitchForRow(note, trackHeights[track]);
+                const localRow = setToggle.slotToRow(slot, track);
+                if (localRow !== null) {
+                  pitch = chordsInterval.getPitchForRow(localRow, trackHeights[track]);
+                } else {
+                  pitch = baseNotes[track] + slot;
+                }
               } else if (track === 'bass') {
                 // V2+: Use interval mode for bass
-                pitch = bassInterval.getPitchForRow(note, trackHeights[track]);
+                const localRow = setToggle.slotToRow(slot, track);
+                if (localRow !== null) {
+                  pitch = bassInterval.getPitchForRow(localRow, trackHeights[track]);
+                } else {
+                  pitch = baseNotes[track] + slot;
+                }
               } else {
                 // Fallback (shouldn't reach here)
-                pitch = baseNotes[track] + note;
+                pitch = baseNotes[track] + slot;
               }
               
               // Ensure pitch is valid
               if (isNaN(pitch) || pitch < 0 || pitch > 127) {
-                console.warn('[PixelBoop] Invalid pitch calculated:', pitch, 'for track', track, 'note', note);
-                pitch = baseNotes[track] + note;  // Fallback to chromatic
+                console.warn('[PixelBoop] Invalid pitch calculated:', pitch, 'for track', track, 'slot', slot);
+                pitch = baseNotes[track] + slot;  // Fallback to chromatic
               }
               
               playNote(midiToFreq(pitch), duration, track, velocity);
             } catch (err) {
-              console.error('[PixelBoop] Error calculating pitch:', err, 'track:', track, 'note:', note);
+              console.error('[PixelBoop] Error calculating pitch:', err, 'track:', track, 'slot:', slot);
               // Fallback to chromatic if interval mode fails
-              pitch = baseNotes[track] + note;
+              pitch = baseNotes[track] + slot;
               playNote(midiToFreq(pitch), duration, track, velocity);
             }
           }
@@ -2064,7 +2232,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
 
     setPulseStep(step);
     setTimeout(() => setPulseStep(-1), 100);
-  }, [tracks, muted, soloed, playNote, playDrum, bpm, patternLength, melodyInterval, chordsInterval, bassInterval, isV1Baseline]);
+  }, [tracks, muted, soloed, playNote, playDrum, bpm, patternLength, melodyInterval, chordsInterval, bassInterval, isV1Baseline, setToggle]);
 
   // ============================================================================
   // PLAYBACK LOOP

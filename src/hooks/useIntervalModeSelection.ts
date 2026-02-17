@@ -68,6 +68,7 @@ export function useIntervalModeSelection(
   const currentStep = useRef(0);
   const hasEnteredSelectionMode = useRef(false);
   const startingModeIndex = useRef(0);
+  const activeTrackRef = useRef<TrackType | null>(null);  // Capture track for endHold
   
   // Update hold state (called every UPDATE_INTERVAL while holding)
   const updateHoldState = useCallback(() => {
@@ -137,13 +138,9 @@ export function useIntervalModeSelection(
     updateTimer.current = setInterval(updateHoldState, UPDATE_INTERVAL * 1000);
   }, [updateHoldState]);
   
-  // Ref to capture track for endHold (avoids closure issues)
-  const activeTrackRef = useRef<TrackType | null>(null);
-  
   // End hold gesture
   const endHold = useCallback(() => {
     const track = activeTrackRef.current;
-    const currentHighlightedMode = highlightedMode;
     
     if (updateTimer.current) {
       clearInterval(updateTimer.current);
@@ -151,11 +148,11 @@ export function useIntervalModeSelection(
     }
     
     // Allow confirmation even if only activated (not just after first step)
-    const shouldConfirm = hasEnteredSelectionMode.current && currentHighlightedMode !== null;
+    const shouldConfirm = hasEnteredSelectionMode.current && highlightedMode !== null;
     
     if (shouldConfirm && track && onModeConfirmed) {
       // Confirmed - apply the selected mode
-      const mode = INTERVAL_MODE_ORDER[currentHighlightedMode];
+      const mode = INTERVAL_MODE_ORDER[highlightedMode];
       console.log('[IntervalModeSelection] Confirming mode:', track, mode);
       onModeConfirmed(track, mode);
     } else if (hasEnteredSelectionMode.current && track && onCancelled) {
@@ -183,7 +180,7 @@ export function useIntervalModeSelection(
     } else {
       resetState();
     }
-  }, [highlightedMode, isConfirmed, onModeConfirmed, onCancelled]);
+  }, [highlightedMode, onModeConfirmed, onCancelled]);
   
   // Cancel hold without callbacks
   const cancelHold = useCallback(() => {
