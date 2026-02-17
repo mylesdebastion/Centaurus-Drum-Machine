@@ -4,8 +4,8 @@ import { ViewTemplate } from '../Layout/ViewTemplate';
 import { pixelboopSessionService } from '@/services/pixelboopSession';
 import type { PatternEditDelta } from '@/types/pixelboopSession';
 import { useIntervalMode } from '@/hooks/useIntervalMode';
-// import { useIntervalModeSelection, type TrackType as IntervalTrackType } from '@/hooks/useIntervalModeSelection';
-// import type { IntervalModeType } from '@/lib/intervalMode';
+import { useIntervalModeSelection, type TrackType as IntervalTrackType } from '@/hooks/useIntervalModeSelection';
+import type { IntervalModeType } from '@/lib/intervalMode';
 
 // ============================================================================
 // TYPES
@@ -132,6 +132,60 @@ const DRUM_NAMES: Record<number, string> = {
   9: 'crash',
   10: 'ride',
   11: 'cowbell',
+};
+
+// ============================================================================
+// VERSION REGISTRY
+// ============================================================================
+
+const PIXELBOOP_VERSIONS = {
+  'v1-baseline': {
+    name: 'v1 Baseline',
+    description: 'Original chromatic grid (12 notes, no interval modes)',
+    features: [
+      'Chromatic note mapping',
+      'Gesture system (tap, hold, swipe)',
+      'Ghost notes',
+      'Mute/solo',
+      'Scale filtering (major/minor/penta)'
+    ]
+  },
+  'v2-interval-modes': {
+    name: 'v2 Interval Modes',
+    description: 'Diatonic intervals with column 3 mode selection',
+    features: [
+      'All v1 features',
+      'Interval modes: 3rds, 4ths, 5ths, 7ths, 9ths, chromatic',
+      'Per-track interval mode selection',
+      'Column 3: Note color indicators (35% alpha)',
+      'Hold column 3: Climbing pixel mode selector (WIP)',
+      'Scales span multiple octaves naturally'
+    ]
+  },
+  'v3-set-toggling': {
+    name: 'v3 Set Toggling (Planned)',
+    description: '6→12 note access via column 4 set toggle',
+    features: [
+      'All v2 features',
+      'Column 4: Set indicator (●/●●/●●●)',
+      'Tap column 4: Toggle between 2 note sets (6 notes each)',
+      'Bass track: 3 sets (4 notes each)',
+      'Notes persist across set switches',
+      'Key changes affect all sets (hidden notes transpose)'
+    ]
+  },
+  'v4-sections-as-chords': {
+    name: 'v4 Sections as Chords (Planned)',
+    description: 'Automated chord progressions via section-based root automation',
+    features: [
+      'All v3 features',
+      'Paint mode: Drag root notes across sections',
+      'Record mode: Hold key button to capture live changes',
+      'Section 2nd-row indicator: Shows root note colors',
+      'Preset progressions: 2-5-1, 1-4-5',
+      'Undo support for progression editing'
+    ]
+  }
 };
 
 // 3x5 pixel font
@@ -281,8 +335,6 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   const bassInterval = useIntervalMode('thirds', rootNote, scale);
   
   // Interval mode selection controller (for column 3 hold gesture)
-  // TODO: Wire this up to grid rendering and touch handlers (see docs/INTERVAL-MODE-PORT-STATUS.md)
-  /*
   const intervalModeSelection = useIntervalModeSelection(
     // onModeConfirmed
     (track: IntervalTrackType, mode: IntervalModeType) => {
@@ -297,7 +349,6 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     // onCancelled
     undefined
   );
-  */
   
   // Sync interval modes with root/scale changes
   useEffect(() => {
@@ -334,6 +385,9 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   const [pixelSize, setPixelSize] = useState(12);
   const [isMobile, setIsMobile] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Version selector state
+  const [pixelboopVersion, setPixelboopVersion] = useState<string>('v2-interval-modes');
 
   // Shake detection state
   const [shakeDirectionChanges, setShakeDirectionChanges] = useState(0);
@@ -1057,7 +1111,44 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         grid[r][0] = { color: `${baseColor}${alpha}`, action: `mute_${track}`, baseColor };
         grid[r][1] = { color: isSoloed ? '#fff' : '#333', action: `solo_${track}`, baseColor: '#fff' };
         grid[r][2] = { color: '#111', action: null, baseColor: '#111' };
-        grid[r][3] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
+        
+        // Column 3: Interval mode indicator - show note colors for current interval mode
+        const localRow = r - start;
+        if (track !== 'rhythm') {
+          // Get current interval mode for this track
+          let currentIntervalMode = melodyInterval;
+          if (track === 'chords') currentIntervalMode = chordsInterval;
+          else if (track === 'bass') currentIntervalMode = bassInterval;
+          
+          // Check if interval mode selection is active for this track
+          const isSelecting = intervalModeSelection.activeTrack === track;
+          const highlightedRow = intervalModeSelection.highlightedMode !== null ? intervalModeSelection.highlightedMode % height : -1;
+          
+          if (isSelecting && localRow === highlightedRow) {
+            // Show climbing white pixel during selection
+            const brightness = Math.round(intervalModeSelection.highlightBrightness * 255);
+            grid[r][3] = {
+              color: `rgb(${brightness}, ${brightness}, ${brightness})`,
+              action: `interval_mode_${track}`,
+              baseColor: '#ffffff'
+            };
+          } else {
+            // Calculate pitch class for this row using interval mode
+            const pitchClass = currentIntervalMode.getPitchClassForRow(localRow, height);
+            const noteColor = NOTE_COLORS[pitchClass];
+            
+            // Show dim note color (35% alpha for normal, 25% alpha during selection)
+            const alpha = isSelecting ? '40' : '59';  // Dimmer during selection except highlighted row
+            grid[r][3] = { 
+              color: `${noteColor}${alpha}`,
+              action: `interval_mode_${track}`, 
+              baseColor: noteColor 
+            };
+          }
+        } else {
+          // Rhythm track doesn't use interval modes
+          grid[r][3] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
+        }
       }
 
       for (let localRow = 0; localRow < height; localRow++) {
@@ -1221,7 +1312,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     });
 
     return grid;
-  }, [tracks, currentStep, isPlaying, scale, rootNote, isInScale, gesturePreview, muted, soloed, showGhosts, pulseStep, bpm, patternLength, history, historyIndex, tooltipPixels, isShaking, shakeDirectionChanges]);
+  }, [tracks, currentStep, isPlaying, scale, rootNote, isInScale, gesturePreview, muted, soloed, showGhosts, pulseStep, bpm, patternLength, history, historyIndex, tooltipPixels, isShaking, shakeDirectionChanges, melodyInterval, chordsInterval, bassInterval, intervalModeSelection]);
 
   // ============================================================================
   // ACTION HANDLER
@@ -1931,7 +2022,26 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   const gridContent = (
     <>
       {/* Info bar */}
-      <div className={`flex items-center gap-2 mb-2 text-xs text-gray-400 flex-wrap justify-center ${isFullscreen ? 'mt-2' : ''}`}>
+      <div className={`flex items-center gap-3 mb-2 text-xs text-gray-400 flex-wrap justify-center ${isFullscreen ? 'mt-2' : ''}`}>
+        {/* Version selector */}
+        <div className="flex items-center gap-2 bg-gray-800/50 rounded px-2 py-1">
+          <span className="text-gray-500">Version:</span>
+          <select
+            value={pixelboopVersion}
+            onChange={(e) => setPixelboopVersion(e.target.value)}
+            className="bg-gray-700 text-white text-xs rounded px-2 py-0.5 border border-gray-600 focus:border-blue-500 focus:outline-none"
+            title={PIXELBOOP_VERSIONS[pixelboopVersion as keyof typeof PIXELBOOP_VERSIONS]?.description}
+          >
+            {Object.entries(PIXELBOOP_VERSIONS).map(([key, version]) => (
+              <option key={key} value={key}>
+                {version.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        <span className="text-gray-600">|</span>
+        
         <span style={{ color: NOTE_COLORS[rootNote] }}>{NOTE_NAMES[rootNote]}</span>
         <span className="text-orange-400">{scale}</span>
         <span className="text-red-400">{bpm}bpm</span>
@@ -1954,6 +2064,27 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
           )}
         </button>
       </div>
+      
+      {/* Version info tooltip */}
+      {!isFullscreen && (
+        <div className="mb-2 text-center max-w-2xl mx-auto">
+          <details className="bg-gray-800/30 rounded px-3 py-1 text-xs">
+            <summary className="cursor-pointer text-gray-500 hover:text-gray-400">
+              ℹ️ {PIXELBOOP_VERSIONS[pixelboopVersion as keyof typeof PIXELBOOP_VERSIONS]?.name} Features
+            </summary>
+            <div className="mt-2 text-left text-gray-400 space-y-1">
+              <p className="text-gray-300 font-semibold">
+                {PIXELBOOP_VERSIONS[pixelboopVersion as keyof typeof PIXELBOOP_VERSIONS]?.description}
+              </p>
+              <ul className="list-disc list-inside space-y-0.5 mt-2">
+                {PIXELBOOP_VERSIONS[pixelboopVersion as keyof typeof PIXELBOOP_VERSIONS]?.features.map((feature, idx) => (
+                  <li key={idx}>{feature}</li>
+                ))}
+              </ul>
+            </div>
+          </details>
+        </div>
+      )}
 
       {/* Main grid */}
       <div
