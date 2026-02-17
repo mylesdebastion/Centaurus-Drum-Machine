@@ -4,6 +4,8 @@ import { ViewTemplate } from '../Layout/ViewTemplate';
 import { pixelboopSessionService } from '@/services/pixelboopSession';
 import type { PatternEditDelta } from '@/types/pixelboopSession';
 import { useIntervalMode } from '@/hooks/useIntervalMode';
+import { useIntervalModeSelection, type TrackType as IntervalTrackType } from '@/hooks/useIntervalModeSelection';
+import type { IntervalModeType } from '@/lib/intervalMode';
 
 // ============================================================================
 // TYPES
@@ -277,6 +279,22 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   const melodyInterval = useIntervalMode('thirds', rootNote, scale);
   const chordsInterval = useIntervalMode('thirds', rootNote, scale);
   const bassInterval = useIntervalMode('thirds', rootNote, scale);
+  
+  // Interval mode selection controller (for column 3 hold gesture)
+  const intervalModeSelection = useIntervalModeSelection(
+    // onModeConfirmed
+    (track: IntervalTrackType, mode: IntervalModeType) => {
+      if (track === 'melody') melodyInterval.setIntervalMode(mode);
+      else if (track === 'chords') chordsInterval.setIntervalMode(mode);
+      else if (track === 'bass') bassInterval.setIntervalMode(mode);
+    },
+    // onModePreview (updates note colors in real-time during hold)
+    undefined,  // Preview happens automatically via highlightedMode state
+    // onActivation (could show tooltip)
+    undefined,
+    // onCancelled
+    undefined
+  );
   
   // Sync interval modes with root/scale changes
   useEffect(() => {
@@ -1198,43 +1216,9 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         };
       }
     });
-    
-    // Row 22: Interval mode controls (integrated into grid like iOS)
-    // Melody interval mode (left side)
-    const melodyModeColors = ['#f7dc6f22', '#f7dc6f44', '#f7dc6f66', '#f7dc6f88', '#f7dc6faa', '#f7dc6f'];
-    const melodyModeIndex = ['thirds', 'fourths', 'fifths', 'sevenths', 'ninths', 'chromatic'].indexOf(melodyInterval.intervalMode);
-    for (let i = 0; i < 6; i++) {
-      grid[22][i] = { 
-        color: i === melodyModeIndex ? melodyModeColors[5] : melodyModeColors[i], 
-        action: `melody_interval_${i}`, 
-        baseColor: melodyModeColors[5] 
-      };
-    }
-    
-    // Chords interval mode (middle)
-    const chordsModeColors = ['#4ecdc422', '#4ecdc444', '#4ecdc466', '#4ecdc488', '#4ecdc4aa', '#4ecdc4'];
-    const chordsModeIndex = ['thirds', 'fourths', 'fifths', 'sevenths', 'ninths', 'chromatic'].indexOf(chordsInterval.intervalMode);
-    for (let i = 0; i < 6; i++) {
-      grid[22][7 + i] = { 
-        color: i === chordsModeIndex ? chordsModeColors[5] : chordsModeColors[i], 
-        action: `chords_interval_${i}`, 
-        baseColor: chordsModeColors[5] 
-      };
-    }
-    
-    // Bass interval mode (right side)
-    const bassModeColors = ['#45b7d122', '#45b7d144', '#45b7d166', '#45b7d188', '#45b7d1aa', '#45b7d1'];
-    const bassModeIndex = ['thirds', 'fourths', 'fifths', 'sevenths', 'ninths', 'chromatic'].indexOf(bassInterval.intervalMode);
-    for (let i = 0; i < 6; i++) {
-      grid[22][14 + i] = { 
-        color: i === bassModeIndex ? bassModeColors[5] : bassModeColors[i], 
-        action: `bass_interval_${i}`, 
-        baseColor: bassModeColors[5] 
-      };
-    }
 
     return grid;
-  }, [tracks, currentStep, isPlaying, scale, rootNote, isInScale, gesturePreview, muted, soloed, showGhosts, pulseStep, bpm, patternLength, history, historyIndex, tooltipPixels, isShaking, shakeDirectionChanges, melodyInterval, chordsInterval, bassInterval]);
+  }, [tracks, currentStep, isPlaying, scale, rootNote, isInScale, gesturePreview, muted, soloed, showGhosts, pulseStep, bpm, patternLength, history, historyIndex, tooltipPixels, isShaking, shakeDirectionChanges]);
 
   // ============================================================================
   // ACTION HANDLER
