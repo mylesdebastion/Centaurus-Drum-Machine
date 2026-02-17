@@ -437,6 +437,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   // Version check helpers
   const isV1Baseline = pixelboopVersion === 'v1-baseline';
   const isV2OrHigher = !isV1Baseline;
+  const isV3OrHigher = ['v3-set-toggling', 'v4-sections-as-chords', 'v5-full-ios-port'].includes(pixelboopVersion);
   
   // Sync interval modes with root/scale changes
   useEffect(() => {
@@ -1215,8 +1216,8 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
               const pitchClass = currentIntervalMode.getPitchClassForRow(localRow, height);
               const noteColor = NOTE_COLORS[pitchClass];
               
-              // Show dim note color (35% alpha for normal, 25% alpha during selection)
-              const alpha = isSelecting ? '40' : '59';  // Dimmer during selection except highlighted row
+              // Show note color (50% alpha for normal, 35% alpha during selection - more visible)
+              const alpha = isSelecting ? '59' : '80';  // More visible indicator colors
               grid[r][3] = { 
                 color: `${noteColor}${alpha}`,
                 action: `interval_mode_${track}`, 
@@ -1236,7 +1237,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         }
         
         // Column 4: Set indicator (v3+ only, not rhythm track)
-        if (pixelboopVersion === 'v3-set-toggling' && track !== 'rhythm') {
+        if (isV3OrHigher && track !== 'rhythm') {
           // Show dots at bottom of track for set indicator
           // (currentSet and indicator display will be added in v3)
           // Bass (4 rows): bottom row only
@@ -1676,7 +1677,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     }
     
     // V3+: Column 4 tap gesture for set toggling
-    if (pixelboopVersion === 'v3-set-toggling' && pixel.col === 4) {
+    if (isV3OrHigher && pixel.col === 4) {
       // Determine which track this row belongs to
       let track: 'melody' | 'chords' | 'bass' | null = null;
       
@@ -1751,7 +1752,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     }
     
     // V3+: Column 4 tap gesture for set toggling
-    if (pixelboopVersion === 'v3-set-toggling' && col === 4) {
+    if (isV3OrHigher && col === 4) {
       // Determine which track this row belongs to
       let track: TrackType | null = null;
       
