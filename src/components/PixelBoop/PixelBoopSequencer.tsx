@@ -1170,36 +1170,44 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         // Column 3: Version-dependent rendering
         const localRow = r - start;
         if (isV2OrHigher && track !== 'rhythm') {
-          // V2+: Interval mode indicator - show note colors for current interval mode
-          // Get current interval mode for this track
-          let currentIntervalMode = melodyInterval;
-          if (track === 'chords') currentIntervalMode = chordsInterval;
-          else if (track === 'bass') currentIntervalMode = bassInterval;
-          
-          // Check if interval mode selection is active for this track
-          const isSelecting = intervalModeSelection.activeTrack === track;
-          const highlightedRow = intervalModeSelection.highlightedMode !== null ? intervalModeSelection.highlightedMode % height : -1;
-          
-          if (isSelecting && localRow === highlightedRow) {
-            // Show climbing white pixel during selection
-            const brightness = Math.round(intervalModeSelection.highlightBrightness * 255);
-            grid[r][3] = {
-              color: `rgb(${brightness}, ${brightness}, ${brightness})`,
-              action: `interval_mode_${track}`,
-              baseColor: '#ffffff'
-            };
-          } else {
-            // Calculate pitch class for this row using interval mode
-            const pitchClass = currentIntervalMode.getPitchClassForRow(localRow, height);
-            const noteColor = NOTE_COLORS[pitchClass];
+          try {
+            // V2+: Interval mode indicator - show note colors for current interval mode
+            // Get current interval mode for this track
+            let currentIntervalMode = melodyInterval;
+            if (track === 'chords') currentIntervalMode = chordsInterval;
+            else if (track === 'bass') currentIntervalMode = bassInterval;
             
-            // Show dim note color (35% alpha for normal, 25% alpha during selection)
-            const alpha = isSelecting ? '40' : '59';  // Dimmer during selection except highlighted row
-            grid[r][3] = { 
-              color: `${noteColor}${alpha}`,
-              action: `interval_mode_${track}`, 
-              baseColor: noteColor 
-            };
+            // Check if interval mode selection is active for this track
+            const isSelecting = intervalModeSelection.activeTrack === track;
+            const highlightedRow = intervalModeSelection.highlightedMode !== null ? intervalModeSelection.highlightedMode % height : -1;
+            
+            if (isSelecting && localRow === highlightedRow) {
+              // Show climbing white pixel during selection
+              const brightness = Math.round(intervalModeSelection.highlightBrightness * 255);
+              grid[r][3] = {
+                color: `rgb(${brightness}, ${brightness}, ${brightness})`,
+                action: `interval_mode_${track}`,
+                baseColor: '#ffffff'
+              };
+            } else if (currentIntervalMode && currentIntervalMode.getPitchClassForRow) {
+              // Calculate pitch class for this row using interval mode
+              const pitchClass = currentIntervalMode.getPitchClassForRow(localRow, height);
+              const noteColor = NOTE_COLORS[pitchClass];
+              
+              // Show dim note color (35% alpha for normal, 25% alpha during selection)
+              const alpha = isSelecting ? '40' : '59';  // Dimmer during selection except highlighted row
+              grid[r][3] = { 
+                color: `${noteColor}${alpha}`,
+                action: `interval_mode_${track}`, 
+                baseColor: noteColor 
+              };
+            } else {
+              // Fallback if interval mode not available
+              grid[r][3] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
+            }
+          } catch (err) {
+            console.error('[PixelBoop] Error rendering column 3:', err);
+            grid[r][3] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
           }
         } else {
           // V1 or rhythm track: Simple dark background (no interval indicator)
@@ -1215,11 +1223,18 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         let rowPitchClass = noteBase % 12;  // Default v1 behavior
         if (isV2OrHigher && track !== 'rhythm') {
           // V2+: Use interval mode to determine pitch class for this row
-          let currentIntervalMode = melodyInterval;
-          if (track === 'chords') currentIntervalMode = chordsInterval;
-          else if (track === 'bass') currentIntervalMode = bassInterval;
-          
-          rowPitchClass = currentIntervalMode.getPitchClassForRow(localRow, height);
+          try {
+            let currentIntervalMode = melodyInterval;
+            if (track === 'chords') currentIntervalMode = chordsInterval;
+            else if (track === 'bass') currentIntervalMode = bassInterval;
+            
+            if (currentIntervalMode && currentIntervalMode.getPitchClassForRow) {
+              rowPitchClass = currentIntervalMode.getPitchClassForRow(localRow, height);
+            }
+          } catch (err) {
+            console.error('[PixelBoop] Error getting pitch class for row:', err);
+            // Fall back to chromatic
+          }
         }
 
         for (let step = 0; step < patternLength; step++) {
@@ -1974,9 +1989,15 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   }, []);
 
   const playStep = useCallback((step: number) => {
-    const baseNotes: Record<string, number> = { melody: 60, chords: 48, bass: 36 };
+    const baseNotes: Record<string, number> = { melody: 60, chords: 48, bass: 36, rhythm: 36 };
     const trackHeights: Record<string, number> = { melody: 6, chords: 6, bass: 4, rhythm: 12 };
     const stepDuration = 60 / bpm / 4;
+    
+    // Ensure interval modes are available in v2+
+    if (!isV1Baseline && (!melodyInterval || !chordsInterval || !bassInterval)) {
+      console.error('[PixelBoop] Interval modes not initialized');
+      return;
+    }
 
     TRACK_ORDER.forEach(track => {
       const isMutedTrack = muted[track] || (soloed !== null && soloed !== track);
@@ -2003,26 +2024,39 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
 
             const duration = Math.max(0.15, stepDuration * sustainSteps * 0.95);
             
-            // Calculate pitch (version-dependent)
+            // Calculate pitch (version-dependent) with error handling
             let pitch: number;
-            if (isV1Baseline) {
-              // V1 Baseline: Simple chromatic mapping for all tracks
+            try {
+              if (isV1Baseline) {
+                // V1 Baseline: Simple chromatic mapping for all tracks
+                pitch = baseNotes[track] + note;
+              } else if (track === 'melody') {
+                // V2+: Use interval mode for melody
+                pitch = melodyInterval.getPitchForRow(note, trackHeights[track]);
+              } else if (track === 'chords') {
+                // V2+: Use interval mode for chords
+                pitch = chordsInterval.getPitchForRow(note, trackHeights[track]);
+              } else if (track === 'bass') {
+                // V2+: Use interval mode for bass
+                pitch = bassInterval.getPitchForRow(note, trackHeights[track]);
+              } else {
+                // Fallback (shouldn't reach here)
+                pitch = baseNotes[track] + note;
+              }
+              
+              // Ensure pitch is valid
+              if (isNaN(pitch) || pitch < 0 || pitch > 127) {
+                console.warn('[PixelBoop] Invalid pitch calculated:', pitch, 'for track', track, 'note', note);
+                pitch = baseNotes[track] + note;  // Fallback to chromatic
+              }
+              
+              playNote(midiToFreq(pitch), duration, track, velocity);
+            } catch (err) {
+              console.error('[PixelBoop] Error calculating pitch:', err, 'track:', track, 'note:', note);
+              // Fallback to chromatic if interval mode fails
               pitch = baseNotes[track] + note;
-            } else if (track === 'melody') {
-              // V2+: Use interval mode for melody
-              pitch = melodyInterval.getPitchForRow(note, trackHeights[track]);
-            } else if (track === 'chords') {
-              // V2+: Use interval mode for chords
-              pitch = chordsInterval.getPitchForRow(note, trackHeights[track]);
-            } else if (track === 'bass') {
-              // V2+: Use interval mode for bass
-              pitch = bassInterval.getPitchForRow(note, trackHeights[track]);
-            } else {
-              // Fallback (shouldn't reach here)
-              pitch = baseNotes[track] + note;
+              playNote(midiToFreq(pitch), duration, track, velocity);
             }
-            
-            playNote(midiToFreq(pitch), duration, track, velocity);
           }
         }
       }
