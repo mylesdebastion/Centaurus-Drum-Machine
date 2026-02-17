@@ -121,6 +121,7 @@ export function useIntervalModeSelection(
     }
     
     setActiveTrack(track);
+    activeTrackRef.current = track;  // Capture in ref for endHold
     holdStartTime.current = Date.now();
     hasEnteredSelectionMode.current = false;
     currentStep.current = 0;
@@ -130,22 +131,32 @@ export function useIntervalModeSelection(
     setHighlightedMode(null);
     setHighlightBrightness(0);
     
+    console.log('[IntervalModeSelection] beginHold:', track, currentMode);
+    
     // Start update timer
     updateTimer.current = setInterval(updateHoldState, UPDATE_INTERVAL * 1000);
   }, [updateHoldState]);
   
+  // Ref to capture track for endHold (avoids closure issues)
+  const activeTrackRef = useRef<TrackType | null>(null);
+  
   // End hold gesture
   const endHold = useCallback(() => {
-    const track = activeTrack;
+    const track = activeTrackRef.current;
+    const currentHighlightedMode = highlightedMode;
     
     if (updateTimer.current) {
       clearInterval(updateTimer.current);
       updateTimer.current = null;
     }
     
-    if (isConfirmed && highlightedMode !== null && track && onModeConfirmed) {
+    // Allow confirmation even if only activated (not just after first step)
+    const shouldConfirm = hasEnteredSelectionMode.current && currentHighlightedMode !== null;
+    
+    if (shouldConfirm && track && onModeConfirmed) {
       // Confirmed - apply the selected mode
-      const mode = INTERVAL_MODE_ORDER[highlightedMode];
+      const mode = INTERVAL_MODE_ORDER[currentHighlightedMode];
+      console.log('[IntervalModeSelection] Confirming mode:', track, mode);
       onModeConfirmed(track, mode);
     } else if (hasEnteredSelectionMode.current && track && onCancelled) {
       // Entered selection but released before confirmation
@@ -172,7 +183,7 @@ export function useIntervalModeSelection(
     } else {
       resetState();
     }
-  }, [activeTrack, isConfirmed, highlightedMode, onModeConfirmed, onCancelled]);
+  }, [highlightedMode, isConfirmed, onModeConfirmed, onCancelled]);
   
   // Cancel hold without callbacks
   const cancelHold = useCallback(() => {

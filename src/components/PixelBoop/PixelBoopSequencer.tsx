@@ -272,6 +272,26 @@ const TOOLTIPS: Record<string, TooltipDef> = {
   gesture_swipeUndo: { text: '<<UNDO', row: 2 },
   gesture_swipeRedo: { text: 'REDO>>', row: 2 },
   gesture_sustain: { text: 'SUSTAIN', row: 2 },
+  
+  // Interval mode tooltips
+  'melody_3RDS': { text: 'MELODY: 3RDS', row: 4 },
+  'melody_4THS': { text: 'MELODY: 4THS', row: 4 },
+  'melody_5THS': { text: 'MELODY: 5THS', row: 4 },
+  'melody_7THS': { text: 'MELODY: 7THS', row: 4 },
+  'melody_9THS': { text: 'MELODY: 9THS', row: 4 },
+  'melody_CHROM': { text: 'MELODY: CHROM', row: 4 },
+  'chords_3RDS': { text: 'CHORDS: 3RDS', row: 10 },
+  'chords_4THS': { text: 'CHORDS: 4THS', row: 10 },
+  'chords_5THS': { text: 'CHORDS: 5THS', row: 10 },
+  'chords_7THS': { text: 'CHORDS: 7THS', row: 10 },
+  'chords_9THS': { text: 'CHORDS: 9THS', row: 10 },
+  'chords_CHROM': { text: 'CHORDS: CHROM', row: 10 },
+  'bass_3RDS': { text: 'BASS: 3RDS', row: 15 },
+  'bass_4THS': { text: 'BASS: 4THS', row: 15 },
+  'bass_5THS': { text: 'BASS: 5THS', row: 15 },
+  'bass_7THS': { text: 'BASS: 7THS', row: 15 },
+  'bass_9THS': { text: 'BASS: 9THS', row: 15 },
+  'bass_CHROM': { text: 'BASS: CHROM', row: 15 },
 };
 
 // ============================================================================
@@ -341,14 +361,45 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   const intervalModeSelection = useIntervalModeSelection(
     // onModeConfirmed
     (track: IntervalTrackType, mode: IntervalModeType) => {
-      if (track === 'melody') melodyInterval.setIntervalMode(mode);
-      else if (track === 'chords') chordsInterval.setIntervalMode(mode);
-      else if (track === 'bass') bassInterval.setIntervalMode(mode);
+      console.log('[PixelBoop] Interval mode confirmed:', track, mode);
+      if (track === 'melody') {
+        melodyInterval.setIntervalMode(mode);
+        showTooltip(`melody_mode_${mode}`);
+      }
+      else if (track === 'chords') {
+        chordsInterval.setIntervalMode(mode);
+        showTooltip(`chords_mode_${mode}`);
+      }
+      else if (track === 'bass') {
+        bassInterval.setIntervalMode(mode);
+        showTooltip(`bass_mode_${mode}`);
+      }
     },
     // onModePreview (updates note colors in real-time during hold)
-    undefined,  // Preview happens automatically via highlightedMode state
-    // onActivation (could show tooltip)
-    undefined,
+    (track: IntervalTrackType, mode: IntervalModeType) => {
+      // Show tooltip with mode name during preview
+      const modeNames: Record<IntervalModeType, string> = {
+        'thirds': '3RDS',
+        'fourths': '4THS',
+        'fifths': '5THS',
+        'sevenths': '7THS',
+        'ninths': '9THS',
+        'chromatic': 'CHROM'
+      };
+      showTooltip(`${track}_${modeNames[mode]}`);
+    },
+    // onActivation (show initial tooltip)
+    (track: IntervalTrackType, mode: IntervalModeType) => {
+      const modeNames: Record<IntervalModeType, string> = {
+        'thirds': '3RDS',
+        'fourths': '4THS',
+        'fifths': '5THS',
+        'sevenths': '7THS',
+        'ninths': '9THS',
+        'chromatic': 'CHROM'
+      };
+      showTooltip(`${track}_${modeNames[mode]}`);
+    },
     // onCancelled
     undefined
   );
