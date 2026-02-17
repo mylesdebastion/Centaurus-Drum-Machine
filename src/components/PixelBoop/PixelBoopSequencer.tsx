@@ -8,6 +8,7 @@ import { useIntervalModeSelection, type TrackType as IntervalTrackType } from '@
 import { useSetToggle } from '@/hooks/useSetToggle';
 import type { IntervalModeType } from '@/lib/intervalMode';
 import { audioEngine } from '@/lib/audioEngine';
+import { getPixelGrid_v6, type V6GridState } from './getPixelGrid_v6_direct_port';
 
 // ============================================================================
 // TYPES
@@ -201,6 +202,23 @@ const PIXELBOOP_VERSIONS = {
       'Teaching mode (auto-tooltips after idle)',
       'Proper ADSR envelopes and filter sweeps',
       'Sound parity with iOS app'
+    ]
+  },
+  'v6-direct-port': {
+    name: 'v6 Direct iOS Port',
+    description: 'Direct translation of iOS PixelGridUIView.swift rendering',
+    features: [
+      'DIRECT TRANSLATION from iOS Swift code',
+      'Pixel-perfect iOS layout matching',
+      'Row 0: Play(0-2), Undo(4), Redo(5), Scales(7-9), Root(11-22), Ghost(24), BPM(26-28), Len(30-32)',
+      'Row 23: WLED(0-3), Link(5-7), Mode(9-10), Sync(11-13), Overview(14-35)',
+      'iOS control bar layout (bottom row)',
+      'iOS-accurate track rendering with sustain fade (ADSR)',
+      'Section thumbnails (cols 36-43)',
+      'Rainbow WLED animation',
+      'BPM pulse animation',
+      'Ghost notes at 13% alpha (iOS exact)',
+      'Note colors: iOS chromatic wheel'
     ]
   }
 };
@@ -449,6 +467,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   const isV1Baseline = pixelboopVersion === 'v1-baseline';
   const isV2OrHigher = !isV1Baseline;
   const isV3OrHigher = ['v3-set-toggling', 'v4-sections-as-chords', 'v5-full-ios-port'].includes(pixelboopVersion);
+  const isV6DirectPort = pixelboopVersion === 'v6-direct-port';
   
   // Sync interval modes with root/scale changes
   useEffect(() => {
@@ -1119,7 +1138,51 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   // PIXEL GRID RENDERING
   // ============================================================================
 
+  // Frame counter for v6 WLED animation
+  const [frameCounter, setFrameCounter] = useState(0);
+  const [bpmPulseFade, setBpmPulseFade] = useState(0);
+  
+  // Update frame counter for animations
+  useEffect(() => {
+    if (!isV6DirectPort) return;
+    const interval = setInterval(() => {
+      setFrameCounter(f => (f + 1) % 600);
+      // Simple BPM pulse simulation
+      if (isPlaying) {
+        setBpmPulseFade(f => f > 0.01 ? f * 0.92 : 0);
+      }
+    }, 16); // ~60fps
+    return () => clearInterval(interval);
+  }, [isV6DirectPort, isPlaying]);
+
   const getPixelGrid = useCallback((): Pixel[][] => {
+    // V6 Direct Port: Use iOS-translated rendering function
+    if (isV6DirectPort) {
+      const v6State: V6GridState = {
+        tracks,
+        patternLength,
+        currentStep,
+        pulseStep,
+        isPlaying,
+        scale,
+        rootNote,
+        bpm,
+        muted,
+        soloed,
+        showGhosts,
+        activeSection,
+        historyIndex,
+        historyLength: history.length,
+        isShaking,
+        shakeDirectionChanges,
+        gesturePreview,
+        tooltipPixels,
+        frameCounter,
+        bpmPulseFade,
+      };
+      return getPixelGrid_v6(v6State);
+    }
+    
     const grid: Pixel[][] = Array(ROWS).fill(null).map(() =>
       Array(COLS).fill(null).map(() => ({ color: '#0a0a0a', action: null, baseColor: '#0a0a0a' }))
     );
@@ -1575,7 +1638,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     });
 
     return grid;
-  }, [tracks, currentStep, isPlaying, scale, rootNote, isInScale, gesturePreview, muted, soloed, showGhosts, pulseStep, bpm, patternLength, history, historyIndex, tooltipPixels, isShaking, shakeDirectionChanges, melodyInterval, chordsInterval, bassInterval, intervalModeSelection, isV1Baseline, isV2OrHigher]);
+  }, [tracks, currentStep, isPlaying, scale, rootNote, isInScale, gesturePreview, muted, soloed, showGhosts, pulseStep, bpm, patternLength, history, historyIndex, tooltipPixels, isShaking, shakeDirectionChanges, melodyInterval, chordsInterval, bassInterval, intervalModeSelection, isV1Baseline, isV2OrHigher, isV6DirectPort, activeSection, frameCounter, bpmPulseFade]);
 
   // ============================================================================
   // ACTION HANDLER
