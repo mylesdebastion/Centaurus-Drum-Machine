@@ -307,6 +307,9 @@ const midiToFreq = (midi: number): number => 440 * Math.pow(2, (midi - 69) / 12)
 // ============================================================================
 
 export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, viewerMode = false, roomCode, onSessionReady }) => {
+  // Version selector state (must be first to use in other hooks)
+  const [pixelboopVersion, setPixelboopVersion] = useState<string>('v2-interval-modes');
+  
   // Track state
   const [tracks, setTracks] = useState<Tracks>({
     melody: emptyTrack(),
@@ -329,12 +332,12 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   const [bpm, setBpm] = useState(120);
   const [patternLength, setPatternLength] = useState(32);
   
-  // Interval mode state (per-track)
+  // Interval mode state (per-track) - only used in v2+
   const melodyInterval = useIntervalMode('thirds', rootNote, scale);
   const chordsInterval = useIntervalMode('thirds', rootNote, scale);
   const bassInterval = useIntervalMode('thirds', rootNote, scale);
   
-  // Interval mode selection controller (for column 3 hold gesture)
+  // Interval mode selection controller (for column 3 hold gesture) - only used in v2+
   const intervalModeSelection = useIntervalModeSelection(
     // onModeConfirmed
     (track: IntervalTrackType, mode: IntervalModeType) => {
@@ -349,6 +352,10 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     // onCancelled
     undefined
   );
+  
+  // Version check helpers
+  const isV1Baseline = pixelboopVersion === 'v1-baseline';
+  const isV2OrHigher = !isV1Baseline;
   
   // Sync interval modes with root/scale changes
   useEffect(() => {
@@ -385,9 +392,6 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   const [pixelSize, setPixelSize] = useState(12);
   const [isMobile, setIsMobile] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  
-  // Version selector state
-  const [pixelboopVersion, setPixelboopVersion] = useState<string>('v2-interval-modes');
 
   // Shake detection state
   const [shakeDirectionChanges, setShakeDirectionChanges] = useState(0);
@@ -1112,9 +1116,10 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         grid[r][1] = { color: isSoloed ? '#fff' : '#333', action: `solo_${track}`, baseColor: '#fff' };
         grid[r][2] = { color: '#111', action: null, baseColor: '#111' };
         
-        // Column 3: Interval mode indicator - show note colors for current interval mode
+        // Column 3: Version-dependent rendering
         const localRow = r - start;
-        if (track !== 'rhythm') {
+        if (isV2OrHigher && track !== 'rhythm') {
+          // V2+: Interval mode indicator - show note colors for current interval mode
           // Get current interval mode for this track
           let currentIntervalMode = melodyInterval;
           if (track === 'chords') currentIntervalMode = chordsInterval;
@@ -1146,7 +1151,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
             };
           }
         } else {
-          // Rhythm track doesn't use interval modes
+          // V1 or rhythm track: Simple dark background (no interval indicator)
           grid[r][3] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
         }
       }
@@ -1312,7 +1317,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     });
 
     return grid;
-  }, [tracks, currentStep, isPlaying, scale, rootNote, isInScale, gesturePreview, muted, soloed, showGhosts, pulseStep, bpm, patternLength, history, historyIndex, tooltipPixels, isShaking, shakeDirectionChanges, melodyInterval, chordsInterval, bassInterval, intervalModeSelection]);
+  }, [tracks, currentStep, isPlaying, scale, rootNote, isInScale, gesturePreview, muted, soloed, showGhosts, pulseStep, bpm, patternLength, history, historyIndex, tooltipPixels, isShaking, shakeDirectionChanges, melodyInterval, chordsInterval, bassInterval, intervalModeSelection, isV1Baseline, isV2OrHigher]);
 
   // ============================================================================
   // ACTION HANDLER
@@ -1878,16 +1883,22 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
 
             const duration = Math.max(0.15, stepDuration * sustainSteps * 0.95);
             
-            // Calculate pitch using interval mode
+            // Calculate pitch (version-dependent)
             let pitch: number;
-            if (track === 'melody') {
+            if (isV1Baseline) {
+              // V1 Baseline: Simple chromatic mapping for all tracks
+              pitch = baseNotes[track] + note;
+            } else if (track === 'melody') {
+              // V2+: Use interval mode for melody
               pitch = melodyInterval.getPitchForRow(note, trackHeights[track]);
             } else if (track === 'chords') {
+              // V2+: Use interval mode for chords
               pitch = chordsInterval.getPitchForRow(note, trackHeights[track]);
             } else if (track === 'bass') {
+              // V2+: Use interval mode for bass
               pitch = bassInterval.getPitchForRow(note, trackHeights[track]);
             } else {
-              // Fallback to old chromatic method
+              // Fallback (shouldn't reach here)
               pitch = baseNotes[track] + note;
             }
             
@@ -1899,7 +1910,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
 
     setPulseStep(step);
     setTimeout(() => setPulseStep(-1), 100);
-  }, [tracks, muted, soloed, playNote, playDrum, bpm, patternLength, melodyInterval, chordsInterval, bassInterval]);
+  }, [tracks, muted, soloed, playNote, playDrum, bpm, patternLength, melodyInterval, chordsInterval, bassInterval, isV1Baseline]);
 
   // ============================================================================
   // PLAYBACK LOOP
@@ -2046,9 +2057,13 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         <span className="text-orange-400">{scale}</span>
         <span className="text-red-400">{bpm}bpm</span>
         <span className="text-purple-400">{patternLength}st</span>
-        <span className="text-blue-300">{melodyInterval.displayName}</span>
-        <span className="text-cyan-300">{chordsInterval.displayName}</span>
-        <span className="text-teal-300">{bassInterval.displayName}</span>
+        {isV2OrHigher && (
+          <>
+            <span className="text-blue-300">{melodyInterval.displayName}</span>
+            <span className="text-cyan-300">{chordsInterval.displayName}</span>
+            <span className="text-teal-300">{bassInterval.displayName}</span>
+          </>
+        )}
         {isShaking && <span className="text-yellow-400 animate-pulse">~SHAKE~</span>}
 
         {/* Fullscreen toggle button */}
