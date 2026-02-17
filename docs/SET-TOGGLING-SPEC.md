@@ -163,7 +163,10 @@ Row 4 (slot 3):  ────────
 Row 5 (slot 1):  ●───────  (notes PRESERVED)
 ```
 
-**Key principle:** Sets are **views** into the same underlying 12-slot pattern, not separate patterns.
+**Key principles:** 
+- Sets are **views** into the same underlying 12-slot pattern, not separate patterns.
+- **Key/root note changes affect ALL 12 slots** regardless of which set is currently visible.
+- Notes in non-visible sets still transpose when you change the root note or scale.
 
 ---
 
@@ -209,6 +212,52 @@ Row 5 (slot 1):  ●───────  (notes PRESERVED)
 **Active state (tap feedback):**
 - Brief brightness pulse (100% → 35% over 0.2s)
 - Same as iOS tap feedback
+
+---
+
+## 🎼 Key/Root Note Changes Affect All Sets
+
+### Critical Behavior: Hidden Notes Still Transpose
+
+**When you change the root note or scale, ALL 12 slots transpose - not just the visible set.**
+
+#### Example Scenario:
+
+```
+Initial state: C Major, Set 1 active
+─────────────────────────────────────
+Melody Track - Set 1 (slots 1-3-5-7-9-11):
+Row 0 (slot 11): ●──────  (note at step 0)
+Row 5 (slot 1):  ───●────  (note at step 3)
+
+[User switches to Set 2]
+
+Melody Track - Set 2 (slots 0-2-4-6-8-10):
+(No notes visible - Set 2 was empty)
+
+[User changes root note from C to G]
+
+Melody Track - Set 2 (slots 0-2-4-6-8-10):
+(Still no notes visible - Set 2 is still empty)
+BUT: Notes in Set 1 have transposed from C to G!
+
+[User switches back to Set 1]
+
+Melody Track - Set 1 (slots 1-3-5-7-9-11):
+Row 0 (slot 11): ●──────  (TRANSPOSED - now playing different pitch in G)
+Row 5 (slot 1):  ───●────  (TRANSPOSED - now playing different pitch in G)
+```
+
+**Key insight:** The notes themselves don't move to different slots, but their **pitch values** change because the interval mode + root note determines what pitch each slot represents.
+
+#### How It Works:
+
+1. **Pattern data** stores which slots have notes (slot 1 @ step 0, slot 11 @ step 3, etc.)
+2. **Interval mode + root note** determines what pitch each slot plays
+3. **Set toggle** only controls which 6 slots are visible for editing
+4. **Key change** recalculates pitch for ALL 12 slots simultaneously
+
+**Result:** Changing root/scale while viewing Set 2 will affect notes in Set 1, even though you can't see them. Switch back to Set 1 and they'll sound different.
 
 ---
 
@@ -343,6 +392,12 @@ function slotToRow(slot: number, track: TrackType, set: number): number | null {
 - [ ] Place notes in both sets, switch back and forth → both preserved
 - [ ] Notes in non-visible slots don't show in grid but still play
 - [ ] Clearing a track clears ALL slots (not just visible set)
+
+### Key/Root Note Transposition
+- [ ] Place notes in Set 1, switch to Set 2, change root note → switch back to Set 1, notes transposed
+- [ ] Place notes in both sets, change root note → both sets transpose (even non-visible)
+- [ ] Change scale (major→minor) while viewing Set 2 → Set 1 notes also affected
+- [ ] Column 3 colors update for visible set when root/scale changes
 
 ### Interaction
 - [ ] Tap any row in column 4 toggles set (not just specific row)
