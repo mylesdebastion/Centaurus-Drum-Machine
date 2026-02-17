@@ -1113,49 +1113,84 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       Array(COLS).fill(null).map(() => ({ color: '#0a0a0a', action: null, baseColor: '#0a0a0a' }))
     );
 
-    // Row 0: Controls
-    for (let c = 0; c < 3; c++) {
-      const color = isPlaying ? '#ff4444' : '#44ff44';
-      grid[0][c] = { color, action: 'togglePlay', baseColor: color };
+    // ========================================================================
+    // ROW 0: TOP CONTROL BAR (iOS parity layout)
+    // ========================================================================
+    // Cols 0-3: USB/BT MIDI indicators (placeholder for now)
+    for (let c = 0; c <= 3; c++) {
+      grid[0][c] = { color: '#222', action: null, baseColor: '#333' };
     }
-
-    grid[0][4] = { color: historyIndex > 0 ? '#888' : '#333', action: 'undo', baseColor: '#888' };
-    grid[0][5] = { color: historyIndex < history.length - 1 ? '#888' : '#333', action: 'redo', baseColor: '#888' };
-
+    
+    // Cols 4-6: Clear button
+    for (let c = 4; c <= 6; c++) {
+      grid[0][c] = { color: '#662222', action: 'clearAll', baseColor: '#ff4444' };
+    }
+    
+    // Col 7: Scale Major
     grid[0][7] = { color: scale === 'major' ? '#ffaa00' : '#442200', action: 'scaleMajor', baseColor: '#ffaa00' };
+    // Col 8: Scale Minor
     grid[0][8] = { color: scale === 'minor' ? '#00aaff' : '#002244', action: 'scaleMinor', baseColor: '#00aaff' };
+    // Col 9: Scale Pentatonic
     grid[0][9] = { color: scale === 'penta' ? '#aa00ff' : '#220044', action: 'scalePenta', baseColor: '#aa00ff' };
-
+    
+    // Col 10: gap
+    grid[0][10] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
+    
+    // Cols 11-22: Root note selector (C through B)
     for (let n = 0; n < 12; n++) {
       const color = n === rootNote ? NOTE_COLORS[n] : `${NOTE_COLORS[n]}44`;
       grid[0][11 + n] = { color, action: `root_${n}`, baseColor: NOTE_COLORS[n] };
     }
-
-    grid[0][24] = { color: showGhosts ? '#666' : '#222', action: 'toggleGhosts', baseColor: '#666' };
-
+    
+    // Cols 23-25: gap/undo/redo
+    grid[0][23] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
+    grid[0][24] = { color: historyIndex > 0 ? '#888' : '#333', action: 'undo', baseColor: '#888' };
+    grid[0][25] = { color: historyIndex < history.length - 1 ? '#888' : '#333', action: 'redo', baseColor: '#888' };
+    
+    // Col 26: BPM down
     grid[0][26] = { color: '#444', action: 'bpmDown', baseColor: '#666' };
-    grid[0][27] = { color: `hsl(${bpm}, 70%, 50%)`, action: null, baseColor: `hsl(${bpm}, 70%, 50%)` };
+    // Col 27: BPM display (tap for tempo)
+    grid[0][27] = { color: `hsl(${bpm}, 70%, 50%)`, action: 'tapTempo', baseColor: `hsl(${bpm}, 70%, 50%)` };
+    // Col 28: BPM up
     grid[0][28] = { color: '#444', action: 'bpmUp', baseColor: '#666' };
-
+    
+    // Col 29: gap
+    grid[0][29] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
+    
+    // Col 30: Pattern length down
     grid[0][30] = { color: '#444', action: 'lenDown', baseColor: '#666' };
+    // Col 31: Pattern length display
     grid[0][31] = { color: `hsl(${patternLength * 8}, 70%, 50%)`, action: null, baseColor: '#f5f' };
+    // Col 32: Pattern length up
     grid[0][32] = { color: '#444', action: 'lenUp', baseColor: '#666' };
-
-    // Shake indicator
+    
+    // Cols 33-35: gap/ghosts/shake indicator
+    grid[0][33] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
+    grid[0][34] = { color: showGhosts ? '#666' : '#222', action: 'toggleGhosts', baseColor: '#666' };
     const shakeColor = isShaking ? `hsl(${360 - shakeDirectionChanges * 60}, 100%, 50%)` : '#222';
-    for (let c = 34; c < 38; c++) {
-      grid[0][c] = { color: shakeColor, action: null, baseColor: shakeColor };
+    grid[0][35] = { color: shakeColor, action: null, baseColor: shakeColor };
+    
+    // Cols 36-37: USB MIDI indicator (section area)
+    grid[0][36] = { color: '#224422', action: null, baseColor: '#44ff44' };
+    grid[0][37] = { color: '#224422', action: null, baseColor: '#44ff44' };
+    
+    // Cols 38-43: unused in row 0 (dark)
+    for (let c = 38; c <= 43; c++) {
+      grid[0][c] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
     }
 
-    // Clear button
-    for (let c = 40; c < 44; c++) {
-      grid[0][c] = { color: '#662222', action: 'clearAll', baseColor: '#ff4444' };
+    // ========================================================================
+    // ROW 1: STEP MARKERS (pattern columns 4-35)
+    // ========================================================================
+    // Cols 0-3: Track control column headers (dark)
+    for (let c = 0; c < 4; c++) {
+      grid[1][c] = { color: '#222', action: null, baseColor: '#222' };
     }
-
-    // Row 1: Step markers
+    
+    // Cols 4-35: Step markers (32 steps, no gaps for iOS parity)
     for (let s = 0; s < patternLength; s++) {
-      const col = 5 + s + Math.floor(s / 8);
-      if (col < COLS) {
+      const col = 4 + s;  // Pattern starts at column 4
+      if (col <= 35) {
         const isBeat = s % 4 === 0;
         const isBar = s % 8 === 0;
         const isPulse = s === pulseStep;
@@ -1163,12 +1198,16 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         grid[1][col] = { color, action: null, baseColor: '#555' };
       }
     }
-
-    for (let c = 0; c < 5; c++) {
-      grid[1][c] = { color: '#222', action: null, baseColor: '#222' };
+    
+    // Cols 36-43: Section column headers
+    for (let sec = 0; sec < 8; sec++) {
+      const col = 36 + sec;
+      grid[1][col] = { color: '#333', action: `section_header_${sec}`, baseColor: '#555' };
     }
 
-    // Track grids
+    // ========================================================================
+    // TRACK GRIDS (rows 2-21)
+    // ========================================================================
     const trackRows: { track: TrackType; start: number; height: number }[] = [
       { track: 'melody', start: 2, height: 6 },
       { track: 'chords', start: 8, height: 6 },
@@ -1184,11 +1223,17 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         const intensity = 1 - (r - start) / height * 0.5;
         const baseColor = TRACK_COLORS[track];
         const alpha = isMuted ? '33' : (isSoloed ? 'ff' : Math.round(intensity * 200).toString(16).padStart(2, '0'));
+        
+        // Column 0: Mute button
         grid[r][0] = { color: `${baseColor}${alpha}`, action: `mute_${track}`, baseColor };
+        
+        // Column 1: Solo button
         grid[r][1] = { color: isSoloed ? '#fff' : '#333', action: `solo_${track}`, baseColor: '#fff' };
+        
+        // Column 2: TX indicator (MIDI transmit activity)
         grid[r][2] = { color: '#111', action: null, baseColor: '#111' };
         
-        // Column 3: Version-dependent rendering
+        // Column 3: Version-dependent interval mode indicator
         const localRow = r - start;
         if (isV2OrHigher && track !== 'rhythm') {
           try {
@@ -1216,8 +1261,8 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
               const pitchClass = currentIntervalMode.getPitchClassForRow(localRow, height);
               const noteColor = NOTE_COLORS[pitchClass];
               
-              // Show note color (50% alpha for normal, 35% alpha during selection - more visible)
-              const alpha = isSelecting ? '59' : '80';  // More visible indicator colors
+              // Show note color (50% alpha for normal, 35% alpha during selection)
+              const alpha = isSelecting ? '59' : '80';
               grid[r][3] = { 
                 color: `${noteColor}${alpha}`,
                 action: `interval_mode_${track}`, 
@@ -1236,33 +1281,11 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
           grid[r][3] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
         }
         
-        // Column 4: Set indicator (v3+ only, not rhythm track)
-        if (isV3OrHigher && track !== 'rhythm') {
-          // Show dots at bottom of track for set indicator
-          // (currentSet and indicator display will be added in v3)
-          // Bass (4 rows): bottom row only
-          // Melody/Chords (6 rows): bottom 2 rows
-          const showIndicator = track === 'bass' 
-            ? localRow === height - 1 
-            : localRow >= height - 2;
-          
-          if (showIndicator) {
-            // Dim gray dots
-            const dotColor = '#555555';
-            grid[r][4] = {
-              color: dotColor,
-              action: `set_toggle_${track}`,
-              baseColor: dotColor
-            };
-          } else {
-            grid[r][4] = { color: '#0a0a0a', action: `set_toggle_${track}`, baseColor: '#0a0a0a' };
-          }
-        } else {
-          // V1/V2 or rhythm: Column 4 is dark/unused
-          grid[r][4] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
-        }
+        // NOTE: In iOS layout, column 4 is first pattern step, NOT set toggle
+        // Set toggle is accessed via column 3 hold gesture in v3+
       }
 
+      // Render pattern grid for this track
       for (let localRow = 0; localRow < height; localRow++) {
         const row = start + localRow;
         const noteBase = Math.round((height - 1 - localRow) / (height - 1) * 11);
@@ -1285,10 +1308,10 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
           }
         }
 
+        // Pattern columns 4-35 (32 steps, no gaps for iOS parity)
         for (let step = 0; step < patternLength; step++) {
-          // Start grid at column 5 to accommodate columns 0-4 (mute/solo/VU/mode/set)
-          const col = 5 + step + Math.floor(step / 8);
-          if (col >= COLS) continue;
+          const col = 4 + step;  // Pattern starts at column 4
+          if (col > 35) continue;
 
           const noteStart = Math.max(0, noteBase - 1);
           const noteEnd = Math.min(11, noteBase + 1);
@@ -1398,23 +1421,44 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
             baseColor,
           };
         }
+        
+        // Section columns 36-43: Section thumbnails for each track row
+        for (let sec = 0; sec < 8; sec++) {
+          const col = 36 + sec;
+          // For now, show section placeholder (will be enhanced with actual section data)
+          // Use track color with low alpha for section thumbnails
+          const sectionColor = `${TRACK_COLORS[track]}33`;
+          grid[row][col] = {
+            color: sectionColor,
+            action: `section_${sec}_${track}_${localRow}`,
+            baseColor: TRACK_COLORS[track]
+          };
+        }
       }
     });
 
-    // Bottom overview rows
+    // ========================================================================
+    // ROW 22: KEY AUTOMATION INDICATORS (iOS parity)
+    // ========================================================================
+    // Cols 0-3: Control area (dark)
+    for (let c = 0; c < 4; c++) {
+      grid[22][c] = { color: '#222', action: null, baseColor: '#222' };
+    }
+    
+    // Cols 4-35: Key automation markers (show root note colors where automation exists)
+    // For now, show overview of pattern activity with potential key changes
     for (let step = 0; step < patternLength; step++) {
-      const col = 5 + step + Math.floor(step / 8);
-      if (col >= COLS) continue;
+      const col = 4 + step;
+      if (col > 35) continue;
 
+      // Find if any track has notes at this step
       let activeTrack: TrackType | null = null;
-      let activeNote = 0;
       for (const track of TRACK_ORDER) {
         const isMutedTrack = muted[track] || (soloed !== null && soloed !== track);
         if (isMutedTrack) continue;
         for (let n = 0; n < 12; n++) {
           if (tracks[track][n][step] > 0) {
             activeTrack = track;
-            activeNote = n;
             break;
           }
         }
@@ -1422,13 +1466,87 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       }
 
       const isPlayhead = step === currentStep && isPlaying;
-      grid[22][col] = { color: activeTrack ? TRACK_COLORS[activeTrack] : (isPlayhead ? '#222' : '#0a0a0a'), action: null, baseColor: activeTrack ? TRACK_COLORS[activeTrack] : '#0a0a0a' };
-      grid[23][col] = { color: activeTrack ? NOTE_COLORS[activeNote % 12] : '#050505', action: null, baseColor: activeTrack ? NOTE_COLORS[activeNote % 12] : '#050505' };
+      // Show key automation area - colored by root note, with activity indicator
+      const keyColor = activeTrack ? NOTE_COLORS[rootNote] : '#0a0a0a';
+      const keyAlpha = activeTrack ? '66' : (isPlayhead ? '22' : '0a');
+      grid[22][col] = { 
+        color: activeTrack ? `${keyColor}${keyAlpha}` : (isPlayhead ? '#1a1a1a' : '#0a0a0a'), 
+        action: `key_auto_${step}`, 
+        baseColor: NOTE_COLORS[rootNote] 
+      };
+    }
+    
+    // Cols 36-43: Section indicators for row 22
+    for (let sec = 0; sec < 8; sec++) {
+      const col = 36 + sec;
+      grid[22][col] = { 
+        color: '#333', 
+        action: `section_indicator_${sec}`, 
+        baseColor: '#555' 
+      };
     }
 
-    for (let c = 0; c < 5; c++) {
-      grid[22][c] = { color: '#222', action: null, baseColor: '#222' };
-      grid[23][c] = { color: '#111', action: null, baseColor: '#111' };
+    // ========================================================================
+    // ROW 23: BOTTOM CONTROL BAR (iOS parity layout)
+    // ========================================================================
+    // Cols 0-3: WLED button (gradient, 4 cols)
+    const wledGradient = ['#ff0000', '#ff8800', '#ffff00', '#00ff00'];
+    for (let c = 0; c <= 3; c++) {
+      grid[23][c] = { color: wledGradient[c], action: 'wled', baseColor: wledGradient[c] };
+    }
+    
+    // Col 4: Gap
+    grid[23][4] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
+    
+    // Cols 5-7: Link button (Ableton Link, 3 cols) - cyan color
+    for (let c = 5; c <= 7; c++) {
+      grid[23][c] = { color: '#00aaaa', action: 'link', baseColor: '#00ffff' };
+    }
+    
+    // Col 8: Gap
+    grid[23][8] = { color: '#0a0a0a', action: null, baseColor: '#0a0a0a' };
+    
+    // Cols 9-10: Mode button (2 cols)
+    grid[23][9] = { color: '#666', action: 'mode', baseColor: '#888' };
+    grid[23][10] = { color: '#666', action: 'mode', baseColor: '#888' };
+    
+    // Cols 11-14: Play/Stop button (4 cols, matches iOS)
+    const playColor = isPlaying ? '#ff4444' : '#44ff44';
+    for (let c = 11; c <= 14; c++) {
+      grid[23][c] = { color: playColor, action: 'togglePlay', baseColor: playColor };
+    }
+    
+    // Cols 15-35: Pattern overview (note colors per step)
+    for (let step = 0; step < patternLength; step++) {
+      const col = 15 + step;
+      if (col > 35) continue;
+
+      // Find active note at this step for overview
+      let activeNote = -1;
+      for (const track of TRACK_ORDER) {
+        const isMutedTrack = muted[track] || (soloed !== null && soloed !== track);
+        if (isMutedTrack) continue;
+        for (let n = 0; n < 12; n++) {
+          if (tracks[track][n][step] > 0) {
+            activeNote = n;
+            break;
+          }
+        }
+        if (activeNote >= 0) break;
+      }
+
+      const isPlayhead = step === currentStep && isPlaying;
+      const overviewColor = activeNote >= 0 ? NOTE_COLORS[activeNote % 12] : (isPlayhead ? '#222' : '#0a0a0a');
+      grid[23][col] = { color: overviewColor, action: null, baseColor: overviewColor };
+    }
+    
+    // Cols 36-37: Section play button
+    grid[23][36] = { color: '#44aa44', action: 'section_play', baseColor: '#66ff66' };
+    grid[23][37] = { color: '#44aa44', action: 'section_play', baseColor: '#66ff66' };
+    
+    // Cols 38-43: Clear all sections button
+    for (let c = 38; c <= 43; c++) {
+      grid[23][c] = { color: '#662222', action: 'clearSections', baseColor: '#ff4444' };
     }
 
     // Apply tooltip
@@ -1521,10 +1639,9 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         return;
       }
 
-      let step = col - 5;
-      if (step >= 8) step -= 1;
-      if (step >= 16) step -= 1;
-      if (step >= 24) step -= 1;
+      // iOS parity: Pattern columns are 4-35 (no gaps)
+      const step = col - 4;
+      if (step < 0 || step >= 32) return;
 
       setTracks(prev => {
         const newTracks = { ...prev };
@@ -1545,10 +1662,8 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
 
     const track = getTrackForRow(row);
     if (track) {
-      let step = col - 5;
-      if (step >= 8) step -= 1;
-      if (step >= 16) step -= 1;
-      if (step >= 24) step -= 1;
+      // iOS parity: Pattern columns are 4-35 (no gaps)
+      const step = col - 4;
 
       if (step >= 0 && step < 32) {
         const note = getNoteForRow(row, track);
@@ -1572,10 +1687,8 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     const track = getTrackForRow(row);
     if (track !== gesture.track) return;
 
-    let step = col - 5;
-    if (step >= 8) step -= 1;
-    if (step >= 16) step -= 1;
-    if (step >= 24) step -= 1;
+    // iOS parity: Pattern columns are 4-35 (no gaps)
+    const step = col - 4;
 
     if (step < 0 || step >= 32) return;
 
@@ -1600,7 +1713,8 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     if (swipeStartRef.current) {
       const duration = now - swipeStartRef.current.time;
       const startCol = swipeStartRef.current.col;
-      const endCol = gesture ? (5 + gesture.currentStep + Math.floor(gesture.currentStep / 8)) : startCol;
+      // iOS parity: Pattern columns are 4-35 (no gaps)
+      const endCol = gesture ? (4 + gesture.currentStep) : startCol;
 
       const doubleSwipe = detectDoubleSwipe(startCol, endCol, duration);
       if (doubleSwipe === 'left') {
@@ -1676,26 +1790,8 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       }
     }
     
-    // V3+: Column 4 tap gesture for set toggling
-    if (isV3OrHigher && pixel.col === 4) {
-      // Determine which track this row belongs to
-      let track: 'melody' | 'chords' | 'bass' | null = null;
-      
-      if (pixel.row >= 2 && pixel.row <= 7) {
-        track = 'melody';
-      } else if (pixel.row >= 8 && pixel.row <= 13) {
-        track = 'chords';
-      } else if (pixel.row >= 14 && pixel.row <= 17) {
-        track = 'bass';
-      }
-      
-      if (track) {
-        setToggle.toggleSet(track);
-        const setNum = setToggle.currentSets[track];
-        showTooltip(`${track}_set_${setNum}`);
-        return;  // Don't process other actions
-      }
-    }
+    // NOTE: In iOS parity layout, column 4 is the first pattern step (not set toggle)
+    // Set toggling is accessed via column 3 long-press or a future gesture
 
     const grid = getPixelGrid();
     const action = grid[pixel.row][pixel.col].action;
@@ -1705,7 +1801,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     } else {
       startGesture(pixel.row, pixel.col);
     }
-  }, [getPixelFromEvent, getPixelGrid, handleAction, startGesture, resetShake, initAudio, isV2OrHigher, melodyInterval, chordsInterval, bassInterval, intervalModeSelection]);
+  }, [getPixelFromEvent, getPixelGrid, handleAction, startGesture, resetShake, initAudio, isV2OrHigher, isV3OrHigher, melodyInterval, chordsInterval, bassInterval, intervalModeSelection, setToggle, showTooltip]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     const pixel = getPixelFromEvent(e, true);
@@ -1751,24 +1847,8 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       }
     }
     
-    // V3+: Column 4 tap gesture for set toggling
-    if (isV3OrHigher && col === 4) {
-      // Determine which track this row belongs to
-      let track: TrackType | null = null;
-      
-      if (row >= 2 && row <= 7) {
-        track = 'melody';
-      } else if (row >= 8 && row <= 13) {
-        track = 'chords';
-      } else if (row >= 14 && row <= 17) {
-        track = 'bass';
-      }
-      
-      if (track) {
-        setToggle.toggleSet(track);
-        return;  // Don't process other actions
-      }
-    }
+    // NOTE: In iOS parity layout, column 4 is the first pattern step (not set toggle)
+    // Set toggling is accessed via column 3 long-press or a future gesture
     
     const grid = getPixelGrid();
     const action = grid[row][col].action;
@@ -1778,7 +1858,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     } else {
       startGesture(row, col);
     }
-  }, [getPixelGrid, handleAction, startGesture, resetShake, initAudio, isV2OrHigher, melodyInterval, chordsInterval, bassInterval, intervalModeSelection]);
+  }, [getPixelGrid, handleAction, startGesture, resetShake, initAudio, isV2OrHigher, isV3OrHigher, melodyInterval, chordsInterval, bassInterval, intervalModeSelection]);
 
   const handleMouseMove = useCallback((row: number, col: number) => {
     if (gesture || touchStartRef.current) {
