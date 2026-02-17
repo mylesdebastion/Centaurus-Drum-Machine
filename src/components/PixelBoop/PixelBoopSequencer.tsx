@@ -4,10 +4,6 @@ import { ViewTemplate } from '../Layout/ViewTemplate';
 import { pixelboopSessionService } from '@/services/pixelboopSession';
 import type { PatternEditDelta } from '@/types/pixelboopSession';
 import { useIntervalMode } from '@/hooks/useIntervalMode';
-import { IntervalModeSelector } from './IntervalModeSelector';
-import { RootNoteControl } from './RootNoteControl';
-import { ScaleSelector } from './ScaleSelector';
-import type { IntervalModeType } from '@/lib/intervalMode';
 
 // ============================================================================
 // TYPES
@@ -1202,9 +1198,43 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         };
       }
     });
+    
+    // Row 22: Interval mode controls (integrated into grid like iOS)
+    // Melody interval mode (left side)
+    const melodyModeColors = ['#f7dc6f22', '#f7dc6f44', '#f7dc6f66', '#f7dc6f88', '#f7dc6faa', '#f7dc6f'];
+    const melodyModeIndex = ['thirds', 'fourths', 'fifths', 'sevenths', 'ninths', 'chromatic'].indexOf(melodyInterval.intervalMode);
+    for (let i = 0; i < 6; i++) {
+      grid[22][i] = { 
+        color: i === melodyModeIndex ? melodyModeColors[5] : melodyModeColors[i], 
+        action: `melody_interval_${i}`, 
+        baseColor: melodyModeColors[5] 
+      };
+    }
+    
+    // Chords interval mode (middle)
+    const chordsModeColors = ['#4ecdc422', '#4ecdc444', '#4ecdc466', '#4ecdc488', '#4ecdc4aa', '#4ecdc4'];
+    const chordsModeIndex = ['thirds', 'fourths', 'fifths', 'sevenths', 'ninths', 'chromatic'].indexOf(chordsInterval.intervalMode);
+    for (let i = 0; i < 6; i++) {
+      grid[22][7 + i] = { 
+        color: i === chordsModeIndex ? chordsModeColors[5] : chordsModeColors[i], 
+        action: `chords_interval_${i}`, 
+        baseColor: chordsModeColors[5] 
+      };
+    }
+    
+    // Bass interval mode (right side)
+    const bassModeColors = ['#45b7d122', '#45b7d144', '#45b7d166', '#45b7d188', '#45b7d1aa', '#45b7d1'];
+    const bassModeIndex = ['thirds', 'fourths', 'fifths', 'sevenths', 'ninths', 'chromatic'].indexOf(bassInterval.intervalMode);
+    for (let i = 0; i < 6; i++) {
+      grid[22][14 + i] = { 
+        color: i === bassModeIndex ? bassModeColors[5] : bassModeColors[i], 
+        action: `bass_interval_${i}`, 
+        baseColor: bassModeColors[5] 
+      };
+    }
 
     return grid;
-  }, [tracks, currentStep, isPlaying, scale, rootNote, isInScale, gesturePreview, muted, soloed, showGhosts, pulseStep, bpm, patternLength, history, historyIndex, tooltipPixels, isShaking, shakeDirectionChanges]);
+  }, [tracks, currentStep, isPlaying, scale, rootNote, isInScale, gesturePreview, muted, soloed, showGhosts, pulseStep, bpm, patternLength, history, historyIndex, tooltipPixels, isShaking, shakeDirectionChanges, melodyInterval, chordsInterval, bassInterval]);
 
   // ============================================================================
   // ACTION HANDLER
@@ -1253,8 +1283,23 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       toggleSolo(action.split('_')[1] as TrackType);
     } else if (action === 'clearAll') {
       clearAll();
+    } else if (action.startsWith('melody_interval_')) {
+      const modes: ('thirds' | 'fourths' | 'fifths' | 'sevenths' | 'ninths' | 'chromatic')[] = 
+        ['thirds', 'fourths', 'fifths', 'sevenths', 'ninths', 'chromatic'];
+      const index = parseInt(action.split('_')[2]);
+      melodyInterval.setIntervalMode(modes[index]);
+    } else if (action.startsWith('chords_interval_')) {
+      const modes: ('thirds' | 'fourths' | 'fifths' | 'sevenths' | 'ninths' | 'chromatic')[] = 
+        ['thirds', 'fourths', 'fifths', 'sevenths', 'ninths', 'chromatic'];
+      const index = parseInt(action.split('_')[2]);
+      chordsInterval.setIntervalMode(modes[index]);
+    } else if (action.startsWith('bass_interval_')) {
+      const modes: ('thirds' | 'fourths' | 'fifths' | 'sevenths' | 'ninths' | 'chromatic')[] = 
+        ['thirds', 'fourths', 'fifths', 'sevenths', 'ninths', 'chromatic'];
+      const index = parseInt(action.split('_')[2]);
+      bassInterval.setIntervalMode(modes[index]);
     }
-  }, [undo, redo, clearAll, showTooltip, togglePlay, initAudio]);
+  }, [undo, redo, clearAll, showTooltip, togglePlay, initAudio, melodyInterval, chordsInterval, bassInterval]);
 
   // ============================================================================
   // GESTURE HANDLERS
@@ -1913,14 +1958,14 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   const gridContent = (
     <>
       {/* Info bar */}
-      <div className={`flex items-center gap-3 mb-3 text-xs text-gray-400 flex-wrap justify-center ${isFullscreen ? 'mt-2' : ''}`}>
+      <div className={`flex items-center gap-2 mb-2 text-xs text-gray-400 flex-wrap justify-center ${isFullscreen ? 'mt-2' : ''}`}>
         <span style={{ color: NOTE_COLORS[rootNote] }}>{NOTE_NAMES[rootNote]}</span>
         <span className="text-orange-400">{scale}</span>
         <span className="text-red-400">{bpm}bpm</span>
         <span className="text-purple-400">{patternLength}st</span>
-        <span className="text-blue-300">M:{melodyInterval.displayName}</span>
-        <span className="text-cyan-300">C:{chordsInterval.displayName}</span>
-        <span className="text-teal-300">B:{bassInterval.displayName}</span>
+        <span className="text-blue-300">{melodyInterval.displayName}</span>
+        <span className="text-cyan-300">{chordsInterval.displayName}</span>
+        <span className="text-teal-300">{bassInterval.displayName}</span>
         {isShaking && <span className="text-yellow-400 animate-pulse">~SHAKE~</span>}
 
         {/* Fullscreen toggle button */}
@@ -1936,76 +1981,6 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
           )}
         </button>
       </div>
-      
-      {/* Interval Mode Controls (collapsed by default, expandable) */}
-      {!isFullscreen && (
-        <div className="mb-3 w-full max-w-4xl px-4">
-          <details className="bg-gray-800/50 rounded-lg p-3">
-            <summary className="cursor-pointer text-sm text-gray-300 font-semibold mb-2">
-              🎹 Harmonic Controls (Interval Modes)
-            </summary>
-            <div className="mt-3 space-y-4">
-              {/* Melody Track */}
-              <div className="border-l-4 border-yellow-500/50 pl-3">
-                <h4 className="text-xs font-bold text-yellow-400 mb-2">MELODY TRACK</h4>
-                <div className="flex gap-4 flex-wrap">
-                  <div className="flex-1 min-w-[200px]">
-                    <IntervalModeSelector 
-                      currentMode={melodyInterval.intervalMode}
-                      onModeChange={(mode: IntervalModeType) => melodyInterval.setIntervalMode(mode)}
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              {/* Chords Track */}
-              <div className="border-l-4 border-cyan-500/50 pl-3">
-                <h4 className="text-xs font-bold text-cyan-400 mb-2">CHORDS TRACK</h4>
-                <div className="flex gap-4 flex-wrap">
-                  <div className="flex-1 min-w-[200px]">
-                    <IntervalModeSelector 
-                      currentMode={chordsInterval.intervalMode}
-                      onModeChange={(mode: IntervalModeType) => chordsInterval.setIntervalMode(mode)}
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              {/* Bass Track */}
-              <div className="border-l-4 border-teal-500/50 pl-3">
-                <h4 className="text-xs font-bold text-teal-400 mb-2">BASS TRACK</h4>
-                <div className="flex gap-4 flex-wrap">
-                  <div className="flex-1 min-w-[200px]">
-                    <IntervalModeSelector 
-                      currentMode={bassInterval.intervalMode}
-                      onModeChange={(mode: IntervalModeType) => bassInterval.setIntervalMode(mode)}
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              {/* Global Controls */}
-              <div className="border-t border-gray-700 pt-3 mt-3">
-                <h4 className="text-xs font-bold text-gray-300 mb-3">GLOBAL SETTINGS</h4>
-                <div className="flex gap-4 flex-wrap">
-                  <div className="flex-1 min-w-[200px]">
-                    <RootNoteControl 
-                      rootNote={rootNote}
-                      onRootNoteChange={setRootNote}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-[200px]">
-                    <ScaleSelector 
-                      scale={scale}
-                      onScaleChange={setScale}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </details>
-        </div>
-      )}
 
       {/* Main grid */}
       <div
