@@ -1160,6 +1160,17 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
         const row = start + localRow;
         const noteBase = Math.round((height - 1 - localRow) / (height - 1) * 11);
 
+        // Calculate what pitch class this row represents (for coloring)
+        let rowPitchClass = noteBase % 12;  // Default v1 behavior
+        if (isV2OrHigher && track !== 'rhythm') {
+          // V2+: Use interval mode to determine pitch class for this row
+          let currentIntervalMode = melodyInterval;
+          if (track === 'chords') currentIntervalMode = chordsInterval;
+          else if (track === 'bass') currentIntervalMode = bassInterval;
+          
+          rowPitchClass = currentIntervalMode.getPitchClassForRow(localRow, height);
+        }
+
         for (let step = 0; step < patternLength; step++) {
           const col = 4 + step + Math.floor(step / 8);
           if (col >= COLS) continue;
@@ -1229,7 +1240,8 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
           let color = '#0a0a0a';
           let baseColor = '#0a0a0a';
           if (velocity > 0) {
-            const noteColor = NOTE_COLORS[activeNote % 12];
+            // Use the row's pitch class (based on interval mode in v2+) for coloring
+            const noteColor = NOTE_COLORS[rowPitchClass];
             if (velocity === 2) {
               color = noteColor;
             } else if (velocity === 3) {
