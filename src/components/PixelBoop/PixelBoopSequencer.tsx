@@ -4,8 +4,8 @@ import { ViewTemplate } from '../Layout/ViewTemplate';
 import { pixelboopSessionService } from '@/services/pixelboopSession';
 import type { PatternEditDelta } from '@/types/pixelboopSession';
 import { useIntervalMode } from '@/hooks/useIntervalMode';
-import { useIntervalModeSelection, type TrackType as IntervalTrackType } from '@/hooks/useIntervalModeSelection';
-import type { IntervalModeType } from '@/lib/intervalMode';
+// import { useIntervalModeSelection, type TrackType as IntervalTrackType } from '@/hooks/useIntervalModeSelection';
+// import type { IntervalModeType } from '@/lib/intervalMode';
 
 // ============================================================================
 // TYPES
@@ -281,6 +281,8 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   const bassInterval = useIntervalMode('thirds', rootNote, scale);
   
   // Interval mode selection controller (for column 3 hold gesture)
+  // TODO: Wire this up to grid rendering and touch handlers (see docs/INTERVAL-MODE-PORT-STATUS.md)
+  /*
   const intervalModeSelection = useIntervalModeSelection(
     // onModeConfirmed
     (track: IntervalTrackType, mode: IntervalModeType) => {
@@ -295,6 +297,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     // onCancelled
     undefined
   );
+  */
   
   // Sync interval modes with root/scale changes
   useEffect(() => {
@@ -1267,23 +1270,9 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
       toggleSolo(action.split('_')[1] as TrackType);
     } else if (action === 'clearAll') {
       clearAll();
-    } else if (action.startsWith('melody_interval_')) {
-      const modes: ('thirds' | 'fourths' | 'fifths' | 'sevenths' | 'ninths' | 'chromatic')[] = 
-        ['thirds', 'fourths', 'fifths', 'sevenths', 'ninths', 'chromatic'];
-      const index = parseInt(action.split('_')[2]);
-      melodyInterval.setIntervalMode(modes[index]);
-    } else if (action.startsWith('chords_interval_')) {
-      const modes: ('thirds' | 'fourths' | 'fifths' | 'sevenths' | 'ninths' | 'chromatic')[] = 
-        ['thirds', 'fourths', 'fifths', 'sevenths', 'ninths', 'chromatic'];
-      const index = parseInt(action.split('_')[2]);
-      chordsInterval.setIntervalMode(modes[index]);
-    } else if (action.startsWith('bass_interval_')) {
-      const modes: ('thirds' | 'fourths' | 'fifths' | 'sevenths' | 'ninths' | 'chromatic')[] = 
-        ['thirds', 'fourths', 'fifths', 'sevenths', 'ninths', 'chromatic'];
-      const index = parseInt(action.split('_')[2]);
-      bassInterval.setIntervalMode(modes[index]);
     }
-  }, [undo, redo, clearAll, showTooltip, togglePlay, initAudio, melodyInterval, chordsInterval, bassInterval]);
+    // TODO: Add interval mode handlers for column 3 hold gesture (see docs/INTERVAL-MODE-PORT-STATUS.md)
+  }, [undo, redo, clearAll, showTooltip, togglePlay, initAudio]);
 
   // ============================================================================
   // GESTURE HANDLERS
