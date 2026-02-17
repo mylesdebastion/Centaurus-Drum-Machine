@@ -1533,6 +1533,29 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     touchStartRef.current = { ...pixel, time: Date.now() };
     resetShake();
 
+    // V2+: Column 3 hold gesture for interval mode selection
+    if (isV2OrHigher && pixel.col === 3) {
+      // Determine which track this row belongs to
+      let track: 'melody' | 'chords' | 'bass' | null = null;
+      let currentMode: IntervalModeType = 'thirds';
+      
+      if (pixel.row >= 2 && pixel.row <= 7) {
+        track = 'melody';
+        currentMode = melodyInterval.intervalMode;
+      } else if (pixel.row >= 8 && pixel.row <= 13) {
+        track = 'chords';
+        currentMode = chordsInterval.intervalMode;
+      } else if (pixel.row >= 14 && pixel.row <= 17) {
+        track = 'bass';
+        currentMode = bassInterval.intervalMode;
+      }
+      
+      if (track) {
+        intervalModeSelection.beginHold(track, currentMode);
+        return;  // Don't process other actions
+      }
+    }
+
     const grid = getPixelGrid();
     const action = grid[pixel.row][pixel.col].action;
 
@@ -1541,7 +1564,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     } else {
       startGesture(pixel.row, pixel.col);
     }
-  }, [getPixelFromEvent, getPixelGrid, handleAction, startGesture, resetShake, initAudio]);
+  }, [getPixelFromEvent, getPixelGrid, handleAction, startGesture, resetShake, initAudio, isV2OrHigher, melodyInterval, chordsInterval, bassInterval, intervalModeSelection]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     const pixel = getPixelFromEvent(e, true);
@@ -1550,14 +1573,43 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   }, [getPixelFromEvent, updateGesture]);
 
   const handleTouchEnd = useCallback(() => {
-    endGesture();
+    // V2+: End interval mode selection if active
+    if (intervalModeSelection.activeTrack) {
+      intervalModeSelection.endHold();
+    } else {
+      endGesture();
+    }
     touchStartRef.current = null;
-  }, [endGesture]);
+  }, [endGesture, intervalModeSelection]);
 
   // Mouse handlers
   const handleMouseDown = useCallback((row: number, col: number) => {
     initAudio();
     resetShake();
+    
+    // V2+: Column 3 hold gesture for interval mode selection
+    if (isV2OrHigher && col === 3) {
+      // Determine which track this row belongs to
+      let track: 'melody' | 'chords' | 'bass' | null = null;
+      let currentMode: IntervalModeType = 'thirds';
+      
+      if (row >= 2 && row <= 7) {
+        track = 'melody';
+        currentMode = melodyInterval.intervalMode;
+      } else if (row >= 8 && row <= 13) {
+        track = 'chords';
+        currentMode = chordsInterval.intervalMode;
+      } else if (row >= 14 && row <= 17) {
+        track = 'bass';
+        currentMode = bassInterval.intervalMode;
+      }
+      
+      if (track) {
+        intervalModeSelection.beginHold(track, currentMode);
+        return;  // Don't process other actions
+      }
+    }
+    
     const grid = getPixelGrid();
     const action = grid[row][col].action;
 
@@ -1566,7 +1618,7 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
     } else {
       startGesture(row, col);
     }
-  }, [getPixelGrid, handleAction, startGesture, resetShake, initAudio]);
+  }, [getPixelGrid, handleAction, startGesture, resetShake, initAudio, isV2OrHigher, melodyInterval, chordsInterval, bassInterval, intervalModeSelection]);
 
   const handleMouseMove = useCallback((row: number, col: number) => {
     if (gesture || touchStartRef.current) {
@@ -1575,8 +1627,13 @@ export const PixelBoopSequencer: React.FC<PixelBoopSequencerProps> = ({ onBack, 
   }, [gesture, updateGesture]);
 
   const handleMouseUp = useCallback(() => {
-    endGesture();
-  }, [endGesture]);
+    // V2+: End interval mode selection if active
+    if (intervalModeSelection.activeTrack) {
+      intervalModeSelection.endHold();
+    } else {
+      endGesture();
+    }
+  }, [endGesture, intervalModeSelection]);
 
   useEffect(() => {
     window.addEventListener('mouseup', handleMouseUp);
