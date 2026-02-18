@@ -254,43 +254,53 @@ export class ChordsSynth {
   }
 
   play(noteNumber: number, velocity: number): void {
-    const freq = Tone.Frequency(noteNumber, 'midi').toFrequency();
-    const velNorm = velocity / 127;
-    const now = Tone.now();
+    // Defensive checks
+    if (!this.masterGain || !Number.isFinite(noteNumber) || noteNumber < 0 || noteNumber > 127) {
+      console.warn('ChordsSynth.play: Invalid state or note', { noteNumber, velocity });
+      return;
+    }
 
-    // Stop any existing note at this pitch (for re-trigger)
-    this.stop(noteNumber);
+    try {
+      const freq = Tone.Frequency(noteNumber, 'midi').toFrequency();
+      const velNorm = velocity / 127;
+      const now = Tone.now();
 
-    // Track which synth is playing this note
-    const presetNames = ['pad', 'piano', 'rhodes', 'wurli', 'pluck', 'organ'];
-    this.activeNotes.set(noteNumber, presetNames[this.currentPreset]);
+      // Stop any existing note at this pitch (for re-trigger)
+      this.stop(noteNumber);
 
-    switch (this.currentPreset) {
-      case ChordPreset.Pad:
-        this.pad.triggerAttack(freq, now, velNorm);
-        break;
+      // Track which synth is playing this note
+      const presetNames = ['pad', 'piano', 'rhodes', 'wurli', 'pluck', 'organ'];
+      this.activeNotes.set(noteNumber, presetNames[this.currentPreset]);
 
-      case ChordPreset.Piano:
-        this.piano.triggerAttack(freq, now, velNorm);
-        break;
+      switch (this.currentPreset) {
+        case ChordPreset.Pad:
+          this.pad.triggerAttack(freq, now, velNorm);
+          break;
 
-      case ChordPreset.RhodesEP:
-        // Rhodes: velocity affects modulation index for bell/bark character
-        // This mimics iOS behavior where velocity affects FM modulation
-        this.rhodes.triggerAttack(freq, now, velNorm);
-        break;
+        case ChordPreset.Piano:
+          this.piano.triggerAttack(freq, now, velNorm);
+          break;
 
-      case ChordPreset.Wurlitzer:
-        this.wurlitzer.triggerAttack(freq, now, velNorm);
-        break;
+        case ChordPreset.RhodesEP:
+          // Rhodes: velocity affects modulation index for bell/bark character
+          // This mimics iOS behavior where velocity affects FM modulation
+          this.rhodes.triggerAttack(freq, now, velNorm);
+          break;
 
-      case ChordPreset.Pluck:
-        this.pluck.triggerAttack(freq, now, velNorm);
-        break;
+        case ChordPreset.Wurlitzer:
+          this.wurlitzer.triggerAttack(freq, now, velNorm);
+          break;
 
-      case ChordPreset.Organ:
-        this.organ.triggerAttack(freq, now, velNorm);
-        break;
+        case ChordPreset.Pluck:
+          this.pluck.triggerAttack(freq, now, velNorm);
+          break;
+
+        case ChordPreset.Organ:
+          this.organ.triggerAttack(freq, now, velNorm);
+          break;
+      }
+    } catch (e) {
+      console.warn('ChordsSynth.play: Audio trigger failed:', e);
     }
   }
 
@@ -298,41 +308,49 @@ export class ChordsSynth {
     const synthType = this.activeNotes.get(noteNumber);
     if (!synthType) return;
 
-    const freq = Tone.Frequency(noteNumber, 'midi').toFrequency();
-    const now = Tone.now();
+    try {
+      const freq = Tone.Frequency(noteNumber, 'midi').toFrequency();
+      const now = Tone.now();
 
-    switch (synthType) {
-      case 'pad':
-        this.pad.triggerRelease(freq, now);
-        break;
-      case 'piano':
-        this.piano.triggerRelease(freq, now);
-        break;
-      case 'rhodes':
-        this.rhodes.triggerRelease(freq, now);
-        break;
-      case 'wurli':
-        this.wurlitzer.triggerRelease(freq, now);
-        break;
-      case 'pluck':
-        this.pluck.triggerRelease(freq, now);
-        break;
-      case 'organ':
-        this.organ.triggerRelease(freq, now);
-        break;
+      switch (synthType) {
+        case 'pad':
+          this.pad.triggerRelease(freq, now);
+          break;
+        case 'piano':
+          this.piano.triggerRelease(freq, now);
+          break;
+        case 'rhodes':
+          this.rhodes.triggerRelease(freq, now);
+          break;
+        case 'wurli':
+          this.wurlitzer.triggerRelease(freq, now);
+          break;
+        case 'pluck':
+          this.pluck.triggerRelease(freq, now);
+          break;
+        case 'organ':
+          this.organ.triggerRelease(freq, now);
+          break;
+      }
+    } catch (e) {
+      console.warn('ChordsSynth.stop: Audio release failed:', e);
     }
 
     this.activeNotes.delete(noteNumber);
   }
 
   stopAll(): void {
-    const now = Tone.now();
-    this.pad.releaseAll(now);
-    this.piano.releaseAll(now);
-    this.rhodes.releaseAll(now);
-    this.wurlitzer.releaseAll(now);
-    this.pluck.releaseAll(now);
-    this.organ.releaseAll(now);
+    try {
+      const now = Tone.now();
+      this.pad.releaseAll(now);
+      this.piano.releaseAll(now);
+      this.rhodes.releaseAll(now);
+      this.wurlitzer.releaseAll(now);
+      this.pluck.releaseAll(now);
+      this.organ.releaseAll(now);
+    } catch (e) {
+      console.warn('ChordsSynth.stopAll: Audio release failed:', e);
+    }
     this.activeNotes.clear();
   }
 

@@ -150,38 +150,48 @@ export class BassSynth {
   }
 
   play(noteNumber: number, velocity: number): void {
-    const freq = Tone.Frequency(noteNumber, 'midi').toFrequency();
-    const velNorm = velocity / 127;
-    const now = Tone.now();
+    // Defensive checks
+    if (!this.masterGain || !Number.isFinite(noteNumber) || noteNumber < 0 || noteNumber > 127) {
+      console.warn('BassSynth.play: Invalid state or note', { noteNumber, velocity });
+      return;
+    }
 
-    // Stop any existing note at this pitch
-    this.stop(noteNumber);
+    try {
+      const freq = Tone.Frequency(noteNumber, 'midi').toFrequency();
+      const velNorm = velocity / 127;
+      const now = Tone.now();
 
-    // Track which synth is playing this note
-    const presetNames = ['acid', 'fm', 'saw', 'sub'];
-    this.activeNotes.set(noteNumber, presetNames[this.currentPreset]);
+      // Stop any existing note at this pitch
+      this.stop(noteNumber);
 
-    switch (this.currentPreset) {
-      case BassPreset.AcidBass:
-        // Velocity controls filter cutoff for acid character
-        const filterFreq = 400 + velNorm * 1500;
-        this.acidFilter.frequency.setValueAtTime(filterFreq, now);
-        this.acidBass.triggerAttack(freq, now, velNorm);
-        break;
+      // Track which synth is playing this note
+      const presetNames = ['acid', 'fm', 'saw', 'sub'];
+      this.activeNotes.set(noteNumber, presetNames[this.currentPreset]);
 
-      case BassPreset.FMBass:
-        // Velocity affects modulation index for brighter attack
-        this.fmBass.modulationIndex.value = 2 + velNorm * 3;
-        this.fmBass.triggerAttack(freq, now, velNorm);
-        break;
+      switch (this.currentPreset) {
+        case BassPreset.AcidBass:
+          // Velocity controls filter cutoff for acid character
+          const filterFreq = 400 + velNorm * 1500;
+          this.acidFilter.frequency.setValueAtTime(filterFreq, now);
+          this.acidBass.triggerAttack(freq, now, velNorm);
+          break;
 
-      case BassPreset.SawBass:
-        this.sawBass.triggerAttack(freq, now, velNorm);
-        break;
+        case BassPreset.FMBass:
+          // Velocity affects modulation index for brighter attack
+          this.fmBass.modulationIndex.value = 2 + velNorm * 3;
+          this.fmBass.triggerAttack(freq, now, velNorm);
+          break;
 
-      case BassPreset.SubBass:
-        this.subBass.triggerAttack(freq, now, velNorm);
-        break;
+        case BassPreset.SawBass:
+          this.sawBass.triggerAttack(freq, now, velNorm);
+          break;
+
+        case BassPreset.SubBass:
+          this.subBass.triggerAttack(freq, now, velNorm);
+          break;
+      }
+    } catch (e) {
+      console.warn('BassSynth.play: Audio trigger failed:', e);
     }
   }
 
@@ -189,32 +199,40 @@ export class BassSynth {
     const synthType = this.activeNotes.get(noteNumber);
     if (!synthType) return;
 
-    const now = Tone.now();
+    try {
+      const now = Tone.now();
 
-    switch (synthType) {
-      case 'acid':
-        this.acidBass.triggerRelease(now);
-        break;
-      case 'fm':
-        this.fmBass.triggerRelease(now);
-        break;
-      case 'saw':
-        this.sawBass.triggerRelease(now);
-        break;
-      case 'sub':
-        this.subBass.triggerRelease(now);
-        break;
+      switch (synthType) {
+        case 'acid':
+          this.acidBass.triggerRelease(now);
+          break;
+        case 'fm':
+          this.fmBass.triggerRelease(now);
+          break;
+        case 'saw':
+          this.sawBass.triggerRelease(now);
+          break;
+        case 'sub':
+          this.subBass.triggerRelease(now);
+          break;
+      }
+    } catch (e) {
+      console.warn('BassSynth.stop: Audio release failed:', e);
     }
 
     this.activeNotes.delete(noteNumber);
   }
 
   stopAll(): void {
-    const now = Tone.now();
-    this.acidBass.triggerRelease(now);
-    this.fmBass.triggerRelease(now);
-    this.sawBass.triggerRelease(now);
-    this.subBass.triggerRelease(now);
+    try {
+      const now = Tone.now();
+      this.acidBass.triggerRelease(now);
+      this.fmBass.triggerRelease(now);
+      this.sawBass.triggerRelease(now);
+      this.subBass.triggerRelease(now);
+    } catch (e) {
+      console.warn('BassSynth.stopAll: Audio release failed:', e);
+    }
     this.activeNotes.clear();
   }
 

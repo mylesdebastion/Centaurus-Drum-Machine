@@ -93,23 +93,27 @@ class AudioEngine {
       return;
     }
 
-    // Resume context if needed (handles browser autoplay restrictions)
-    if (Tone.context.state === 'suspended') {
-      Tone.start();
-    }
+    try {
+      // Resume context if needed (handles browser autoplay restrictions)
+      if (Tone.context.state === 'suspended') {
+        Tone.start();
+      }
 
-    switch (track) {
-      case 0: // Melody
-        this.melodySynth?.play(pitch, velocity);
-        break;
-      case 1: // Chords (using dedicated ChordsSynth with Rhodes etc.)
-        this.chordsSynth?.play(pitch, velocity);
-        break;
-      case 2: // Bass
-        this.bassSynth?.play(pitch, velocity);
-        break;
-      default:
-        console.warn(`AudioEngine: Invalid track ${track}`);
+      switch (track) {
+        case 0: // Melody
+          this.melodySynth?.play(pitch, velocity);
+          break;
+        case 1: // Chords (using dedicated ChordsSynth with Rhodes etc.)
+          this.chordsSynth?.play(pitch, velocity);
+          break;
+        case 2: // Bass
+          this.bassSynth?.play(pitch, velocity);
+          break;
+        default:
+          console.warn(`AudioEngine: Invalid track ${track}`);
+      }
+    } catch (e) {
+      console.error('AudioEngine.triggerNote failed:', e);
     }
   }
 
@@ -123,16 +127,20 @@ class AudioEngine {
       return;
     }
 
-    switch (track) {
-      case 0: // Melody
-        this.melodySynth?.stop(pitch);
-        break;
-      case 1: // Chords
-        this.chordsSynth?.stop(pitch);
-        break;
-      case 2: // Bass
-        this.bassSynth?.stop(pitch);
-        break;
+    try {
+      switch (track) {
+        case 0: // Melody
+          this.melodySynth?.stop(pitch);
+          break;
+        case 1: // Chords
+          this.chordsSynth?.stop(pitch);
+          break;
+        case 2: // Bass
+          this.bassSynth?.stop(pitch);
+          break;
+      }
+    } catch (e) {
+      console.error('AudioEngine.releaseNote failed:', e);
     }
   }
 
@@ -147,12 +155,16 @@ class AudioEngine {
       return;
     }
 
-    // Resume context if needed
-    if (Tone.context.state === 'suspended') {
-      Tone.start();
-    }
+    try {
+      // Resume context if needed
+      if (Tone.context.state === 'suspended') {
+        Tone.start();
+      }
 
-    this.drumSynth?.trigger(drumType as DrumType, velocity);
+      this.drumSynth?.trigger(drumType as DrumType, velocity);
+    } catch (e) {
+      console.error('AudioEngine.triggerDrum failed:', e);
+    }
   }
 
   /**
@@ -253,16 +265,20 @@ class AudioEngine {
       return;
     }
 
-    switch (track) {
-      case 0: // Melody
-        this.melodySynth?.stopAll();
-        break;
-      case 1: // Chords
-        this.chordsSynth?.stopAll();
-        break;
-      case 2: // Bass
-        this.bassSynth?.stopAll();
-        break;
+    try {
+      switch (track) {
+        case 0: // Melody
+          this.melodySynth?.stopAll();
+          break;
+        case 1: // Chords
+          this.chordsSynth?.stopAll();
+          break;
+        case 2: // Bass
+          this.bassSynth?.stopAll();
+          break;
+      }
+    } catch (e) {
+      console.error('AudioEngine.stopAllNotes failed:', e);
     }
   }
 

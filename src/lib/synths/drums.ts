@@ -210,102 +210,152 @@ export class DrumSynth {
   }
 
   trigger(drumType: DrumType, velocity: number): void {
-    const now = Tone.now();
-    const velNorm = velocity / 127;
+    // Defensive checks
+    if (!this.masterGain) {
+      console.warn('DrumSynth.trigger: Not initialized');
+      return;
+    }
 
-    switch (drumType) {
-      case DrumType.Kick:
-      case DrumType.Kick2:
-        this.triggerKick(now, velNorm, drumType === DrumType.Kick2);
-        break;
+    try {
+      const now = Tone.now();
+      const velNorm = velocity / 127;
 
-      case DrumType.LowTom:
-        this.triggerTom(now, velNorm);
-        break;
+      switch (drumType) {
+        case DrumType.Kick:
+        case DrumType.Kick2:
+          this.triggerKick(now, velNorm, drumType === DrumType.Kick2);
+          break;
 
-      case DrumType.Snare:
-      case DrumType.Snare2:
-        this.triggerSnare(now, velNorm);
-        break;
+        case DrumType.LowTom:
+          this.triggerTom(now, velNorm);
+          break;
 
-      case DrumType.Rimshot:
-        this.triggerRimshot(now, velNorm);
-        break;
+        case DrumType.Snare:
+        case DrumType.Snare2:
+          this.triggerSnare(now, velNorm);
+          break;
 
-      case DrumType.Clap:
-        this.triggerClap(now, velNorm);
-        break;
+        case DrumType.Rimshot:
+          this.triggerRimshot(now, velNorm);
+          break;
 
-      case DrumType.ClosedHat:
-        this.triggerClosedHat(now, velNorm);
-        break;
+        case DrumType.Clap:
+          this.triggerClap(now, velNorm);
+          break;
 
-      case DrumType.OpenHat:
-        this.triggerOpenHat(now, velNorm);
-        break;
+        case DrumType.ClosedHat:
+          this.triggerClosedHat(now, velNorm);
+          break;
 
-      case DrumType.Crash:
-        this.triggerCrash(now, velNorm);
-        break;
+        case DrumType.OpenHat:
+          this.triggerOpenHat(now, velNorm);
+          break;
 
-      case DrumType.Ride:
-        this.triggerRide(now, velNorm);
-        break;
+        case DrumType.Crash:
+          this.triggerCrash(now, velNorm);
+          break;
 
-      case DrumType.Cowbell:
-        this.triggerCowbell(now, velNorm);
-        break;
+        case DrumType.Ride:
+          this.triggerRide(now, velNorm);
+          break;
+
+        case DrumType.Cowbell:
+          this.triggerCowbell(now, velNorm);
+          break;
+      }
+    } catch (e) {
+      console.warn('DrumSynth.trigger: Audio trigger failed:', e);
     }
   }
 
   private triggerKick(time: number, velocity: number, alt: boolean = false): void {
-    // Alt kick is slightly higher pitched
-    const note = alt ? 'C2' : 'C1';
-    this.kick.triggerAttackRelease(note, '8n', time, velocity);
+    try {
+      // Alt kick is slightly higher pitched
+      const note = alt ? 'C2' : 'C1';
+      this.kick.triggerAttackRelease(note, '8n', time, velocity);
+    } catch (e) {
+      console.warn('DrumSynth.triggerKick failed:', e);
+    }
   }
 
   private triggerTom(time: number, velocity: number): void {
-    // Reuse kick with higher pitch for tom
-    this.kick.triggerAttackRelease('G2', '8n', time, velocity * 0.8);
+    try {
+      // Reuse kick with higher pitch for tom
+      this.kick.triggerAttackRelease('G2', '8n', time, velocity * 0.8);
+    } catch (e) {
+      console.warn('DrumSynth.triggerTom failed:', e);
+    }
   }
 
   private triggerSnare(time: number, velocity: number): void {
-    // Layer noise + tone for full snare
-    this.snareNoise.triggerAttackRelease('16n', time, velocity);
-    this.snareTone.triggerAttackRelease('E3', '16n', time, velocity * 0.7);
+    try {
+      // Layer noise + tone for full snare
+      this.snareNoise.triggerAttackRelease('16n', time, velocity);
+      this.snareTone.triggerAttackRelease('E3', '16n', time, velocity * 0.7);
+    } catch (e) {
+      console.warn('DrumSynth.triggerSnare failed:', e);
+    }
   }
 
   private triggerRimshot(time: number, velocity: number): void {
-    // High pitched short tone
-    this.snareTone.triggerAttackRelease('A4', '32n', time, velocity);
+    try {
+      // High pitched short tone
+      this.snareTone.triggerAttackRelease('A4', '32n', time, velocity);
+    } catch (e) {
+      console.warn('DrumSynth.triggerRimshot failed:', e);
+    }
   }
 
   private triggerClap(time: number, velocity: number): void {
-    // Multiple short bursts for clap character
-    this.clap.triggerAttackRelease('16n', time, velocity * 0.8);
-    this.clap.triggerAttackRelease('32n', time + 0.01, velocity * 0.6);
-    this.clap.triggerAttackRelease('32n', time + 0.02, velocity * 0.9);
+    try {
+      // Multiple short bursts for clap character
+      this.clap.triggerAttackRelease('16n', time, velocity * 0.8);
+      this.clap.triggerAttackRelease('32n', time + 0.01, velocity * 0.6);
+      this.clap.triggerAttackRelease('32n', time + 0.02, velocity * 0.9);
+    } catch (e) {
+      console.warn('DrumSynth.triggerClap failed:', e);
+    }
   }
 
   private triggerClosedHat(time: number, velocity: number): void {
-    this.closedHat.triggerAttackRelease('32n', time, velocity);
+    try {
+      this.closedHat.triggerAttackRelease('32n', time, velocity);
+    } catch (e) {
+      console.warn('DrumSynth.triggerClosedHat failed:', e);
+    }
   }
 
   private triggerOpenHat(time: number, velocity: number): void {
-    this.openHat.triggerAttackRelease('8n', time, velocity);
+    try {
+      this.openHat.triggerAttackRelease('8n', time, velocity);
+    } catch (e) {
+      console.warn('DrumSynth.triggerOpenHat failed:', e);
+    }
   }
 
   private triggerCrash(time: number, velocity: number): void {
-    this.cymbal.triggerAttackRelease('2n', time, velocity);
+    try {
+      this.cymbal.triggerAttackRelease('2n', time, velocity);
+    } catch (e) {
+      console.warn('DrumSynth.triggerCrash failed:', e);
+    }
   }
 
   private triggerRide(time: number, velocity: number): void {
-    // Shorter cymbal for ride
-    this.cymbal.triggerAttackRelease('8n', time, velocity * 0.7);
+    try {
+      // Shorter cymbal for ride
+      this.cymbal.triggerAttackRelease('8n', time, velocity * 0.7);
+    } catch (e) {
+      console.warn('DrumSynth.triggerRide failed:', e);
+    }
   }
 
   private triggerCowbell(time: number, velocity: number): void {
-    this.cowbell.triggerAttackRelease('16n', time, velocity);
+    try {
+      this.cowbell.triggerAttackRelease('16n', time, velocity);
+    } catch (e) {
+      console.warn('DrumSynth.triggerCowbell failed:', e);
+    }
   }
 
   dispose(): void {

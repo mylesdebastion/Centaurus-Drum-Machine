@@ -66,7 +66,7 @@ export class MelodySynth {
         release: 0.2,
       },
     });
-    this.glissLead.maxPolyphony = 6;
+    this.glissLead.maxPolyphony = 12;
     this.glissLead.volume.value = -8;
     this.glissLead.connect(this.delay);
 
@@ -89,7 +89,7 @@ export class MelodySynth {
         release: 0.5,
       },
     });
-    this.bell.maxPolyphony = 6;
+    this.bell.maxPolyphony = 12;
     this.bell.volume.value = -10;
     this.bell.connect(this.reverb); // More reverb for bell
 
@@ -103,7 +103,7 @@ export class MelodySynth {
         release: 0.25,
       },
     });
-    this.flute.maxPolyphony = 6;
+    this.flute.maxPolyphony = 12;
     this.flute.volume.value = -8;
     this.flute.connect(this.delay);
 
@@ -117,7 +117,7 @@ export class MelodySynth {
         release: 0.15,
       },
     });
-    this.squareLead.maxPolyphony = 6;
+    this.squareLead.maxPolyphony = 12;
     this.squareLead.volume.value = -12; // Squares are loud
     this.squareLead.connect(this.delay);
 
@@ -131,7 +131,7 @@ export class MelodySynth {
         release: 0.2,
       },
     });
-    this.pwm.maxPolyphony = 6;
+    this.pwm.maxPolyphony = 12;
     this.pwm.volume.value = -10;
     this.pwm.connect(this.delay);
 
@@ -154,7 +154,7 @@ export class MelodySynth {
         release: 0.1,
       },
     });
-    this.syncLead.maxPolyphony = 6;
+    this.syncLead.maxPolyphony = 12;
     this.syncLead.volume.value = -8;
     this.syncLead.connect(this.delay);
   }
@@ -179,41 +179,51 @@ export class MelodySynth {
   }
 
   play(noteNumber: number, velocity: number): void {
-    const freq = Tone.Frequency(noteNumber, 'midi').toFrequency();
-    const velNorm = velocity / 127;
-    const now = Tone.now();
+    // Defensive checks
+    if (!this.masterGain || !Number.isFinite(noteNumber) || noteNumber < 0 || noteNumber > 127) {
+      console.warn('MelodySynth.play: Invalid state or note', { noteNumber, velocity });
+      return;
+    }
 
-    // Stop any existing note at this pitch (for re-trigger)
-    this.stop(noteNumber);
+    try {
+      const freq = Tone.Frequency(noteNumber, 'midi').toFrequency();
+      const velNorm = velocity / 127;
+      const now = Tone.now();
 
-    // Track which synth is playing this note
-    const presetNames = ['gliss', 'bell', 'flute', 'square', 'pwm', 'sync'];
-    this.activeNotes.set(noteNumber, presetNames[this.currentPreset]);
+      // Stop any existing note at this pitch (for re-trigger)
+      this.stop(noteNumber);
 
-    switch (this.currentPreset) {
-      case MelodyPreset.GlissLead:
-        this.glissLead.triggerAttack(freq, now, velNorm);
-        break;
+      // Track which synth is playing this note
+      const presetNames = ['gliss', 'bell', 'flute', 'square', 'pwm', 'sync'];
+      this.activeNotes.set(noteNumber, presetNames[this.currentPreset]);
 
-      case MelodyPreset.Bell:
-        this.bell.triggerAttack(freq, now, velNorm);
-        break;
+      switch (this.currentPreset) {
+        case MelodyPreset.GlissLead:
+          this.glissLead.triggerAttack(freq, now, velNorm);
+          break;
 
-      case MelodyPreset.Flute:
-        this.flute.triggerAttack(freq, now, velNorm);
-        break;
+        case MelodyPreset.Bell:
+          this.bell.triggerAttack(freq, now, velNorm);
+          break;
 
-      case MelodyPreset.SquareLead:
-        this.squareLead.triggerAttack(freq, now, velNorm);
-        break;
+        case MelodyPreset.Flute:
+          this.flute.triggerAttack(freq, now, velNorm);
+          break;
 
-      case MelodyPreset.PWM:
-        this.pwm.triggerAttack(freq, now, velNorm);
-        break;
+        case MelodyPreset.SquareLead:
+          this.squareLead.triggerAttack(freq, now, velNorm);
+          break;
 
-      case MelodyPreset.SyncLead:
-        this.syncLead.triggerAttack(freq, now, velNorm);
-        break;
+        case MelodyPreset.PWM:
+          this.pwm.triggerAttack(freq, now, velNorm);
+          break;
+
+        case MelodyPreset.SyncLead:
+          this.syncLead.triggerAttack(freq, now, velNorm);
+          break;
+      }
+    } catch (e) {
+      console.warn('MelodySynth.play: Audio trigger failed:', e);
     }
   }
 
@@ -221,41 +231,49 @@ export class MelodySynth {
     const synthType = this.activeNotes.get(noteNumber);
     if (!synthType) return;
 
-    const freq = Tone.Frequency(noteNumber, 'midi').toFrequency();
-    const now = Tone.now();
+    try {
+      const freq = Tone.Frequency(noteNumber, 'midi').toFrequency();
+      const now = Tone.now();
 
-    switch (synthType) {
-      case 'gliss':
-        this.glissLead.triggerRelease(freq, now);
-        break;
-      case 'bell':
-        this.bell.triggerRelease(freq, now);
-        break;
-      case 'flute':
-        this.flute.triggerRelease(freq, now);
-        break;
-      case 'square':
-        this.squareLead.triggerRelease(freq, now);
-        break;
-      case 'pwm':
-        this.pwm.triggerRelease(freq, now);
-        break;
-      case 'sync':
-        this.syncLead.triggerRelease(freq, now);
-        break;
+      switch (synthType) {
+        case 'gliss':
+          this.glissLead.triggerRelease(freq, now);
+          break;
+        case 'bell':
+          this.bell.triggerRelease(freq, now);
+          break;
+        case 'flute':
+          this.flute.triggerRelease(freq, now);
+          break;
+        case 'square':
+          this.squareLead.triggerRelease(freq, now);
+          break;
+        case 'pwm':
+          this.pwm.triggerRelease(freq, now);
+          break;
+        case 'sync':
+          this.syncLead.triggerRelease(freq, now);
+          break;
+      }
+    } catch (e) {
+      console.warn('MelodySynth.stop: Audio release failed:', e);
     }
 
     this.activeNotes.delete(noteNumber);
   }
 
   stopAll(): void {
-    const now = Tone.now();
-    this.glissLead.releaseAll(now);
-    this.bell.releaseAll(now);
-    this.flute.releaseAll(now);
-    this.squareLead.releaseAll(now);
-    this.pwm.releaseAll(now);
-    this.syncLead.releaseAll(now);
+    try {
+      const now = Tone.now();
+      this.glissLead.releaseAll(now);
+      this.bell.releaseAll(now);
+      this.flute.releaseAll(now);
+      this.squareLead.releaseAll(now);
+      this.pwm.releaseAll(now);
+      this.syncLead.releaseAll(now);
+    } catch (e) {
+      console.warn('MelodySynth.stopAll: Audio release failed:', e);
+    }
     this.activeNotes.clear();
   }
 
