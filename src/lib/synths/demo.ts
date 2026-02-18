@@ -8,7 +8,7 @@
  * runAudioDemo();
  */
 
-import { audioEngine, MelodyPreset, BassPreset, DrumType } from '../audioEngine';
+import { audioEngine, MelodyPreset, BassPreset, ChordPreset, DrumType } from '../audioEngine';
 
 export async function runAudioDemo() {
   console.log('🎵 Audio Engine Demo Starting...');
@@ -55,8 +55,35 @@ export async function runAudioDemo() {
     await wait(200);
   }
 
-  // Demo 2: Bass Presets
-  console.log('\n🔊 Demo 2: Bass Presets (4 total)');
+  // Demo 2: Chord Presets (NEW - includes Rhodes!)
+  console.log('\n🎹 Demo 2: Chord Presets (6 total, including Rhodes EP)');
+  const chordPresets = [
+    { preset: ChordPreset.Pad, name: 'Pad' },
+    { preset: ChordPreset.Piano, name: 'Piano' },
+    { preset: ChordPreset.RhodesEP, name: 'Rhodes EP' },  // ⭐ NEW
+    { preset: ChordPreset.Wurlitzer, name: 'Wurlitzer' },
+    { preset: ChordPreset.Pluck, name: 'Pluck' },
+    { preset: ChordPreset.Organ, name: 'Organ' },
+  ];
+
+  for (const { preset, name } of chordPresets) {
+    console.log(`  Playing: ${name}`);
+    audioEngine.setChordPreset(preset);
+    
+    // Play a C major chord on chords track (track 1)
+    audioEngine.triggerNote(60, 100, 1); // C
+    audioEngine.triggerNote(64, 100, 1); // E
+    audioEngine.triggerNote(67, 100, 1); // G
+    await wait(800);
+    audioEngine.releaseNote(60, 1);
+    audioEngine.releaseNote(64, 1);
+    audioEngine.releaseNote(67, 1);
+    
+    await wait(300);
+  }
+
+  // Demo 3: Bass Presets
+  console.log('\n🔊 Demo 3: Bass Presets (4 total)');
   const bassPresets = [
     { preset: BassPreset.AcidBass, name: 'Acid Bass' },
     { preset: BassPreset.FMBass, name: 'FM Bass' },
@@ -80,8 +107,8 @@ export async function runAudioDemo() {
     await wait(200);
   }
 
-  // Demo 3: Acid Bass Velocity Sweep
-  console.log('\n🎛️  Demo 3: Acid Bass Filter Sweep (velocity-controlled)');
+  // Demo 4: Acid Bass Velocity Sweep
+  console.log('\n🎛️  Demo 4: Acid Bass Filter Sweep (velocity-controlled)');
   audioEngine.setBassPreset(BassPreset.AcidBass);
   
   for (let vel = 40; vel <= 120; vel += 20) {
@@ -92,8 +119,8 @@ export async function runAudioDemo() {
     await wait(50);
   }
 
-  // Demo 4: Drums
-  console.log('\n🥁 Demo 4: Drum Pattern');
+  // Demo 5: Drums
+  console.log('\n🥁 Demo 5: Drum Pattern');
   const pattern = [
     { drum: DrumType.Kick, name: 'Kick', beats: [0, 4, 8, 12] },
     { drum: DrumType.Snare, name: 'Snare', beats: [4, 12] },
@@ -110,8 +137,8 @@ export async function runAudioDemo() {
     await wait(150); // 400 BPM for demo
   }
 
-  // Demo 5: Polyphonic Chord
-  console.log('\n🎼 Demo 5: Polyphonic Chord (C Major)');
+  // Demo 6: Polyphonic Chord
+  console.log('\n🎼 Demo 6: Polyphonic Chord (C Major)');
   audioEngine.setMelodyPreset(MelodyPreset.Bell);
   
   // Trigger all notes simultaneously
@@ -142,6 +169,19 @@ export function testBassPreset(presetIndex: number) {
   audioEngine.setBassPreset(presetIndex);
   audioEngine.triggerNote(36, 120, 2);
   setTimeout(() => audioEngine.releaseNote(36, 2), 1000);
+}
+
+export function testChordPreset(presetIndex: number) {
+  audioEngine.setChordPreset(presetIndex);
+  // Play a chord on track 1
+  audioEngine.triggerNote(60, 100, 1); // C
+  audioEngine.triggerNote(64, 100, 1); // E
+  audioEngine.triggerNote(67, 100, 1); // G
+  setTimeout(() => {
+    audioEngine.releaseNote(60, 1);
+    audioEngine.releaseNote(64, 1);
+    audioEngine.releaseNote(67, 1);
+  }, 1500);
 }
 
 export function testDrum(drumType: DrumType) {

@@ -135,7 +135,13 @@ export class BassSynth {
   }
 
   setPreset(preset: BassPreset): void {
+    // Stop all notes before switching preset to avoid stuck notes (iOS parity)
+    this.stopAll();
     this.currentPreset = preset;
+  }
+
+  getPreset(): BassPreset {
+    return this.currentPreset;
   }
 
   setVolume(volume: number): void {

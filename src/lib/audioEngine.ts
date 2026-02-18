@@ -4,19 +4,29 @@
  * Main audio engine managing all synthesizers using Tone.js
  * 
  * Provides API for:
- * - Note triggering and release for melody/bass tracks
+ * - Note triggering and release for melody/bass/chords tracks
  * - Drum triggering
  * - Preset management
- * - Track volume control
+ * - Track volume control (matching iOS: 0.0-1.5 range)
  */
 
 import * as Tone from 'tone';
 import { MelodySynth, MelodyPreset } from './synths/melodySynth';
 import { BassSynth, BassPreset } from './synths/bassSynth';
+import { ChordsSynth, ChordPreset } from './synths/chordsSynth';
 import { DrumSynth, DrumType } from './synths/drums';
+
+// iOS-matching default track volumes
+const DEFAULT_TRACK_VOLUMES = {
+  melody: 1.0,
+  chords: 1.0,
+  bass: 0.85,
+  rhythm: 1.2,
+};
 
 class AudioEngine {
   private melodySynth: MelodySynth | null = null;
+  private chordsSynth: ChordsSynth | null = null;
   private bassSynth: BassSynth | null = null;
   private drumSynth: DrumSynth | null = null;
   private masterGain: Tone.Gain | null = null;
@@ -47,16 +57,24 @@ class AudioEngine {
 
       // Initialize synths
       this.melodySynth = new MelodySynth();
+      this.chordsSynth = new ChordsSynth();
       this.bassSynth = new BassSynth();
       this.drumSynth = new DrumSynth();
 
       // Connect synths to master
       this.melodySynth.connect(this.masterGain.input as unknown as AudioNode);
+      this.chordsSynth.connect(this.masterGain.input as unknown as AudioNode);
       this.bassSynth.connect(this.masterGain.input as unknown as AudioNode);
       this.drumSynth.connect(this.masterGain.input as unknown as AudioNode);
 
+      // Apply iOS-matching default track volumes
+      this.melodySynth.setVolume(DEFAULT_TRACK_VOLUMES.melody);
+      this.chordsSynth.setVolume(DEFAULT_TRACK_VOLUMES.chords);
+      this.bassSynth.setVolume(DEFAULT_TRACK_VOLUMES.bass);
+      this.drumSynth.setVolume(DEFAULT_TRACK_VOLUMES.rhythm);
+
       this.isInitialized = true;
-      console.log('AudioEngine: Initialized successfully with Tone.js');
+      console.log('AudioEngine: Initialized successfully with Tone.js (Melody, Chords, Bass, Drums)');
     } catch (error) {
       console.error('AudioEngine: Initialization failed', error);
       throw error;
@@ -84,8 +102,8 @@ class AudioEngine {
       case 0: // Melody
         this.melodySynth?.play(pitch, velocity);
         break;
-      case 1: // Chords (currently using melody synth)
-        this.melodySynth?.play(pitch, velocity);
+      case 1: // Chords (using dedicated ChordsSynth with Rhodes etc.)
+        this.chordsSynth?.play(pitch, velocity);
         break;
       case 2: // Bass
         this.bassSynth?.play(pitch, velocity);
@@ -110,7 +128,7 @@ class AudioEngine {
         this.melodySynth?.stop(pitch);
         break;
       case 1: // Chords
-        this.melodySynth?.stop(pitch);
+        this.chordsSynth?.stop(pitch);
         break;
       case 2: // Bass
         this.bassSynth?.stop(pitch);
@@ -172,27 +190,54 @@ class AudioEngine {
   }
 
   /**
-   * Set track volume
+   * Set the chords track preset
+   * @param preset - Preset index (0-5: Pad, Piano, RhodesEP, Wurlitzer, Pluck, Organ)
+   */
+  setChordPreset(preset: number): void {
+    if (!this.isInitialized) {
+      return;
+    }
+
+    const presetEnum = preset as ChordPreset;
+    if (presetEnum >= ChordPreset.Pad && presetEnum <= ChordPreset.Organ) {
+      this.chordsSynth?.setPreset(presetEnum);
+    } else {
+      console.warn(`AudioEngine: Invalid chord preset ${preset}`);
+    }
+  }
+
+  /**
+   * Get the current chord preset
+   */
+  getChordPreset(): ChordPreset | null {
+    return this.chordsSynth?.getPreset() ?? null;
+  }
+
+  /**
+   * Set track volume (iOS-matching: 0.0-1.5 range = 0%-150%)
    * @param track - Track number (0=melody, 1=chords, 2=bass, 3=drums)
-   * @param volume - Volume multiplier (0.0-1.5)
+   * @param volume - Volume multiplier (0.0-1.5, linear scaling like iOS)
    */
   setTrackVolume(track: number, volume: number): void {
     if (!this.isInitialized) {
       return;
     }
 
+    // Clamp to iOS range (0.0-1.5)
+    const clampedVolume = Math.max(0.0, Math.min(1.5, volume));
+
     switch (track) {
       case 0: // Melody
-        this.melodySynth?.setVolume(volume);
+        this.melodySynth?.setVolume(clampedVolume);
         break;
       case 1: // Chords
-        // Using same synth as melody for now
+        this.chordsSynth?.setVolume(clampedVolume);
         break;
       case 2: // Bass
-        this.bassSynth?.setVolume(volume);
+        this.bassSynth?.setVolume(clampedVolume);
         break;
       case 3: // Drums
-        this.drumSynth?.setVolume(volume);
+        this.drumSynth?.setVolume(clampedVolume);
         break;
       default:
         console.warn(`AudioEngine: Invalid track ${track}`);
@@ -213,7 +258,7 @@ class AudioEngine {
         this.melodySynth?.stopAll();
         break;
       case 1: // Chords
-        this.melodySynth?.stopAll();
+        this.chordsSynth?.stopAll();
         break;
       case 2: // Bass
         this.bassSynth?.stopAll();
@@ -250,12 +295,14 @@ class AudioEngine {
     }
 
     this.melodySynth?.dispose();
+    this.chordsSynth?.dispose();
     this.bassSynth?.dispose();
     this.drumSynth?.dispose();
     this.masterGain?.dispose();
     this.limiter?.dispose();
 
     this.melodySynth = null;
+    this.chordsSynth = null;
     this.bassSynth = null;
     this.drumSynth = null;
     this.masterGain = null;
@@ -270,4 +317,7 @@ class AudioEngine {
 export const audioEngine = new AudioEngine();
 
 // Export enums for external use
-export { MelodyPreset, BassPreset, DrumType };
+export { MelodyPreset, BassPreset, ChordPreset, DrumType };
+
+// Export preset name maps for UI
+export { CHORD_PRESET_NAMES, CHORD_PRESET_SHORT_NAMES } from './synths/chordsSynth';

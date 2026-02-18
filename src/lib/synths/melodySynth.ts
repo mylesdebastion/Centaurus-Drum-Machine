@@ -164,7 +164,13 @@ export class MelodySynth {
   }
 
   setPreset(preset: MelodyPreset): void {
+    // Stop all notes before switching preset to avoid stuck notes (iOS parity)
+    this.stopAll();
     this.currentPreset = preset;
+  }
+
+  getPreset(): MelodyPreset {
+    return this.currentPreset;
   }
 
   setVolume(volume: number): void {
